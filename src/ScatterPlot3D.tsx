@@ -98,7 +98,7 @@ export default function ScatterPlot3D({ points, labels, highlightIndex, onPointC
     // Highlight mesh (single point)
     const hlGeo = new THREE.BufferGeometry()
     hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
-    const hlMat = new THREE.PointsMaterial({ size: 0.10, sizeAttenuation: true, color: 0xffffff })
+    const hlMat = new THREE.PointsMaterial({ size: 0.12, sizeAttenuation: true, color: 0xff2222 })
     const highlightMesh = new THREE.Points(hlGeo, hlMat)
     highlightMesh.visible = false
     scene.add(highlightMesh)
