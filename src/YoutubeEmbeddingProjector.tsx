@@ -93,21 +93,6 @@ export default function YoutubeEmbeddingProjector() {
   return (
     <div className="youtube-viewer-wrapper">
       <div className="youtube-bar">
-        {isProd && (
-          <p className="youtube-notice">
-            {currentVideoId ? (
-              <>
-                <a href={transcriptToolUrl} target="_blank" rel="noopener">Get transcript on youtube-transcript.io ↗</a>
-                {' '}— then paste it into the text area below.
-              </>
-            ) : (
-              <>Paste a YouTube URL above, then grab the transcript from{' '}
-                <a href={transcriptToolUrl} target="_blank" rel="noopener">youtube-transcript.io ↗</a>
-                {' '}and paste it below.
-              </>
-            )}
-          </p>
-        )}
         <div className="youtube-row">
           <input
             type="url"
@@ -127,6 +112,14 @@ export default function YoutubeEmbeddingProjector() {
           )}
         </div>
         {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
+        {isProd && (
+          <p className="youtube-notice">
+            {currentVideoId
+              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Get the transcript for this video ↗</a> then paste it into the text area below.</>
+              : <>Paste a YouTube URL above to get started.</>
+            }
+          </p>
+        )}
       </div>
 
       <TranscriptViewer
