@@ -16,10 +16,10 @@ function extractVideoId(url: string): string | null {
 const isProd = import.meta.env.PROD
 
 export default function YoutubeTranscriptViewer() {
-  const [urlInput, setUrlInput] = useState('')
-  const [loadedText, setLoadedText] = useState<string | null>(null)
-  const [loadedDuration, setLoadedDuration] = useState<string | null>(null)
-  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(null)
+  const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
+  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
+  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
+  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() => localStorage.getItem('yt-video-id'))
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -39,9 +39,13 @@ export default function YoutubeTranscriptViewer() {
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
       const text = data.segments.map((s: { text: string }) => s.text).join(' ')
+      const duration = String(Math.round(data.totalDuration))
       setLoadedText(text)
-      setLoadedDuration(String(Math.round(data.totalDuration)))
+      setLoadedDuration(duration)
       setLoadedVideoId(videoId)
+      localStorage.setItem('yt-transcript', text)
+      localStorage.setItem('yt-duration', duration)
+      localStorage.setItem('yt-video-id', videoId)
       setStatus('idle')
     } catch (e) {
       setStatus('error')
@@ -63,7 +67,7 @@ export default function YoutubeTranscriptViewer() {
             type="url"
             className="youtube-url-input"
             value={urlInput}
-            onChange={e => setUrlInput(e.target.value)}
+            onChange={e => { setUrlInput(e.target.value); localStorage.setItem('yt-url', e.target.value) }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
             disabled={isProd}
