@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getEmbeddings } from './embedSegments'
+import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { runUmap } from './runUmap'
 import ScatterPlot3D from './ScatterPlot3D'
 import './SegmentProjectorModal.css'
@@ -20,6 +20,9 @@ interface Props {
 }
 
 export default function SegmentProjectorModal({ segments, onClose }: Props) {
+  const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(
+    EMBEDDING_MODELS.find(m => m.default)!.id
+  )
   const [phase, setPhase] = useState<Phase>({ status: 'idle' })
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [dotPosition, setDotPosition] = useState<number | null>(null) // float for smooth interpolation
@@ -93,7 +96,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
         } else {
           setPhase({ status: 'embedding', loaded, total })
         }
-      })
+      }, selectedModel)
       setPhase({ status: 'umap-running' })
       await new Promise(resolve => setTimeout(resolve, 0))
       const points = runUmap(vectors)
@@ -147,7 +150,18 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
             {!isDone && (
               <div className="projector-controls">
                 {phase.status === 'idle' && (
-                  <button onClick={handleEmbed} className="embed-btn">Embed All</button>
+                  <div className="embed-controls">
+                    <select
+                      className="model-select"
+                      value={selectedModel}
+                      onChange={e => setSelectedModel(e.target.value as EmbeddingModelId)}
+                    >
+                      {EMBEDDING_MODELS.map(m => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                    <button onClick={handleEmbed} className="embed-btn">Embed All</button>
+                  </div>
                 )}
                 {phase.status === 'model-loading' && (
                   <div className="progress-wrap">
