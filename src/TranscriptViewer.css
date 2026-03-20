@@ -91,6 +91,31 @@
   opacity: 0.85;
 }
 
+.speed-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.speed-btn {
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.speed-btn:first-child { border-radius: 4px 0 0 4px; }
+.speed-btn:last-child  { border-radius: 0 4px 4px 0; }
+.speed-btn:not(:first-child):not(:last-child) { border-radius: 0; }
+
+.speed-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .word-count {
   font-size: 13px;
   color: var(--text);

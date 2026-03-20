@@ -16,6 +16,7 @@ export default function TranscriptViewer() {
   const [windowSize, setWindowSize] = useState(20)
   const [durationInput, setDurationInput] = useState(() => localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
+  const [speed, setSpeed] = useState(1)
   const [position, setPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
 
@@ -43,14 +44,14 @@ export default function TranscriptViewer() {
       startTimeRef.current = timestamp
     }
     const elapsed = (timestamp - startTimeRef.current) / 1000
-    const newPosition = Math.min(1, startPositionRef.current + elapsed / duration)
+    const newPosition = Math.min(1, startPositionRef.current + (elapsed * speed) / duration)
     setPosition(newPosition)
     if (newPosition >= 1) {
       stopPlayback()
       return
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [duration, stopPlayback])
+  }, [duration, speed, stopPlayback])
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -140,6 +141,15 @@ export default function TranscriptViewer() {
           <button className="play-btn" onClick={handlePlayPause}>
             {isPlaying ? '⏸ Pause' : position >= 1 ? '↺ Replay' : '▶ Play'}
           </button>
+          <div className="speed-btns">
+            {[1, 2, 5, 10].map(s => (
+              <button
+                key={s}
+                className={`speed-btn${speed === s ? ' active' : ''}`}
+                onClick={() => setSpeed(s)}
+              >{s}x</button>
+            ))}
+          </div>
           <span className="word-count">{words.length} words</span>
         </div>
         <div
