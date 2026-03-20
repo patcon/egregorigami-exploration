@@ -116,7 +116,6 @@ export default function YoutubeEmbeddingProjector() {
             onChange={e => { setUrlInput(e.target.value); localStorage.setItem('yt-url', e.target.value) }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
-            disabled={isProd}
           />
           <button onClick={handleLoad} disabled={isProd || status === 'loading'}>
             {status === 'loading' ? 'Loading…' : 'Load'}
