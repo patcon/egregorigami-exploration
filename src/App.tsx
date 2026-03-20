@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
+import YoutubeTranscriptViewer from './YoutubeTranscriptViewer'
 import './App.css'
 
 function useHash() {
@@ -27,6 +28,12 @@ function IndexPage() {
               <span>Watch an embedding context window slide through a transcript in real time.</span>
             </a>
           </li>
+          <li>
+            <a href="#v2">
+              <strong>YouTube Transcript Visualizer</strong>
+              <span>Paste a YouTube URL and watch the embedding window slide through the transcript.</span>
+            </a>
+          </li>
         </ul>
       </section>
       <div className="ticks"></div>
@@ -38,6 +45,7 @@ function IndexPage() {
 function App() {
   const hash = useHash()
   if (hash === '#v1') return <TranscriptViewer />
+  if (hash === '#v2') return <YoutubeTranscriptViewer />
   return <IndexPage />
 }
 

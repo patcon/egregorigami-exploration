@@ -11,10 +11,15 @@ function parseTimecode(s: string): number {
   return parts[0] * 3600 + parts[1] * 60 + parts[2]
 }
 
-export default function TranscriptViewer() {
-  const [text, setText] = useState(() => localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
+interface TranscriptViewerProps {
+  initialText?: string
+  initialDuration?: string
+}
+
+export default function TranscriptViewer({ initialText, initialDuration }: TranscriptViewerProps = {}) {
+  const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowSize, setWindowSize] = useState(20)
-  const [durationInput, setDurationInput] = useState(() => localStorage.getItem('transcript-duration') ?? '30')
+  const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
   const [speed, setSpeed] = useState(1)
   const [position, setPosition] = useState(0)
