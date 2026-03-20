@@ -140,6 +140,14 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           className="paste-area"
           value={text}
           onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
+          onPaste={e => {
+            e.preventDefault()
+            const normalized = e.clipboardData.getData('text').replace(/\s+/g, ' ').trim()
+            setText(normalized)
+            localStorage.setItem('transcript-text', normalized)
+            setPosition(0)
+            stopPlayback()
+          }}
           placeholder="Paste transcript text here…"
           rows={3}
         />

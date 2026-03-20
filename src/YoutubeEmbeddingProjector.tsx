@@ -79,6 +79,11 @@ export default function YoutubeEmbeddingProjector() {
     }
   }
 
+  const currentVideoId = extractVideoId(urlInput)
+  const transcriptToolUrl = currentVideoId
+    ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
+    : 'https://www.youtube-transcript.io'
+
   const handleOpenProjector = () => {
     const { windowSize, overlapPct, text } = windowParamsRef.current
     const chunks = computeChunks(text, windowSize, overlapPct)
@@ -90,8 +95,17 @@ export default function YoutubeEmbeddingProjector() {
       <div className="youtube-bar">
         {isProd && (
           <p className="youtube-notice">
-            ⚠ Transcript loading requires a local dev server and is not available on this hosted site.{' '}
-            <a href="https://github.com/patcon/egregorigami-exploration" target="_blank" rel="noopener">Run it locally</a> to use this feature.
+            {currentVideoId ? (
+              <>
+                <a href={transcriptToolUrl} target="_blank" rel="noopener">Get transcript on youtube-transcript.io ↗</a>
+                {' '}— then paste it into the text area below.
+              </>
+            ) : (
+              <>Paste a YouTube URL above, then grab the transcript from{' '}
+                <a href={transcriptToolUrl} target="_blank" rel="noopener">youtube-transcript.io ↗</a>
+                {' '}and paste it below.
+              </>
+            )}
           </p>
         )}
         <div className="youtube-row">
