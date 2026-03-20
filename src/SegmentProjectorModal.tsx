@@ -22,11 +22,12 @@ interface Props {
 export default function SegmentProjectorModal({ segments, onClose }: Props) {
   const [phase, setPhase] = useState<Phase>({ status: 'idle' })
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const [dotPosition, setDotPosition] = useState<number | null>(null) // float for smooth interpolation
   const [isPlaying, setIsPlaying] = useState(false)
   const listRef = useRef<HTMLUListElement>(null)
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
-  const startIndexRef = useRef(0)
+  const tickStartPosRef = useRef(0)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -53,10 +54,13 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   const tick = useCallback((timestamp: number) => {
     if (startTimeRef.current === null) startTimeRef.current = timestamp
     const elapsed = (timestamp - startTimeRef.current) / 1000
-    const progress = Math.min(1, elapsed / PLAYBACK_DURATION)
-    const idx = Math.min(segments.length - 1, Math.floor(progress * segments.length) + startIndexRef.current)
-    setHighlightIndex(idx)
-    if (idx >= segments.length - 1) {
+    const startPos = tickStartPosRef.current
+    const endPos = segments.length - 1
+    const speed = (endPos - startPos) / PLAYBACK_DURATION
+    const floatPos = Math.min(endPos, startPos + elapsed * speed)
+    setDotPosition(floatPos)
+    setHighlightIndex(Math.round(floatPos))
+    if (floatPos >= endPos) {
       stopPlayback()
       return
     }
@@ -67,15 +71,15 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
     if (isPlaying) {
       stopPlayback()
     } else {
-      const currentIdx = highlightIndex ?? 0
-      const atEnd = currentIdx >= segments.length - 1
-      startIndexRef.current = atEnd ? 0 : currentIdx
-      if (atEnd) setHighlightIndex(0)
+      const currentPos = dotPosition ?? 0
+      const atEnd = currentPos >= segments.length - 1
+      tickStartPosRef.current = atEnd ? 0 : currentPos
+      if (atEnd) { setDotPosition(0); setHighlightIndex(0) }
       startTimeRef.current = null
       setIsPlaying(true)
       rafRef.current = requestAnimationFrame(tick)
     }
-  }, [isPlaying, highlightIndex, segments.length, stopPlayback, tick])
+  }, [isPlaying, dotPosition, segments.length, stopPlayback, tick])
 
   useEffect(() => () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }, [])
 
@@ -99,13 +103,14 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   }
 
   const isDone = phase.status === 'done'
-  const scrubPosition = highlightIndex !== null ? highlightIndex / (segments.length - 1) : 0
+  const scrubPosition = dotPosition !== null ? dotPosition / (segments.length - 1) : 0
 
   const handleScrub = (e: React.MouseEvent<HTMLDivElement>) => {
     stopPlayback()
     const rect = e.currentTarget.getBoundingClientRect()
-    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    setHighlightIndex(Math.round(pos * (segments.length - 1)))
+    const floatPos = Math.max(0, Math.min(segments.length - 1, (e.clientX - rect.left) / rect.width * (segments.length - 1)))
+    setDotPosition(floatPos)
+    setHighlightIndex(Math.round(floatPos))
   }
 
   const handleScrubMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -124,7 +129,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
         {isDone && (
           <div className="projector-player">
             <button className="player-btn" onClick={handlePlayPause}>
-              {isPlaying ? '⏸' : highlightIndex !== null && highlightIndex >= segments.length - 1 ? '↺' : '▶'}
+              {isPlaying ? '⏸' : dotPosition !== null && dotPosition >= segments.length - 1 ? '↺' : '▶'}
             </button>
             <div className="player-scrub" onClick={handleScrub} onMouseMove={handleScrubMove}>
               <div className="player-scrub-fill" style={{ width: `${scrubPosition * 100}%` }} />
@@ -169,7 +174,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                 <li
                   key={i}
                   className={`segment-item ${highlightIndex === i ? 'segment-item--active' : ''}`}
-                  onClick={() => { stopPlayback(); setHighlightIndex(i) }}
+                  onClick={() => { stopPlayback(); setDotPosition(i); setHighlightIndex(i) }}
                 >
                   <span className="segment-index">{i + 1}</span>
                   <span className="segment-text">{seg}</span>
@@ -183,8 +188,8 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
               <ScatterPlot3D
                 points={phase.points}
                 labels={segments}
-                highlightIndex={highlightIndex}
-                onPointClick={idx => { stopPlayback(); setHighlightIndex(idx) }}
+                highlightPosition={dotPosition}
+                onPointClick={idx => { stopPlayback(); setDotPosition(idx); setHighlightIndex(idx) }}
               />
             </div>
           )}

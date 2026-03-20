@@ -6,7 +6,7 @@ import './ScatterPlot3D.css'
 interface Props {
   points: [number, number, number][]
   labels: string[]
-  highlightIndex: number | null
+  highlightPosition: number | null  // float: 1.7 = 70% between node 1 and 2
   onPointClick: (index: number) => void
 }
 
@@ -27,7 +27,7 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-export default function ScatterPlot3D({ points, labels, highlightIndex, onPointClick }: Props) {
+export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -134,21 +134,28 @@ export default function ScatterPlot3D({ points, labels, highlightIndex, onPointC
     }
   }, [points])
 
-  // Highlight updates without scene rebuild
+  // Highlight updates without scene rebuild — lerp between adjacent nodes for smooth motion
   useEffect(() => {
     const s = sceneRef.current
     if (!s) return
     const normalized = normalizedRef.current
-    if (highlightIndex !== null && normalized[highlightIndex]) {
-      const p = normalized[highlightIndex]
+    if (highlightPosition !== null && normalized.length > 0) {
+      const a = Math.max(0, Math.floor(highlightPosition))
+      const b = Math.min(normalized.length - 1, Math.ceil(highlightPosition))
+      const t = highlightPosition - a
+      const pa = normalized[a]
+      const pb = normalized[b]
+      const x = pa[0] + (pb[0] - pa[0]) * t
+      const y = pa[1] + (pb[1] - pa[1]) * t
+      const z = pa[2] + (pb[2] - pa[2]) * t
       const posAttr = s.highlightMesh.geometry.getAttribute('position') as THREE.BufferAttribute
-      posAttr.setXYZ(0, p[0], p[1], p[2])
+      posAttr.setXYZ(0, x, y, z)
       posAttr.needsUpdate = true
       s.highlightMesh.visible = true
     } else {
       s.highlightMesh.visible = false
     }
-  }, [highlightIndex])
+  }, [highlightPosition])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current
