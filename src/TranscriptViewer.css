@@ -161,9 +161,17 @@
   display: inline;
 }
 
-.word.highlight {
+.word.in-window {
+  background: color-mix(in srgb, var(--accent-bg) 50%, var(--accent-border) 50%);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.word.cursor {
   background: var(--accent);
   color: #fff;
   border-radius: 2px;
   padding: 1px 0;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }

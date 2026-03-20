@@ -26,8 +26,8 @@ export default function TranscriptViewer() {
   const textAreaRef = useRef<HTMLDivElement>(null)
 
   const words = text.trim() ? text.trim().split(/\s+/) : []
-  const maxStart = Math.max(0, words.length - windowSize)
-  const currentWordIndex = Math.floor(position * maxStart)
+  const cursorIndex = Math.min(words.length - 1, Math.floor(position * (words.length - 1)))
+  const windowStart = Math.max(0, cursorIndex - windowSize + 1)
 
   const stopPlayback = useCallback(() => {
     if (rafRef.current !== null) {
@@ -81,14 +81,14 @@ export default function TranscriptViewer() {
     }
   }, [])
 
-  // Auto-scroll highlighted word into view
+  // Auto-scroll cursor word into view
   useEffect(() => {
     if (words.length === 0) return
-    const el = wordRefsMap.current.get(currentWordIndex)
+    const el = wordRefsMap.current.get(cursorIndex)
     if (el && textAreaRef.current) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
-  }, [currentWordIndex, words.length])
+  }, [cursorIndex, words.length])
 
   const handleScrubClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -158,7 +158,9 @@ export default function TranscriptViewer() {
         ) : (
           <p className="word-list">
             {words.map((word, i) => {
-              const highlighted = i >= currentWordIndex && i < currentWordIndex + windowSize
+              const inWindow = i >= windowStart && i < windowStart + windowSize
+              const isCursor = i === cursorIndex
+              const cls = ['word', inWindow ? 'in-window' : '', isCursor ? 'cursor' : ''].filter(Boolean).join(' ')
               return (
                 <span
                   key={i}
@@ -166,7 +168,7 @@ export default function TranscriptViewer() {
                     if (el) wordRefsMap.current.set(i, el)
                     else wordRefsMap.current.delete(i)
                   }}
-                  className={`word${highlighted ? ' highlight' : ''}`}
+                  className={cls}
                 >
                   {word}{' '}
                 </span>
