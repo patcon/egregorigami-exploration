@@ -20,6 +20,7 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
+  const [overlapInput, setOverlapInput] = useState('50')
   const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
   const [speed, setSpeed] = useState(1)
@@ -33,6 +34,7 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
   const textAreaRef = useRef<HTMLDivElement>(null)
 
   const words = text.trim() ? text.trim().split(/\s+/) : []
+  const overlapPct = Math.min(99, Math.max(0, parseFloat(overlapInput) || 0))
   const windowInputNum = parseInt(windowInput) || 0
   const windowSize = windowMode === 'words'
     ? Math.max(1, windowInputNum)
@@ -115,6 +117,15 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
     setPosition(newPos)
   }, [])
 
+  const handleStep = useCallback((dir: 1 | -1) => {
+    stopPlayback()
+    setPosition(prev => {
+      const stepWords = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
+      const stepFraction = stepWords / Math.max(1, words.length - 1)
+      return Math.min(1, Math.max(0, prev + dir * stepFraction))
+    })
+  }, [stopPlayback, windowSize, overlapPct, words.length])
+
   return (
     <div className="transcript-page">
       <div className="controls-panel">
@@ -159,9 +170,26 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
               style={{ width: 72 }}
             />
           </label>
-          <button className="play-btn" onClick={handlePlayPause}>
-            {isPlaying ? '⏸ Pause' : position >= 1 ? '↺ Replay' : '▶ Play'}
-          </button>
+          <label>
+            Overlap
+            <input
+              type="number"
+              min={0}
+              max={99}
+              className={parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? 'input-error' : ''}
+              value={overlapInput}
+              onChange={e => setOverlapInput(e.target.value)}
+              style={{ width: 52 }}
+            />
+            %
+          </label>
+          <div className="playback-btns">
+            <button className="step-btn" onClick={() => handleStep(-1)} title="Step back">&#9664;</button>
+            <button className="play-btn" onClick={handlePlayPause}>
+              {isPlaying ? '⏸ Pause' : position >= 1 ? '↺ Replay' : '▶ Play'}
+            </button>
+            <button className="step-btn" onClick={() => handleStep(1)} title="Step forward">&#9654;</button>
+          </div>
           <div className="speed-btns">
             {[1, 2, 5, 10].map(s => (
               <button

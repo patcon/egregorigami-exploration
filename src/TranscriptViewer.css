@@ -91,6 +91,12 @@
   outline-color: #e53e3e;
 }
 
+.playback-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .play-btn {
   padding: 6px 16px;
   background: var(--accent);
@@ -105,6 +111,21 @@
 
 .play-btn:hover {
   opacity: 0.85;
+}
+
+.step-btn {
+  padding: 6px 10px;
+  background: var(--code-bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.step-btn:hover {
+  opacity: 0.75;
 }
 
 .speed-btns {
