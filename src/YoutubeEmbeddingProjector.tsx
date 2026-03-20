@@ -45,8 +45,11 @@ export default function YoutubeEmbeddingProjector() {
     text: loadedText ?? '',
   })
 
+  const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(loadedText?.trim()))
+
   const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
     windowParamsRef.current = params
+    setHasTranscriptText(!!params.text.trim())
   }, [])
 
   const handleLoad = async () => {
@@ -105,7 +108,7 @@ export default function YoutubeEmbeddingProjector() {
           <button onClick={handleLoad} disabled={isProd || status === 'loading'}>
             {status === 'loading' ? 'Loading…' : 'Load'}
           </button>
-          {loadedText && (
+          {hasTranscriptText && (
             <button className="open-projector-btn" onClick={handleOpenProjector}>
               Open Projector
             </button>
