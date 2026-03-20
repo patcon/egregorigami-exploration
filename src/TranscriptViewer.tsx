@@ -18,7 +18,8 @@ interface TranscriptViewerProps {
 
 export default function TranscriptViewer({ initialText, initialDuration }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
-  const [windowSize, setWindowSize] = useState(20)
+  const [windowInput, setWindowInput] = useState('20')
+  const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
   const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
   const [speed, setSpeed] = useState(1)
@@ -32,6 +33,10 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
   const textAreaRef = useRef<HTMLDivElement>(null)
 
   const words = text.trim() ? text.trim().split(/\s+/) : []
+  const windowInputNum = parseInt(windowInput) || 0
+  const windowSize = windowMode === 'words'
+    ? Math.max(1, windowInputNum)
+    : (words.length > 0 && windowInputNum > 0 ? Math.max(1, Math.round(words.length / windowInputNum)) : 1)
   const cursorIndex = Math.min(words.length - 1, Math.floor(position * (words.length - 1)))
   const windowStart = Math.max(0, cursorIndex - windowSize + 1)
 
@@ -121,17 +126,28 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
           rows={3}
         />
         <div className="controls-row">
-          <label>
+          <div className="controls-item">
             Window
             <input
               type="number"
               min={1}
-              max={words.length || 1}
-              value={windowSize}
-              onChange={e => setWindowSize(Math.max(1, parseInt(e.target.value) || 1))}
+              className={windowInputNum <= 0 ? 'input-error' : ''}
+              value={windowInput}
+              onChange={e => setWindowInput(e.target.value)}
+              style={{ width: 64 }}
             />
-            words
-          </label>
+            <label className="radio-label">
+              <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => setWindowMode('words')} />
+              words
+            </label>
+            <label className="radio-label">
+              <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => setWindowMode('segments')} />
+              segments
+            </label>
+            {windowMode === 'segments' && windowInputNum > 0 && words.length > 0 && (
+              <span className="window-derived">({windowSize} words)</span>
+            )}
+          </div>
           <label>
             Duration
             <input
