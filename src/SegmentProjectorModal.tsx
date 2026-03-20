@@ -4,12 +4,6 @@ import { runUmap } from './runUmap'
 import ScatterPlot3D from './ScatterPlot3D'
 import './SegmentProjectorModal.css'
 
-interface Segment {
-  text: string
-  offset: number
-  duration: number
-}
-
 type Phase =
   | { status: 'idle' }
   | { status: 'model-loading'; progress: number }
@@ -19,11 +13,11 @@ type Phase =
   | { status: 'error'; message: string }
 
 interface Props {
+  segments: string[]
   onClose: () => void
 }
 
-export default function SegmentProjectorModal({ onClose }: Props) {
-  const segments: Segment[] = JSON.parse(localStorage.getItem('yt-segments') ?? '[]')
+export default function SegmentProjectorModal({ segments, onClose }: Props) {
   const [phase, setPhase] = useState<Phase>({ status: 'idle' })
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -44,7 +38,7 @@ export default function SegmentProjectorModal({ onClose }: Props) {
   const handleEmbed = async () => {
     setPhase({ status: 'model-loading', progress: 0 })
     try {
-      const texts = segments.map(s => s.text)
+      const texts = segments
       const vectors = await getEmbeddings(texts, (loaded, total, phaseLabel) => {
         if (phaseLabel === 'model-loading') {
           setPhase({ status: 'model-loading', progress: loaded })
@@ -108,7 +102,7 @@ export default function SegmentProjectorModal({ onClose }: Props) {
                   onClick={() => setHighlightIndex(i)}
                 >
                   <span className="segment-index">{i + 1}</span>
-                  <span className="segment-text">{seg.text}</span>
+                  <span className="segment-text">{seg}</span>
                 </li>
               ))}
             </ul>
@@ -118,7 +112,7 @@ export default function SegmentProjectorModal({ onClose }: Props) {
             <div className="projector-canvas-col">
               <ScatterPlot3D
                 points={phase.points}
-                labels={segments.map(s => s.text)}
+                labels={segments}
                 highlightIndex={highlightIndex}
                 onPointClick={idx => setHighlightIndex(idx)}
               />

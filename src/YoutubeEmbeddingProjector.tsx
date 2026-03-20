@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import TranscriptViewer from './TranscriptViewer'
 import SegmentProjectorModal from './SegmentProjectorModal'
 import './YoutubeEmbeddingProjector.css'
 
@@ -13,18 +14,40 @@ function extractVideoId(url: string): string | null {
   }
 }
 
+function computeChunks(text: string, windowSize: number, overlapPct: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
+  const chunks: string[] = []
+  for (let cursor = 0; cursor < words.length; cursor += step) {
+    const windowStart = Math.max(0, cursor - windowSize + 1)
+    chunks.push(words.slice(windowStart, windowStart + windowSize).join(' '))
+  }
+  return chunks
+}
+
 const isProd = import.meta.env.PROD
 
 export default function YoutubeEmbeddingProjector() {
   const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
-  const [segmentCount, setSegmentCount] = useState<number | null>(() => {
-    const stored = localStorage.getItem('yt-segments')
-    if (!stored) return null
-    try { return JSON.parse(stored).length } catch { return null }
-  })
+  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
+  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
+  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() => localStorage.getItem('yt-video-id'))
+  const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalSegments, setModalSegments] = useState<string[] | null>(null)
+
+  // Track current window params from TranscriptViewer without re-renders
+  const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
+    windowSize: 20,
+    overlapPct: 50,
+    text: loadedText ?? '',
+  })
+
+  const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
+    windowParamsRef.current = params
+  }, [])
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
@@ -39,9 +62,16 @@ export default function YoutubeEmbeddingProjector() {
       const res = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+      const text = data.segments.map((s: { text: string }) => s.text).join(' ')
+      const duration = String(Math.round(data.totalDuration))
+      setLoadedText(text)
+      setLoadedDuration(duration)
+      setLoadedVideoId(videoId)
+      setLoadCount(c => c + 1)
       localStorage.setItem('yt-url', urlInput)
-      localStorage.setItem('yt-segments', JSON.stringify(data.segments))
-      setSegmentCount(data.segments.length)
+      localStorage.setItem('yt-transcript', text)
+      localStorage.setItem('yt-duration', duration)
+      localStorage.setItem('yt-video-id', videoId)
       setStatus('idle')
     } catch (e) {
       setStatus('error')
@@ -49,10 +79,15 @@ export default function YoutubeEmbeddingProjector() {
     }
   }
 
+  const handleOpenProjector = () => {
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    const chunks = computeChunks(text, windowSize, overlapPct)
+    setModalSegments(chunks)
+  }
+
   return (
-    <div className="projector-page">
-      <div className="projector-topbar">
-        <h1 className="projector-title">Embedding Projector</h1>
+    <div className="youtube-viewer-wrapper">
+      <div className="youtube-bar">
         {isProd && (
           <p className="youtube-notice">
             ⚠ Transcript loading requires a local dev server and is not available on this hosted site.{' '}
@@ -72,19 +107,28 @@ export default function YoutubeEmbeddingProjector() {
           <button onClick={handleLoad} disabled={isProd || status === 'loading'}>
             {status === 'loading' ? 'Loading…' : 'Load'}
           </button>
+          {loadedText && (
+            <button className="open-projector-btn" onClick={handleOpenProjector}>
+              Open Projector
+            </button>
+          )}
         </div>
         {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
-        {segmentCount !== null && (
-          <div className="projector-loaded-row">
-            <span className="projector-segment-count">{segmentCount} segments loaded</span>
-            <button className="open-projector-btn" onClick={() => setModalOpen(true)}>
-              Open Segment Projector
-            </button>
-          </div>
-        )}
       </div>
 
-      {modalOpen && <SegmentProjectorModal onClose={() => setModalOpen(false)} />}
+      <TranscriptViewer
+        key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
+        initialText={loadedText ?? undefined}
+        initialDuration={loadedDuration ?? undefined}
+        onWindowChange={handleWindowChange}
+      />
+
+      {modalSegments && (
+        <SegmentProjectorModal
+          segments={modalSegments}
+          onClose={() => setModalSegments(null)}
+        />
+      )}
     </div>
   )
 }

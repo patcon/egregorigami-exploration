@@ -1,93 +1,13 @@
-.projector-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.projector-topbar {
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-  z-index: 11;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.projector-title {
-  font-size: 18px;
-  margin: 0;
-  color: var(--text-h);
-}
-
-.youtube-row {
-  display: flex;
-  gap: 8px;
-}
-
-.youtube-url-input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--code-bg);
-  color: var(--text-h);
-  font-size: 14px;
-}
-
-.youtube-url-input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.youtube-url-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.youtube-error {
-  font-size: 13px;
-  color: #e53e3e;
-  margin: 0;
-}
-
-.youtube-notice {
-  font-size: 13px;
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  border-radius: 6px;
-  padding: 8px 12px;
-  margin: 0;
-}
-
-.youtube-notice a {
-  color: var(--accent);
-}
-
-.projector-loaded-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.projector-segment-count {
-  font-size: 13px;
-  color: var(--text);
-}
-
 .open-projector-btn {
   padding: 6px 14px;
   border-radius: 6px;
   border: none;
   background: var(--accent);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .open-projector-btn:hover {

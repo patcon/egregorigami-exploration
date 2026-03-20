@@ -14,9 +14,10 @@ function parseTimecode(s: string): number {
 interface TranscriptViewerProps {
   initialText?: string
   initialDuration?: string
+  onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -125,6 +126,12 @@ export default function TranscriptViewer({ initialText, initialDuration }: Trans
       return Math.min(1, Math.max(0, prev + dir * stepFraction))
     })
   }, [stopPlayback, windowSize, overlapPct, words.length])
+
+  useEffect(() => {
+    onWindowChange?.({ windowSize, overlapPct, text })
+  // onWindowChange intentionally omitted — callers should stabilize with useCallback/useRef
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowSize, overlapPct, text])
 
   return (
     <div className="transcript-page">
