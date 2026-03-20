@@ -85,6 +85,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
 
   const handleEmbed = async () => {
     setPhase({ status: 'model-loading', progress: 0 })
+    await new Promise(resolve => setTimeout(resolve, 0)) // flush render before heavy work
     try {
       const vectors = await getEmbeddings(segments, (loaded, total, phaseLabel) => {
         if (phaseLabel === 'model-loading') {
@@ -150,18 +151,36 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                 )}
                 {phase.status === 'model-loading' && (
                   <div className="progress-wrap">
-                    <span>Loading model… {phase.progress}%</span>
-                    <progress value={phase.progress} max={100} />
+                    <div className="progress-label">
+                      <div className="spinner" />
+                      <span>{phase.progress > 0 ? `Downloading model… ${phase.progress}%` : 'Initializing model…'}</span>
+                    </div>
+                    <div className={`progress-bar ${phase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
+                      <div className="progress-bar-fill" style={{ width: `${phase.progress}%` }} />
+                    </div>
                   </div>
                 )}
                 {phase.status === 'embedding' && (
                   <div className="progress-wrap">
-                    <span>Embedding {phase.loaded + 1} / {phase.total}</span>
-                    <progress value={phase.loaded} max={phase.total} />
+                    <div className="progress-label">
+                      <div className="spinner" />
+                      <span>Embedding {phase.loaded + 1} / {phase.total}</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div className="progress-bar-fill" style={{ width: `${(phase.loaded / phase.total) * 100}%` }} />
+                    </div>
                   </div>
                 )}
                 {phase.status === 'umap-running' && (
-                  <div className="progress-wrap"><span>Running UMAP…</span></div>
+                  <div className="progress-wrap">
+                    <div className="progress-label">
+                      <div className="spinner" />
+                      <span>Reducing to 3D…</span>
+                    </div>
+                    <div className="progress-bar progress-bar--indeterminate">
+                      <div className="progress-bar-fill" />
+                    </div>
+                  </div>
                 )}
                 {phase.status === 'error' && (
                   <p className="projector-error">{phase.message}</p>
