@@ -86,6 +86,10 @@
   border-radius: 3px;
   position: relative;
   cursor: pointer;
+  padding-block: 8px;
+  margin-block: -8px;
+  user-select: none;
+  touch-action: none;
 }
 
 .player-scrub-fill {

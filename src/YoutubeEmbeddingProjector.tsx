@@ -19,7 +19,8 @@ function computeChunks(text: string, windowSize: number, overlapPct: number): st
   if (words.length === 0) return []
   const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
   const chunks: string[] = []
-  for (let cursor = 0; cursor < words.length; cursor += step) {
+  // Start at windowSize-1 so the first chunk is a full window (no clamping duplicates)
+  for (let cursor = Math.min(windowSize - 1, words.length - 1); cursor < words.length; cursor += step) {
     const windowStart = Math.max(0, cursor - windowSize + 1)
     chunks.push(words.slice(windowStart, windowStart + windowSize).join(' '))
   }

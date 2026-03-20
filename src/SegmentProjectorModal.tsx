@@ -20,9 +20,10 @@ interface Props {
 }
 
 export default function SegmentProjectorModal({ segments, onClose }: Props) {
-  const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(
-    EMBEDDING_MODELS.find(m => m.default)!.id
-  )
+  const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(() => {
+    const stored = localStorage.getItem('projector-model')
+    return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
+  })
   const [phase, setPhase] = useState<Phase>({ status: 'idle' })
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [dotPosition, setDotPosition] = useState<number | null>(null) // float for smooth interpolation
@@ -109,17 +110,26 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   const isDone = phase.status === 'done'
   const scrubPosition = dotPosition !== null ? dotPosition / (segments.length - 1) : 0
 
-  const handleScrub = (e: React.MouseEvent<HTMLDivElement>) => {
-    stopPlayback()
-    const rect = e.currentTarget.getBoundingClientRect()
-    const floatPos = Math.max(0, Math.min(segments.length - 1, (e.clientX - rect.left) / rect.width * (segments.length - 1)))
+  const scrubRectRef = useRef<DOMRect | null>(null)
+
+  const applyScrubPosition = (clientX: number) => {
+    if (!scrubRectRef.current) return
+    const rect = scrubRectRef.current
+    const floatPos = Math.max(0, Math.min(segments.length - 1, (clientX - rect.left) / rect.width * (segments.length - 1)))
     setDotPosition(floatPos)
     setHighlightIndex(Math.round(floatPos))
   }
 
-  const handleScrubMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.buttons !== 1) return
-    handleScrub(e)
+  const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    scrubRectRef.current = e.currentTarget.getBoundingClientRect()
+    stopPlayback()
+    applyScrubPosition(e.clientX)
+  }
+
+  const handleScrubPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    applyScrubPosition(e.clientX)
   }
 
   return (
@@ -135,7 +145,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
             <button className="player-btn" onClick={handlePlayPause}>
               {isPlaying ? '⏸' : dotPosition !== null && dotPosition >= segments.length - 1 ? '↺' : '▶'}
             </button>
-            <div className="player-scrub" onClick={handleScrub} onMouseMove={handleScrubMove}>
+            <div className="player-scrub" onPointerDown={handleScrubPointerDown} onPointerMove={handleScrubPointerMove}>
               <div className="player-scrub-fill" style={{ width: `${scrubPosition * 100}%` }} />
               <div className="player-scrub-thumb" style={{ left: `${scrubPosition * 100}%` }} />
             </div>
@@ -154,7 +164,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                     <select
                       className="model-select"
                       value={selectedModel}
-                      onChange={e => setSelectedModel(e.target.value as EmbeddingModelId)}
+                      onChange={e => { const v = e.target.value as EmbeddingModelId; setSelectedModel(v); localStorage.setItem('projector-model', v) }}
                     >
                       {EMBEDDING_MODELS.map(m => (
                         <option key={m.id} value={m.id}>{m.label}</option>
