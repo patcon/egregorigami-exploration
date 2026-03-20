@@ -20,6 +20,7 @@ export default function YoutubeTranscriptViewer() {
   const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
   const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
   const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() => localStorage.getItem('yt-video-id'))
+  const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -43,6 +44,7 @@ export default function YoutubeTranscriptViewer() {
       setLoadedText(text)
       setLoadedDuration(duration)
       setLoadedVideoId(videoId)
+      setLoadCount(c => c + 1)
       localStorage.setItem('yt-transcript', text)
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
@@ -82,7 +84,7 @@ export default function YoutubeTranscriptViewer() {
         {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
       </div>
       <TranscriptViewer
-        key={loadedVideoId ?? 'empty'}
+        key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
         initialText={loadedText ?? undefined}
         initialDuration={loadedDuration ?? undefined}
       />
