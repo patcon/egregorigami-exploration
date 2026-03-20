@@ -5,6 +5,7 @@ import { YoutubeTranscript } from 'youtube-transcript-plus'
 // https://vite.dev/config/
 export default defineConfig({
   base: '/egregorigami-exploration/',
+  optimizeDeps: { exclude: ['@huggingface/transformers'] },
   plugins: [
     react(),
     {

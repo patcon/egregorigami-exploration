@@ -11,8 +11,12 @@
     "extract-transcript": "node scripts/extract-transcript.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@types/three": "^0.183.1",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "three": "^0.183.2",
+    "umap-js": "^1.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

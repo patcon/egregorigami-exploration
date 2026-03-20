@@ -1,0 +1,185 @@
+import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import './ScatterPlot3D.css'
+
+interface Props {
+  points: [number, number, number][]
+  labels: string[]
+  highlightIndex: number | null
+  onPointClick: (index: number) => void
+}
+
+function normalize(points: [number, number, number][]): [number, number, number][] {
+  const mins = [Infinity, Infinity, Infinity]
+  const maxs = [-Infinity, -Infinity, -Infinity]
+  for (const p of points) {
+    for (let i = 0; i < 3; i++) {
+      if (p[i] < mins[i]) mins[i] = p[i]
+      if (p[i] > maxs[i]) maxs[i] = p[i]
+    }
+  }
+  return points.map(p =>
+    p.map((v, i) => {
+      const range = maxs[i] - mins[i]
+      return range === 0 ? 0 : ((v - mins[i]) / range) * 2 - 1
+    }) as [number, number, number]
+  )
+}
+
+export default function ScatterPlot3D({ points, labels, highlightIndex, onPointClick }: Props) {
+  const mountRef = useRef<HTMLDivElement>(null)
+  const sceneRef = useRef<{
+    renderer: THREE.WebGLRenderer
+    camera: THREE.PerspectiveCamera
+    controls: OrbitControls
+    scene: THREE.Scene
+    pointsMesh: THREE.Points
+    highlightMesh: THREE.Points
+    raycaster: THREE.Raycaster
+    animId: number
+  } | null>(null)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
+  const normalizedRef = useRef<[number, number, number][]>([])
+
+  // Build scene once
+  useEffect(() => {
+    const mount = mountRef.current!
+    const w = mount.clientWidth
+    const h = mount.clientHeight
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.setSize(w, h)
+    renderer.setPixelRatio(window.devicePixelRatio)
+    const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117'
+    renderer.setClearColor(new THREE.Color(bgColor))
+    mount.appendChild(renderer.domElement)
+
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 100)
+    camera.position.set(0, 0, 4)
+
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.enableDamping = true
+    controls.dampingFactor = 0.08
+
+    const normalized = normalize(points)
+    normalizedRef.current = normalized
+    const n = normalized.length
+
+    const positions = new Float32Array(n * 3)
+    const colors = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) {
+      positions[i * 3] = normalized[i][0]
+      positions[i * 3 + 1] = normalized[i][1]
+      positions[i * 3 + 2] = normalized[i][2]
+      const hue = (1 - i / (n - 1)) * 240 // blue→red
+      const color = new THREE.Color().setHSL(hue / 360, 1, 0.55)
+      colors[i * 3] = color.r
+      colors[i * 3 + 1] = color.g
+      colors[i * 3 + 2] = color.b
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    const mat = new THREE.PointsMaterial({ size: 0.04, sizeAttenuation: true, vertexColors: true })
+    const pointsMesh = new THREE.Points(geo, mat)
+    scene.add(pointsMesh)
+
+    // Highlight mesh (single point)
+    const hlGeo = new THREE.BufferGeometry()
+    hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
+    const hlMat = new THREE.PointsMaterial({ size: 0.10, sizeAttenuation: true, color: 0xffffff })
+    const highlightMesh = new THREE.Points(hlGeo, hlMat)
+    highlightMesh.visible = false
+    scene.add(highlightMesh)
+
+    const raycaster = new THREE.Raycaster()
+    raycaster.params.Points!.threshold = 0.05
+
+    let animId = 0
+    const animate = () => {
+      animId = requestAnimationFrame(animate)
+      controls.update()
+      renderer.render(scene, camera)
+    }
+    animate()
+
+    const ro = new ResizeObserver(() => {
+      const nw = mount.clientWidth
+      const nh = mount.clientHeight
+      renderer.setSize(nw, nh)
+      camera.aspect = nw / nh
+      camera.updateProjectionMatrix()
+    })
+    ro.observe(mount)
+
+    sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId }
+
+    return () => {
+      cancelAnimationFrame(animId)
+      controls.dispose()
+      renderer.dispose()
+      ro.disconnect()
+      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+    }
+  }, [points])
+
+  // Highlight updates without scene rebuild
+  useEffect(() => {
+    const s = sceneRef.current
+    if (!s) return
+    const normalized = normalizedRef.current
+    if (highlightIndex !== null && normalized[highlightIndex]) {
+      const p = normalized[highlightIndex]
+      const posAttr = s.highlightMesh.geometry.getAttribute('position') as THREE.BufferAttribute
+      posAttr.setXYZ(0, p[0], p[1], p[2])
+      posAttr.needsUpdate = true
+      s.highlightMesh.visible = true
+    } else {
+      s.highlightMesh.visible = false
+    }
+  }, [highlightIndex])
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const s = sceneRef.current
+    if (!s) return
+    const rect = mountRef.current!.getBoundingClientRect()
+    const mouse = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    )
+    s.raycaster.setFromCamera(mouse, s.camera)
+    const hits = s.raycaster.intersectObject(s.pointsMesh)
+    if (hits.length > 0) {
+      const idx = hits[0].index!
+      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, text: labels[idx] })
+    } else {
+      setTooltip(null)
+    }
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const s = sceneRef.current
+    if (!s) return
+    const rect = mountRef.current!.getBoundingClientRect()
+    const mouse = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    )
+    s.raycaster.setFromCamera(mouse, s.camera)
+    const hits = s.raycaster.intersectObject(s.pointsMesh)
+    if (hits.length > 0) onPointClick(hits[0].index!)
+  }
+
+  return (
+    <div className="scatter-wrap" ref={mountRef} onMouseMove={handleMouseMove} onClick={handleClick}>
+      {tooltip && (
+        <div className="scatter-tooltip" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}>
+          {tooltip.text}
+        </div>
+      )}
+    </div>
+  )
+}
