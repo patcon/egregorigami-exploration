@@ -12,9 +12,9 @@ function parseTimecode(s: string): number {
 }
 
 export default function TranscriptViewer() {
-  const [text, setText] = useState(DEFAULT_TEXT)
+  const [text, setText] = useState(() => localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowSize, setWindowSize] = useState(20)
-  const [durationInput, setDurationInput] = useState('30')
+  const [durationInput, setDurationInput] = useState(() => localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
   const [position, setPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -110,7 +110,7 @@ export default function TranscriptViewer() {
         <textarea
           className="paste-area"
           value={text}
-          onChange={e => { setText(e.target.value); setPosition(0); stopPlayback() }}
+          onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
           placeholder="Paste transcript text here…"
           rows={3}
         />
@@ -132,7 +132,7 @@ export default function TranscriptViewer() {
               type="text"
               className={parseTimecode(durationInput) > 0 ? '' : 'input-error'}
               value={durationInput}
-              onChange={e => setDurationInput(e.target.value)}
+              onChange={e => { setDurationInput(e.target.value); localStorage.setItem('transcript-duration', e.target.value) }}
               placeholder="30 or 4:28"
               style={{ width: 72 }}
             />
