@@ -87,6 +87,14 @@ export default function ScatterPlot3D({ points, labels, highlightIndex, onPointC
     const pointsMesh = new THREE.Points(geo, mat)
     scene.add(pointsMesh)
 
+    // Path line through points in transcript order
+    const lineGeo = new THREE.BufferGeometry()
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
+    lineGeo.setAttribute('color', new THREE.BufferAttribute(colors.slice(), 3))
+    const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.35, transparent: true })
+    const lineMesh = new THREE.Line(lineGeo, lineMat)
+    scene.add(lineMesh)
+
     // Highlight mesh (single point)
     const hlGeo = new THREE.BufferGeometry()
     hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
