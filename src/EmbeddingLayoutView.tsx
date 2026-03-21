@@ -119,16 +119,30 @@ export default function EmbeddingLayoutView() {
     if (words.length === 0) return
     const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
     const initialCursor = Math.min(windowSize - 1, words.length - 1)
-    let bestIdx = 0
-    let bestDist = Infinity
-    for (let i = 0; i < segs.length; i++) {
+
+    // Compute end word index for each segment
+    const endIndices = segs.map((_, i) => {
       const cursor = Math.min(words.length - 1, initialCursor + i * step)
       const windowStart = Math.max(0, cursor - windowSize + 1)
-      const endIdx = Math.min(words.length - 1, windowStart + windowSize - 1)
-      const dist = Math.abs(endIdx - wordIndex)
-      if (dist < bestDist) { bestDist = dist; bestIdx = i }
+      return Math.min(words.length - 1, windowStart + windowSize - 1)
+    })
+
+    // Interpolate: find the two adjacent segments whose ends bracket wordIndex
+    if (wordIndex <= endIndices[0]) {
+      setHighlightIndex(0)
+      return
     }
-    setHighlightIndex(bestIdx)
+    if (wordIndex >= endIndices[endIndices.length - 1]) {
+      setHighlightIndex(segs.length - 1)
+      return
+    }
+    for (let i = 0; i < endIndices.length - 1; i++) {
+      if (wordIndex >= endIndices[i] && wordIndex < endIndices[i + 1]) {
+        const t = (wordIndex - endIndices[i]) / (endIndices[i + 1] - endIndices[i])
+        setHighlightIndex(i + t)
+        return
+      }
+    }
   }, [])
 
   const handleLoad = async () => {
