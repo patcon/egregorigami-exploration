@@ -156,7 +156,6 @@
 .word-count {
   font-size: 13px;
   color: var(--text);
-  margin-left: auto;
 }
 
 /* Scrub bar */

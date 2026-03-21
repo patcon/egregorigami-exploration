@@ -31,6 +31,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const [speed, setSpeed] = useState(1)
   const [position, setPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
 
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -123,14 +124,14 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying])
 
-  // Auto-scroll cursor word into view (only while playing)
+  // Auto-scroll cursor word into view (only while playing and auto-scroll enabled)
   useEffect(() => {
-    if (!isPlaying || words.length === 0) return
+    if (!isPlaying || !autoScroll || words.length === 0) return
     const el = wordRefsMap.current.get(cursorIndex)
     if (el && textAreaRef.current) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
-  }, [isPlaying, cursorIndex, words.length])
+  }, [isPlaying, autoScroll, cursorIndex, words.length])
 
   const handleScrubClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -246,6 +247,10 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               >{s}x</button>
             ))}
           </div>
+          <label className="radio-label" style={{ marginLeft: 'auto' }}>
+            <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
+            auto-scroll
+          </label>
           <span className="word-count">{words.length} words</span>
         </div>
         <div
