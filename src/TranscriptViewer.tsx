@@ -15,6 +15,7 @@ interface TranscriptViewerProps {
   initialText?: string
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
+  onParamsBlur?: () => void
   externalPosition?: number
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
@@ -23,7 +24,7 @@ interface TranscriptViewerProps {
   maxSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -180,6 +181,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           className="paste-area"
           value={text}
           onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
+          onBlur={onParamsBlur}
           onPaste={e => {
             e.preventDefault()
             const normalized = e.clipboardData.getData('text').replace(/\s+/g, ' ').trim()
@@ -200,6 +202,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               className={windowInputNum <= 0 ? 'input-error' : ''}
               value={windowInput}
               onChange={e => setWindowInput(e.target.value)}
+              onBlur={onParamsBlur}
               style={{ width: 64 }}
             />
             <label className="radio-label">
@@ -234,6 +237,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               className={parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? 'input-error' : ''}
               value={overlapInput}
               onChange={e => setOverlapInput(e.target.value)}
+              onBlur={onParamsBlur}
               style={{ width: 52 }}
             />
             %

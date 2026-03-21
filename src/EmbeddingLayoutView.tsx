@@ -89,6 +89,12 @@ export default function EmbeddingLayoutView() {
     setHasTranscriptText(!!params.text.trim())
   }, [])
 
+  const handleParamsBlur = useCallback(() => {
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    if (!text.trim()) return
+    setSegments(computeChunks(text, windowSize, overlapPct))
+  }, [])
+
   // Embedding state
   const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(() => {
     const stored = localStorage.getItem('projector-model')
@@ -129,7 +135,8 @@ export default function EmbeddingLayoutView() {
       setLoadStatus('idle')
       // Reset embedding state when new transcript loaded
       setEmbedPhase({ status: 'idle' })
-      setSegments(null)
+      const { windowSize, overlapPct } = windowParamsRef.current
+      setSegments(computeChunks(text, windowSize, overlapPct))
     } catch (e) {
       setLoadStatus('error')
       setLoadError(String(e))
@@ -269,6 +276,7 @@ export default function EmbeddingLayoutView() {
             initialText={loadedText ?? undefined}
             initialDuration={loadedDuration ?? undefined}
             onWindowChange={handleWindowChange}
+            onParamsBlur={handleParamsBlur}
             externalPosition={externalPosition}
             externalPlaying={ytPlaying}
             onScrub={handleScrub}
