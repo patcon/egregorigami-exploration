@@ -62,6 +62,7 @@ export default function YoutubeTranscriptViewer() {
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
       localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
+      localStorage.setItem('transcript-raw-text', text)
       setStatus('idle')
     } catch (e) {
       setStatus('error')

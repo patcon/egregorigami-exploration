@@ -29,6 +29,7 @@ interface TranscriptViewerProps {
 }
 
 export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
+  const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
@@ -174,9 +175,11 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     })
   }, [stopPlayback, windowSize, overlapPct, words.length, onScrub])
 
-  const applySubtitleResult = useCallback((parsed: SubtitleParseResult) => {
+  const applySubtitleResult = useCallback((raw: string, parsed: SubtitleParseResult) => {
+    setRawText(raw)
     setText(parsed.text)
     setDurationInput(String(parsed.durationSecs))
+    localStorage.setItem('transcript-raw-text', raw)
     localStorage.setItem('transcript-text', parsed.text)
     localStorage.setItem('transcript-duration', String(parsed.durationSecs))
     setPosition(0)
@@ -192,10 +195,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
       const raw = ev.target?.result as string
       const parsed = detectAndParseSubtitle(raw)
       if (parsed) {
-        applySubtitleResult(parsed)
+        applySubtitleResult(raw, parsed)
       } else {
         const normalized = raw.replace(/\s+/g, ' ').trim()
+        setRawText(raw)
         setText(normalized)
+        localStorage.setItem('transcript-raw-text', raw)
         localStorage.setItem('transcript-text', normalized)
         setPosition(0)
         stopPlayback()
@@ -224,18 +229,29 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
         <div className="paste-area-row">
           <textarea
             className="paste-area"
-            value={text}
-            onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
+            value={rawText}
+            onChange={e => {
+              const raw = e.target.value
+              const normalized = raw.replace(/\s+/g, ' ').trim()
+              setRawText(raw)
+              setText(normalized)
+              localStorage.setItem('transcript-raw-text', raw)
+              localStorage.setItem('transcript-text', normalized)
+              setPosition(0)
+              stopPlayback()
+            }}
             onBlur={onParamsBlur}
             onPaste={e => {
               e.preventDefault()
               const raw = e.clipboardData.getData('text')
               const parsed = detectAndParseSubtitle(raw)
               if (parsed) {
-                applySubtitleResult(parsed)
+                applySubtitleResult(raw, parsed)
               } else {
                 const normalized = raw.replace(/\s+/g, ' ').trim()
+                setRawText(raw)
                 setText(normalized)
+                localStorage.setItem('transcript-raw-text', raw)
                 localStorage.setItem('transcript-text', normalized)
                 setPosition(0)
                 stopPlayback()

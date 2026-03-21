@@ -217,6 +217,7 @@ export default function EmbeddingLayoutView() {
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
       localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
+      localStorage.setItem('transcript-raw-text', text)
       setLoadStatus('idle')
       // Reset embedding state when new transcript loaded
       setEmbedPhase({ status: 'idle' })
