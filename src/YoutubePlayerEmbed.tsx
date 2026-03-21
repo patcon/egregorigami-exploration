@@ -67,14 +67,20 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
         events: {
           onStateChange: (event: YT.OnStateChangeEvent) => {
             const isPlaying = event.data === window.YT.PlayerState.PLAYING
+            const isPaused = event.data === window.YT.PlayerState.PAUSED
             if (isPlaying) {
               startPoll(playerRef.current!)
-            } else {
+              onPlayStateChangeRef.current?.(true)
+            } else if (isPaused) {
               stopPoll()
               // Fire one update so seeks while paused still move the transcript cursor
               onTimeUpdateRef.current(playerRef.current!.getCurrentTime())
+              onPlayStateChangeRef.current?.(false)
+            } else {
+              // BUFFERING or other transient states — stop polling but don't
+              // signal pause so seeks don't interrupt transcript playback
+              stopPoll()
             }
-            onPlayStateChangeRef.current?.(isPlaying)
           },
         },
       })

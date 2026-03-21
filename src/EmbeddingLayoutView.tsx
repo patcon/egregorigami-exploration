@@ -169,6 +169,24 @@ export default function EmbeddingLayoutView() {
     }
   }, [])
 
+  const handlePointClick = useCallback((idx: number) => {
+    setHighlightIndex(idx)
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    const words = text.trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return
+    const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
+    const initialCursor = Math.min(windowSize - 1, words.length - 1)
+    const wordIndex = Math.min(words.length - 1, initialCursor + idx * step)
+    const ts = wordTimestampsRef.current
+    const secs = totalSecsRef.current
+    if (!secs) return
+    const seekTime = ts && ts.length > 0
+      ? ts[Math.min(wordIndex, ts.length - 1)]
+      : (words.length > 1 ? (wordIndex / (words.length - 1)) * secs : 0)
+    setVideoTime(seekTime)
+    setSeekTarget(seekTime)
+  }, [])
+
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
     if (!videoId) {
@@ -484,7 +502,7 @@ export default function EmbeddingLayoutView() {
                   points={embedPhase.points}
                   labels={segments}
                   highlightPosition={highlightIndex}
-                  onPointClick={idx => setHighlightIndex(idx)}
+                  onPointClick={handlePointClick}
                 />
               </div>
             </>
