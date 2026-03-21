@@ -13,14 +13,17 @@ interface YoutubePlayerEmbedProps {
   onTimeUpdate: (seconds: number) => void
   seekTo?: number
   playing?: boolean
+  onPlayStateChange?: (playing: boolean) => void
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const onTimeUpdateRef = useRef(onTimeUpdate)
   onTimeUpdateRef.current = onTimeUpdate
+  const onPlayStateChangeRef = useRef(onPlayStateChange)
+  onPlayStateChangeRef.current = onPlayStateChange
 
   // Load YT IFrame API once
   useEffect(() => {
@@ -62,11 +65,13 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
         playerVars: { rel: 0, modestbranding: 1 },
         events: {
           onStateChange: (event: YT.OnStateChangeEvent) => {
-            if (event.data === window.YT.PlayerState.PLAYING) {
+            const isPlaying = event.data === window.YT.PlayerState.PLAYING
+            if (isPlaying) {
               startPoll(playerRef.current!)
             } else {
               stopPoll()
             }
+            onPlayStateChangeRef.current?.(isPlaying)
           },
         },
       })

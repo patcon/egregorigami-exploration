@@ -16,11 +16,12 @@ interface TranscriptViewerProps {
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
   externalPosition?: number
+  externalPlaying?: boolean
   onScrub?: (pos: number) => void
   onPlayingChange?: (playing: boolean) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, onScrub, onPlayingChange }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -101,6 +102,20 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   useEffect(() => {
     if (externalPosition !== undefined) setPosition(externalPosition)
   }, [externalPosition])
+
+  useEffect(() => {
+    if (externalPlaying === undefined) return
+    if (externalPlaying && !isPlaying) {
+      startPositionRef.current = position >= 1 ? 0 : position
+      if (position >= 1) setPosition(0)
+      startTimeRef.current = null
+      setIsPlaying(true)
+      rafRef.current = requestAnimationFrame(tick)
+    } else if (!externalPlaying && isPlaying) {
+      stopPlayback()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalPlaying])
 
   useEffect(() => {
     onPlayingChange?.(isPlaying)

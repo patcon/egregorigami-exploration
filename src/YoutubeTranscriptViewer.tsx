@@ -29,6 +29,7 @@ export default function YoutubeTranscriptViewer() {
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
+  const [ytPlaying, setYtPlaying] = useState(false)
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
@@ -117,6 +118,7 @@ export default function YoutubeTranscriptViewer() {
           onTimeUpdate={setVideoTime}
           seekTo={seekTarget}
           playing={transcriptPlaying}
+          onPlayStateChange={setYtPlaying}
         />
       )}
       <TranscriptViewer
@@ -124,6 +126,7 @@ export default function YoutubeTranscriptViewer() {
         initialText={loadedText ?? undefined}
         initialDuration={loadedDuration ?? undefined}
         externalPosition={externalPosition}
+        externalPlaying={ytPlaying}
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
       />
