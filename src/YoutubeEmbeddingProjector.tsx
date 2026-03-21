@@ -221,6 +221,7 @@ export default function YoutubeEmbeddingProjector() {
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
+        maxSpeed={loadedVideoId ? 2 : undefined}
       />
 
       {modalSegments && (

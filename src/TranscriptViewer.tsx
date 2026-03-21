@@ -20,9 +20,10 @@ interface TranscriptViewerProps {
   onScrub?: (pos: number) => void
   onPlayingChange?: (playing: boolean) => void
   onSpeedChange?: (speed: number) => void
+  maxSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -250,6 +251,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
                 key={s}
                 className={`speed-btn${speed === s ? ' active' : ''}`}
                 onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
+                disabled={maxSpeed !== undefined && s > maxSpeed}
+                title={maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
               >{s}x</button>
             ))}
           </div>

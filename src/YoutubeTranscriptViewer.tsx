@@ -183,6 +183,7 @@ export default function YoutubeTranscriptViewer() {
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
+        maxSpeed={loadedVideoId ? 2 : undefined}
       />
     </div>
   )
