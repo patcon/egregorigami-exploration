@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import TranscriptViewer from './TranscriptViewer'
+import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import './YoutubeTranscriptViewer.css'
 
 function extractVideoId(url: string): string | null {
@@ -23,6 +24,8 @@ export default function YoutubeTranscriptViewer() {
   const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [videoTime, setVideoTime] = useState(0)
+  const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
@@ -53,6 +56,16 @@ export default function YoutubeTranscriptViewer() {
       setStatus('error')
       setErrorMessage(String(e))
     }
+  }
+
+  const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
+  const externalPosition = totalSecs ? videoTime / totalSecs : undefined
+
+  const handleScrub = (pos: number) => {
+    if (!totalSecs) return
+    const t = pos * totalSecs
+    setVideoTime(t)
+    setSeekTarget(t)
   }
 
   const currentVideoId = extractVideoId(urlInput)
@@ -89,10 +102,19 @@ export default function YoutubeTranscriptViewer() {
           </p>
         )}
       </div>
+      {loadedVideoId && totalSecs && (
+        <YoutubePlayerEmbed
+          videoId={loadedVideoId}
+          onTimeUpdate={setVideoTime}
+          seekTo={seekTarget}
+        />
+      )}
       <TranscriptViewer
         key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
         initialText={loadedText ?? undefined}
         initialDuration={loadedDuration ?? undefined}
+        externalPosition={externalPosition}
+        onScrub={handleScrub}
       />
     </div>
   )

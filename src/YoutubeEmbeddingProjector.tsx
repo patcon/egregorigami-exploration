@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
+import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import SegmentProjectorModal from './SegmentProjectorModal'
 import './YoutubeEmbeddingProjector.css'
 
@@ -38,6 +39,8 @@ export default function YoutubeEmbeddingProjector() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [modalSegments, setModalSegments] = useState<string[] | null>(null)
+  const [videoTime, setVideoTime] = useState(0)
+  const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
@@ -83,6 +86,16 @@ export default function YoutubeEmbeddingProjector() {
     }
   }
 
+  const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
+  const externalPosition = totalSecs ? videoTime / totalSecs : undefined
+
+  const handleScrub = useCallback((pos: number) => {
+    if (!totalSecs) return
+    const t = pos * totalSecs
+    setVideoTime(t)
+    setSeekTarget(t)
+  }, [totalSecs])
+
   const currentVideoId = extractVideoId(urlInput)
   const transcriptToolUrl = currentVideoId
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
@@ -126,11 +139,20 @@ export default function YoutubeEmbeddingProjector() {
         )}
       </div>
 
+      {loadedVideoId && totalSecs && (
+        <YoutubePlayerEmbed
+          videoId={loadedVideoId}
+          onTimeUpdate={setVideoTime}
+          seekTo={seekTarget}
+        />
+      )}
       <TranscriptViewer
         key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
         initialText={loadedText ?? undefined}
         initialDuration={loadedDuration ?? undefined}
         onWindowChange={handleWindowChange}
+        externalPosition={externalPosition}
+        onScrub={handleScrub}
       />
 
       {modalSegments && (

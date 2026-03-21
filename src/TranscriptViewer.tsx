@@ -15,9 +15,11 @@ interface TranscriptViewerProps {
   initialText?: string
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
+  externalPosition?: number
+  onScrub?: (pos: number) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, onScrub }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -95,6 +97,10 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     }
   }, [])
 
+  useEffect(() => {
+    if (externalPosition !== undefined) setPosition(externalPosition)
+  }, [externalPosition])
+
   // Auto-scroll cursor word into view
   useEffect(() => {
     if (words.length === 0) return
@@ -108,24 +114,28 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     const rect = e.currentTarget.getBoundingClientRect()
     const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     setPosition(newPos)
+    onScrub?.(newPos)
     stopPlayback()
-  }, [stopPlayback])
+  }, [stopPlayback, onScrub])
 
   const handleScrubMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.buttons !== 1) return
     const rect = e.currentTarget.getBoundingClientRect()
     const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     setPosition(newPos)
-  }, [])
+    onScrub?.(newPos)
+  }, [onScrub])
 
   const handleStep = useCallback((dir: 1 | -1) => {
     stopPlayback()
     setPosition(prev => {
       const stepWords = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
       const stepFraction = stepWords / Math.max(1, words.length - 1)
-      return Math.min(1, Math.max(0, prev + dir * stepFraction))
+      const newPos = Math.min(1, Math.max(0, prev + dir * stepFraction))
+      onScrub?.(newPos)
+      return newPos
     })
-  }, [stopPlayback, windowSize, overlapPct, words.length])
+  }, [stopPlayback, windowSize, overlapPct, words.length, onScrub])
 
   useEffect(() => {
     onWindowChange?.({ windowSize, overlapPct, text })
