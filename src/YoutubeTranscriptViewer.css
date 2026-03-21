@@ -61,3 +61,25 @@
 .youtube-notice a {
   color: var(--accent);
 }
+
+.yt-action-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.yt-action-btn:hover {
+  opacity: 0.85;
+}
+
+.yt-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

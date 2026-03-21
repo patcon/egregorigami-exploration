@@ -26,6 +26,7 @@ export default function YoutubeTranscriptViewer() {
   const [errorMessage, setErrorMessage] = useState('')
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
+  const [transcriptPlaying, setTranscriptPlaying] = useState(false)
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
@@ -81,11 +82,17 @@ export default function YoutubeTranscriptViewer() {
             type="url"
             className="youtube-url-input"
             value={urlInput}
-            onChange={e => { setUrlInput(e.target.value); localStorage.setItem('yt-url', e.target.value) }}
+            onChange={e => {
+              const val = e.target.value
+              setUrlInput(val)
+              localStorage.setItem('yt-url', val)
+              if (!extractVideoId(val)) setLoadedVideoId(null)
+            }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
           <button
+            className="yt-action-btn"
             onClick={handleLoad}
             disabled={isProd || status === 'loading'}
           >
@@ -107,6 +114,7 @@ export default function YoutubeTranscriptViewer() {
           videoId={loadedVideoId}
           onTimeUpdate={setVideoTime}
           seekTo={seekTarget}
+          playing={transcriptPlaying}
         />
       )}
       <TranscriptViewer
@@ -115,6 +123,7 @@ export default function YoutubeTranscriptViewer() {
         initialDuration={loadedDuration ?? undefined}
         externalPosition={externalPosition}
         onScrub={handleScrub}
+        onPlayingChange={setTranscriptPlaying}
       />
     </div>
   )

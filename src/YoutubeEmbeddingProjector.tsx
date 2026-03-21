@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import SegmentProjectorModal from './SegmentProjectorModal'
+import './YoutubeTranscriptViewer.css'
 import './YoutubeEmbeddingProjector.css'
 
 function extractVideoId(url: string): string | null {
@@ -41,6 +42,7 @@ export default function YoutubeEmbeddingProjector() {
   const [modalSegments, setModalSegments] = useState<string[] | null>(null)
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
+  const [transcriptPlaying, setTranscriptPlaying] = useState(false)
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
@@ -115,11 +117,16 @@ export default function YoutubeEmbeddingProjector() {
             type="url"
             className="youtube-url-input"
             value={urlInput}
-            onChange={e => { setUrlInput(e.target.value); localStorage.setItem('yt-url', e.target.value) }}
+            onChange={e => {
+              const val = e.target.value
+              setUrlInput(val)
+              localStorage.setItem('yt-url', val)
+              if (!extractVideoId(val)) setLoadedVideoId(null)
+            }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
-          <button onClick={handleLoad} disabled={isProd || status === 'loading'}>
+          <button className="yt-action-btn" onClick={handleLoad} disabled={isProd || status === 'loading'}>
             {status === 'loading' ? 'Loading…' : 'Load'}
           </button>
           {hasTranscriptText && (
@@ -144,6 +151,7 @@ export default function YoutubeEmbeddingProjector() {
           videoId={loadedVideoId}
           onTimeUpdate={setVideoTime}
           seekTo={seekTarget}
+          playing={transcriptPlaying}
         />
       )}
       <TranscriptViewer
@@ -153,6 +161,7 @@ export default function YoutubeEmbeddingProjector() {
         onWindowChange={handleWindowChange}
         externalPosition={externalPosition}
         onScrub={handleScrub}
+        onPlayingChange={setTranscriptPlaying}
       />
 
       {modalSegments && (

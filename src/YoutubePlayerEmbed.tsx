@@ -12,9 +12,10 @@ interface YoutubePlayerEmbedProps {
   videoId: string
   onTimeUpdate: (seconds: number) => void
   seekTo?: number
+  playing?: boolean
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -109,6 +110,13 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo }: Yo
       playerRef.current.seekTo(seekTo, true)
     }
   }, [seekTo])
+
+  // Play/pause driven by transcript controls
+  useEffect(() => {
+    if (playing === undefined || !playerRef.current) return
+    if (playing) playerRef.current.playVideo()
+    else playerRef.current.pauseVideo()
+  }, [playing])
 
   return (
     <div className="yt-player-container">

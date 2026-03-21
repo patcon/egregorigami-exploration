@@ -17,9 +17,10 @@ interface TranscriptViewerProps {
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
   externalPosition?: number
   onScrub?: (pos: number) => void
+  onPlayingChange?: (playing: boolean) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, onScrub }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, onScrub, onPlayingChange }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -100,6 +101,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   useEffect(() => {
     if (externalPosition !== undefined) setPosition(externalPosition)
   }, [externalPosition])
+
+  useEffect(() => {
+    onPlayingChange?.(isPlaying)
+  // onPlayingChange intentionally omitted — callers should stabilize with useCallback/setState setter
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying])
 
   // Auto-scroll cursor word into view
   useEffect(() => {
