@@ -454,6 +454,19 @@ export default function EmbeddingLayoutView() {
           {isDone && embedPhase.status === 'done' && segments && (
             <>
               <div className="embedding-panel-form" style={{ flexShrink: 0 }}>
+                <select
+                  className="model-select"
+                  value={selectedModel}
+                  onChange={e => {
+                    const v = e.target.value as EmbeddingModelId
+                    setSelectedModel(v)
+                    localStorage.setItem('projector-model', v)
+                  }}
+                >
+                  {EMBEDDING_MODELS.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
                 <div className="embedding-panel-form-row">
                   <button className="show-segments-btn" onClick={handleShowSegments}>
                     Show Segments ({segments.length})
@@ -462,7 +475,7 @@ export default function EmbeddingLayoutView() {
                     className="run-embedding-btn"
                     onClick={handleRunEmbedding}
                   >
-                    Re-run
+                    Run Embedding
                   </button>
                 </div>
               </div>
