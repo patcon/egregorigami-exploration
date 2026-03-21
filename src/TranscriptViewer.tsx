@@ -15,9 +15,15 @@ interface TranscriptViewerProps {
   initialText?: string
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
+  externalPosition?: number
+  externalPlaying?: boolean
+  onScrub?: (pos: number) => void
+  onPlayingChange?: (playing: boolean) => void
+  onSpeedChange?: (speed: number) => void
+  maxSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -27,6 +33,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const [speed, setSpeed] = useState(1)
   const [position, setPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
 
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -95,37 +102,70 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     }
   }, [])
 
-  // Auto-scroll cursor word into view
   useEffect(() => {
-    if (words.length === 0) return
+    if (externalPosition !== undefined) {
+      setPosition(externalPosition)
+      // Reset RAF baseline so the internal loop doesn't fight the external time source
+      startPositionRef.current = externalPosition
+      startTimeRef.current = null
+    }
+  }, [externalPosition])
+
+  useEffect(() => {
+    if (externalPlaying === undefined) return
+    if (externalPlaying && !isPlaying) {
+      startPositionRef.current = position >= 1 ? 0 : position
+      if (position >= 1) setPosition(0)
+      startTimeRef.current = null
+      setIsPlaying(true)
+      rafRef.current = requestAnimationFrame(tick)
+    } else if (!externalPlaying && isPlaying) {
+      stopPlayback()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalPlaying])
+
+  useEffect(() => {
+    onPlayingChange?.(isPlaying)
+  // onPlayingChange intentionally omitted — callers should stabilize with useCallback/setState setter
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying])
+
+  // Auto-scroll cursor word into view (only while playing and auto-scroll enabled)
+  useEffect(() => {
+    if (!isPlaying || !autoScroll || words.length === 0) return
     const el = wordRefsMap.current.get(cursorIndex)
     if (el && textAreaRef.current) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
-  }, [cursorIndex, words.length])
+  }, [isPlaying, autoScroll, cursorIndex, words.length])
 
   const handleScrubClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
     const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     setPosition(newPos)
+    onScrub?.(newPos)
     stopPlayback()
-  }, [stopPlayback])
+  }, [stopPlayback, onScrub])
 
   const handleScrubMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.buttons !== 1) return
     const rect = e.currentTarget.getBoundingClientRect()
     const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
     setPosition(newPos)
-  }, [])
+    onScrub?.(newPos)
+  }, [onScrub])
 
   const handleStep = useCallback((dir: 1 | -1) => {
     stopPlayback()
     setPosition(prev => {
       const stepWords = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
       const stepFraction = stepWords / Math.max(1, words.length - 1)
-      return Math.min(1, Math.max(0, prev + dir * stepFraction))
+      const newPos = Math.min(1, Math.max(0, prev + dir * stepFraction))
+      onScrub?.(newPos)
+      return newPos
     })
-  }, [stopPlayback, windowSize, overlapPct, words.length])
+  }, [stopPlayback, windowSize, overlapPct, words.length, onScrub])
 
   useEffect(() => {
     onWindowChange?.({ windowSize, overlapPct, text })
@@ -210,10 +250,16 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               <button
                 key={s}
                 className={`speed-btn${speed === s ? ' active' : ''}`}
-                onClick={() => setSpeed(s)}
+                onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
+                disabled={maxSpeed !== undefined && s > maxSpeed}
+                title={maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
               >{s}x</button>
             ))}
           </div>
+          <label className="radio-label" style={{ marginLeft: 'auto' }}>
+            <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
+            auto-scroll
+          </label>
           <span className="word-count">{words.length} words</span>
         </div>
         <div

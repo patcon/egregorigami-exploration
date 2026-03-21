@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
+import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import SegmentProjectorModal from './SegmentProjectorModal'
+import './YoutubeTranscriptViewer.css'
 import './YoutubeEmbeddingProjector.css'
 
 function extractVideoId(url: string): string | null {
@@ -12,6 +14,22 @@ function extractVideoId(url: string): string | null {
   } catch {
     return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
   }
+}
+
+function buildTranscriptData(segments: Array<{ text: string; offset: number }>): {
+  text: string
+  wordTimestamps: number[]
+} {
+  const words: string[] = []
+  const timestamps: number[] = []
+  for (const seg of segments) {
+    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
+    for (const w of segWords) {
+      words.push(w)
+      timestamps.push(seg.offset)
+    }
+  }
+  return { text: words.join(' '), wordTimestamps: timestamps }
 }
 
 function computeChunks(text: string, windowSize: number, overlapPct: number): string[] {
@@ -33,11 +51,21 @@ export default function YoutubeEmbeddingProjector() {
   const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
   const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
   const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
-  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() => localStorage.getItem('yt-video-id'))
+  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
+    extractVideoId(localStorage.getItem('yt-url') ?? '') ? localStorage.getItem('yt-video-id') : null
+  )
   const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [wordTimestamps, setWordTimestamps] = useState<number[] | null>(
+    () => JSON.parse(localStorage.getItem('yt-word-timestamps') ?? 'null')
+  )
   const [modalSegments, setModalSegments] = useState<string[] | null>(null)
+  const [videoTime, setVideoTime] = useState(0)
+  const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
+  const [transcriptPlaying, setTranscriptPlaying] = useState(false)
+  const [ytPlaying, setYtPlaying] = useState(false)
+  const [playbackRate, setPlaybackRate] = useState(1)
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
@@ -66,22 +94,60 @@ export default function YoutubeEmbeddingProjector() {
       const res = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
-      const text = data.segments.map((s: { text: string }) => s.text).join(' ')
+      const { text, wordTimestamps } = buildTranscriptData(data.segments)
       const duration = String(Math.round(data.totalDuration))
       setLoadedText(text)
       setLoadedDuration(duration)
       setLoadedVideoId(videoId)
+      setWordTimestamps(wordTimestamps)
       setLoadCount(c => c + 1)
       localStorage.setItem('yt-url', urlInput)
       localStorage.setItem('yt-transcript', text)
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
+      localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
       setStatus('idle')
     } catch (e) {
       setStatus('error')
       setErrorMessage(String(e))
     }
   }
+
+  const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
+  const externalPosition = (() => {
+    if (!totalSecs) return undefined
+    if (wordTimestamps && wordTimestamps.length > 1) {
+      if (videoTime < wordTimestamps[0]) return 0
+      // Find first word index of the current segment (last segment whose offset <= videoTime)
+      let segFirstIdx = 0
+      for (let i = 1; i < wordTimestamps.length; i++) {
+        if (wordTimestamps[i] > videoTime) break
+        if (wordTimestamps[i] > wordTimestamps[i - 1]) segFirstIdx = i
+      }
+      // Find last word index of this segment
+      let segLastIdx = segFirstIdx
+      while (segLastIdx + 1 < wordTimestamps.length && wordTimestamps[segLastIdx + 1] === wordTimestamps[segFirstIdx]) {
+        segLastIdx++
+      }
+      // Interpolate within the segment using the next segment's start as the boundary
+      const segStart = wordTimestamps[segFirstIdx]
+      const nextSegStart = segLastIdx + 1 < wordTimestamps.length ? wordTimestamps[segLastIdx + 1] : totalSecs
+      const segDuration = nextSegStart - segStart
+      const segWordCount = segLastIdx - segFirstIdx + 1
+      const wordOffset = segDuration > 0
+        ? Math.min(Math.floor(((videoTime - segStart) / segDuration) * segWordCount), segWordCount - 1)
+        : 0
+      return (segFirstIdx + wordOffset) / (wordTimestamps.length - 1)
+    }
+    return videoTime / totalSecs
+  })()
+
+  const handleScrub = useCallback((pos: number) => {
+    if (!totalSecs) return
+    const t = pos * totalSecs
+    setVideoTime(t)
+    setSeekTarget(t)
+  }, [totalSecs])
 
   const currentVideoId = extractVideoId(urlInput)
   const transcriptToolUrl = currentVideoId
@@ -102,11 +168,20 @@ export default function YoutubeEmbeddingProjector() {
             type="url"
             className="youtube-url-input"
             value={urlInput}
-            onChange={e => { setUrlInput(e.target.value); localStorage.setItem('yt-url', e.target.value) }}
+            onChange={e => {
+              const val = e.target.value
+              setUrlInput(val)
+              localStorage.setItem('yt-url', val)
+              if (!extractVideoId(val)) {
+                setLoadedVideoId(null)
+                setWordTimestamps(null)
+                localStorage.removeItem('yt-word-timestamps')
+              }
+            }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
-          <button onClick={handleLoad} disabled={isProd || status === 'loading'}>
+          <button className="yt-action-btn" onClick={handleLoad} disabled={isProd || status === 'loading'}>
             {status === 'loading' ? 'Loading…' : 'Load'}
           </button>
           {hasTranscriptText && (
@@ -126,11 +201,27 @@ export default function YoutubeEmbeddingProjector() {
         )}
       </div>
 
+      {loadedVideoId && totalSecs && (
+        <YoutubePlayerEmbed
+          videoId={loadedVideoId}
+          onTimeUpdate={setVideoTime}
+          seekTo={seekTarget}
+          playing={transcriptPlaying}
+          onPlayStateChange={setYtPlaying}
+          playbackRate={playbackRate}
+        />
+      )}
       <TranscriptViewer
         key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
         initialText={loadedText ?? undefined}
         initialDuration={loadedDuration ?? undefined}
         onWindowChange={handleWindowChange}
+        externalPosition={externalPosition}
+        externalPlaying={ytPlaying}
+        onScrub={handleScrub}
+        onPlayingChange={setTranscriptPlaying}
+        onSpeedChange={setPlaybackRate}
+        maxSpeed={loadedVideoId ? 2 : undefined}
       />
 
       {modalSegments && (
