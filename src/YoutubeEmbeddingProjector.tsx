@@ -66,6 +66,7 @@ export default function YoutubeEmbeddingProjector() {
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
   const [ytPlaying, setYtPlaying] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
+  const [allowFaster, setAllowFaster] = useState(false)
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
@@ -202,14 +203,25 @@ export default function YoutubeEmbeddingProjector() {
       </div>
 
       {loadedVideoId && totalSecs && (
-        <YoutubePlayerEmbed
-          videoId={loadedVideoId}
-          onTimeUpdate={setVideoTime}
-          seekTo={seekTarget}
-          playing={transcriptPlaying}
-          onPlayStateChange={setYtPlaying}
-          playbackRate={playbackRate}
-        />
+        <div style={{ position: 'relative' }}>
+          <div style={{ visibility: allowFaster ? 'hidden' : 'visible' }}>
+            <YoutubePlayerEmbed
+              videoId={loadedVideoId}
+              onTimeUpdate={setVideoTime}
+              seekTo={allowFaster ? undefined : seekTarget}
+              playing={allowFaster ? false : transcriptPlaying}
+              onPlayStateChange={allowFaster ? undefined : setYtPlaying}
+              playbackRate={playbackRate}
+            />
+          </div>
+          {allowFaster && (
+            <div className="yt-player-container" style={{ position: 'absolute', inset: 0, margin: 0 }}>
+              <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>YouTube paused — allow faster enabled</span>
+              </div>
+            </div>
+          )}
+        </div>
       )}
       <TranscriptViewer
         key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
@@ -222,6 +234,7 @@ export default function YoutubeEmbeddingProjector() {
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
         maxSpeed={loadedVideoId ? 2 : undefined}
+        onAllowFasterChange={setAllowFaster}
       />
 
       {modalSegments && (

@@ -21,7 +21,7 @@ function IndexPage() {
       <section id="center">
         <div>
           <h1>egregorigami</h1>
-          <p>Explorations in collective intelligence and machine perception.</p>
+          <p>Explorations of collective intelligence, narrative space, and protein folding.</p>
         </div>
         <ul className="app-list">
           <li>

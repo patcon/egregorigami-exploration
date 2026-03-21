@@ -76,6 +76,7 @@ export default function EmbeddingLayoutView() {
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
   const [ytPlaying, setYtPlaying] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
+  const [allowFaster, setAllowFaster] = useState(false)
 
   const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(loadedText?.trim()))
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
@@ -107,11 +108,34 @@ export default function EmbeddingLayoutView() {
   // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const segmentsRef = useRef<string[] | null>(null)
+  const currentWordIndexRef = useRef(0)
+  const wordTimestampsRef = useRef(wordTimestamps)
+  useEffect(() => { wordTimestampsRef.current = wordTimestamps }, [wordTimestamps])
+  const totalSecsRef = useRef<number | null>(null)
 
   // Keep ref in sync so cursor handler always sees latest segments
   useEffect(() => { segmentsRef.current = segments }, [segments])
 
+  // When re-enabling YouTube player, seek it to where the transcript cursor ended up
+  const allowFasterPrevRef = useRef(false)
+  useEffect(() => {
+    if (!allowFaster && allowFasterPrevRef.current && totalSecsRef.current) {
+      const totalSecs = totalSecsRef.current
+      const wordIndex = currentWordIndexRef.current
+      const ts = wordTimestampsRef.current
+      const seekTime = ts && ts.length > 0
+        ? ts[Math.min(wordIndex, ts.length - 1)]
+        : (windowParamsRef.current.text.trim().split(/\s+/).filter(Boolean).length > 0
+            ? (wordIndex / windowParamsRef.current.text.trim().split(/\s+/).filter(Boolean).length) * totalSecs
+            : 0)
+      setVideoTime(seekTime)
+      setSeekTarget(seekTime)
+    }
+    allowFasterPrevRef.current = allowFaster
+  }, [allowFaster])
+
   const handleCursorChange = useCallback((wordIndex: number) => {
+    currentWordIndexRef.current = wordIndex
     const segs = segmentsRef.current
     if (!segs || segs.length === 0) return
     const { windowSize, overlapPct, text } = windowParamsRef.current
@@ -182,6 +206,7 @@ export default function EmbeddingLayoutView() {
   }
 
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
+  totalSecsRef.current = totalSecs
 
   const externalPosition = (() => {
     if (!totalSecs) return undefined
@@ -300,14 +325,25 @@ export default function EmbeddingLayoutView() {
         {/* Left: video + transcript */}
         <div className="embedding-layout-left">
           {loadedVideoId && totalSecs && (
-            <YoutubePlayerEmbed
-              videoId={loadedVideoId}
-              onTimeUpdate={setVideoTime}
-              seekTo={seekTarget}
-              playing={transcriptPlaying}
-              onPlayStateChange={setYtPlaying}
-              playbackRate={playbackRate}
-            />
+            <div style={{ position: 'relative' }}>
+              <div style={{ visibility: allowFaster ? 'hidden' : 'visible' }}>
+                <YoutubePlayerEmbed
+                  videoId={loadedVideoId}
+                  onTimeUpdate={setVideoTime}
+                  seekTo={allowFaster ? undefined : seekTarget}
+                  playing={allowFaster ? false : transcriptPlaying}
+                  onPlayStateChange={allowFaster ? undefined : setYtPlaying}
+                  playbackRate={playbackRate}
+                />
+              </div>
+              {allowFaster && (
+                <div className="yt-player-container" style={{ position: 'absolute', inset: 0, margin: 0 }}>
+                  <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>YouTube paused — allow faster enabled</span>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           <TranscriptViewer
             key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
@@ -316,8 +352,9 @@ export default function EmbeddingLayoutView() {
             onWindowChange={handleWindowChange}
             onParamsBlur={handleParamsBlur}
             onCursorChange={handleCursorChange}
-            externalPosition={externalPosition}
-            externalPlaying={ytPlaying}
+            onAllowFasterChange={setAllowFaster}
+            externalPosition={allowFaster ? undefined : externalPosition}
+            externalPlaying={allowFaster ? undefined : ytPlaying}
             onScrub={handleScrub}
             onPlayingChange={setTranscriptPlaying}
             onSpeedChange={setPlaybackRate}

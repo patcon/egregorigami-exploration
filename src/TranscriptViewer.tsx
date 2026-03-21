@@ -17,6 +17,7 @@ interface TranscriptViewerProps {
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
   onParamsBlur?: () => void
   onCursorChange?: (wordIndex: number) => void
+  onAllowFasterChange?: (allow: boolean) => void
   externalPosition?: number
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
@@ -25,7 +26,7 @@ interface TranscriptViewerProps {
   maxSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -36,6 +37,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const [position, setPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [allowFaster, setAllowFaster] = useState(false)
 
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -262,10 +264,28 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
                 key={s}
                 className={`speed-btn${speed === s ? ' active' : ''}`}
                 onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
-                disabled={maxSpeed !== undefined && s > maxSpeed}
-                title={maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
+                disabled={!allowFaster && maxSpeed !== undefined && s > maxSpeed}
+                title={!allowFaster && maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
               >{s}x</button>
             ))}
+            {maxSpeed !== undefined && (
+              <label className="radio-label">
+                <input
+                  type="checkbox"
+                  checked={allowFaster}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setAllowFaster(checked)
+                    if (!checked && speed > maxSpeed) {
+                      setSpeed(maxSpeed)
+                      onSpeedChange?.(maxSpeed)
+                    }
+                    onAllowFasterChange?.(checked)
+                  }}
+                />
+                allow faster
+              </label>
+            )}
           </div>
           <label className="radio-label" style={{ marginLeft: 'auto' }}>
             <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
