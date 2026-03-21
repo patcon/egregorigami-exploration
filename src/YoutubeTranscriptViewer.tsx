@@ -49,6 +49,7 @@ export default function YoutubeTranscriptViewer() {
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
   const [ytPlaying, setYtPlaying] = useState(false)
+  const [playbackRate, setPlaybackRate] = useState(1)
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
@@ -170,6 +171,7 @@ export default function YoutubeTranscriptViewer() {
           seekTo={seekTarget}
           playing={transcriptPlaying}
           onPlayStateChange={setYtPlaying}
+          playbackRate={playbackRate}
         />
       )}
       <TranscriptViewer
@@ -180,6 +182,7 @@ export default function YoutubeTranscriptViewer() {
         externalPlaying={ytPlaying}
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
+        onSpeedChange={setPlaybackRate}
       />
     </div>
   )

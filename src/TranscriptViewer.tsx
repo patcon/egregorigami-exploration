@@ -19,9 +19,10 @@ interface TranscriptViewerProps {
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
   onPlayingChange?: (playing: boolean) => void
+  onSpeedChange?: (speed: number) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -248,7 +249,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               <button
                 key={s}
                 className={`speed-btn${speed === s ? ' active' : ''}`}
-                onClick={() => setSpeed(s)}
+                onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
               >{s}x</button>
             ))}
           </div>

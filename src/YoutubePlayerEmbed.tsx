@@ -14,9 +14,10 @@ interface YoutubePlayerEmbedProps {
   seekTo?: number
   playing?: boolean
   onPlayStateChange?: (playing: boolean) => void
+  playbackRate?: number
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -124,6 +125,13 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
     if (playing) playerRef.current.playVideo()
     else playerRef.current.pauseVideo()
   }, [playing])
+
+  // Playback rate
+  useEffect(() => {
+    if (playbackRate !== undefined && playerRef.current) {
+      playerRef.current.setPlaybackRate(playbackRate)
+    }
+  }, [playbackRate])
 
   return (
     <div className="yt-player-container">

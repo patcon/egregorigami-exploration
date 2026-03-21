@@ -65,6 +65,7 @@ export default function YoutubeEmbeddingProjector() {
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
   const [ytPlaying, setYtPlaying] = useState(false)
+  const [playbackRate, setPlaybackRate] = useState(1)
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
@@ -207,6 +208,7 @@ export default function YoutubeEmbeddingProjector() {
           seekTo={seekTarget}
           playing={transcriptPlaying}
           onPlayStateChange={setYtPlaying}
+          playbackRate={playbackRate}
         />
       )}
       <TranscriptViewer
@@ -218,6 +220,7 @@ export default function YoutubeEmbeddingProjector() {
         externalPlaying={ytPlaying}
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
+        onSpeedChange={setPlaybackRate}
       />
 
       {modalSegments && (
