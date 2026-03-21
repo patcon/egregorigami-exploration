@@ -15,6 +15,9 @@ interface TranscriptViewerProps {
   initialText?: string
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
+  onParamsBlur?: () => void
+  onCursorChange?: (wordIndex: number) => void
+  onAllowFasterChange?: (allow: boolean) => void
   externalPosition?: number
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
@@ -23,17 +26,18 @@ interface TranscriptViewerProps {
   maxSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
-  const [windowInput, setWindowInput] = useState('20')
-  const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
-  const [overlapInput, setOverlapInput] = useState('50')
+  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '20')
+  const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
+  const [overlapInput, setOverlapInput] = useState(() => localStorage.getItem('transcript-overlap') ?? '50')
   const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
   const [speed, setSpeed] = useState(1)
   const [position, setPosition] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [autoScroll, setAutoScroll] = useState(true)
+  const [autoScroll, setAutoScroll] = useState(() => localStorage.getItem('transcript-auto-scroll') !== 'false')
+  const [allowFaster, setAllowFaster] = useState(() => localStorage.getItem('transcript-allow-faster') === 'true')
 
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
@@ -173,6 +177,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowSize, overlapPct, text])
 
+  useEffect(() => {
+    onCursorChange?.(cursorIndex)
+  // onCursorChange intentionally omitted
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursorIndex])
+
   return (
     <div className="transcript-page">
       <div className="controls-panel">
@@ -180,6 +190,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           className="paste-area"
           value={text}
           onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
+          onBlur={onParamsBlur}
           onPaste={e => {
             e.preventDefault()
             const normalized = e.clipboardData.getData('text').replace(/\s+/g, ' ').trim()
@@ -199,15 +210,16 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               min={1}
               className={windowInputNum <= 0 ? 'input-error' : ''}
               value={windowInput}
-              onChange={e => setWindowInput(e.target.value)}
+              onChange={e => { setWindowInput(e.target.value); localStorage.setItem('transcript-window', e.target.value) }}
+              onBlur={onParamsBlur}
               style={{ width: 64 }}
             />
             <label className="radio-label">
-              <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => setWindowMode('words')} />
+              <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => { setWindowMode('words'); localStorage.setItem('transcript-window-mode', 'words') }} />
               words
             </label>
             <label className="radio-label">
-              <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => setWindowMode('segments')} />
+              <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
               segments
             </label>
             {windowMode === 'segments' && windowInputNum > 0 && words.length > 0 && (
@@ -233,7 +245,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               max={99}
               className={parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? 'input-error' : ''}
               value={overlapInput}
-              onChange={e => setOverlapInput(e.target.value)}
+              onChange={e => { setOverlapInput(e.target.value); localStorage.setItem('transcript-overlap', e.target.value) }}
+              onBlur={onParamsBlur}
               style={{ width: 52 }}
             />
             %
@@ -251,13 +264,32 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
                 key={s}
                 className={`speed-btn${speed === s ? ' active' : ''}`}
                 onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
-                disabled={maxSpeed !== undefined && s > maxSpeed}
-                title={maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
+                disabled={!allowFaster && maxSpeed !== undefined && s > maxSpeed}
+                title={!allowFaster && maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
               >{s}x</button>
             ))}
+            {maxSpeed !== undefined && (
+              <label className="radio-label">
+                <input
+                  type="checkbox"
+                  checked={allowFaster}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setAllowFaster(checked)
+                    localStorage.setItem('transcript-allow-faster', String(checked))
+                    if (!checked && speed > maxSpeed) {
+                      setSpeed(maxSpeed)
+                      onSpeedChange?.(maxSpeed)
+                    }
+                    onAllowFasterChange?.(checked)
+                  }}
+                />
+                allow faster
+              </label>
+            )}
           </div>
           <label className="radio-label" style={{ marginLeft: 'auto' }}>
-            <input type="checkbox" checked={autoScroll} onChange={e => setAutoScroll(e.target.checked)} />
+            <input type="checkbox" checked={autoScroll} onChange={e => { setAutoScroll(e.target.checked); localStorage.setItem('transcript-auto-scroll', String(e.target.checked)) }} />
             auto-scroll
           </label>
           <span className="word-count">{words.length} words</span>

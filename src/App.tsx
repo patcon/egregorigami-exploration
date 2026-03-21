@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubeTranscriptViewer from './YoutubeTranscriptViewer'
 import YoutubeEmbeddingProjector from './YoutubeEmbeddingProjector'
+import EmbeddingLayoutView from './EmbeddingLayoutView'
 import './App.css'
 
 function useHash() {
@@ -20,7 +21,7 @@ function IndexPage() {
       <section id="center">
         <div>
           <h1>egregorigami</h1>
-          <p>Explorations in collective intelligence and machine perception.</p>
+          <p>Explorations of collective intelligence, narrative space, and protein folding.</p>
         </div>
         <ul className="app-list">
           <li>
@@ -41,6 +42,12 @@ function IndexPage() {
               <span>Generate sentence embeddings in-browser and explore the 3D semantic space with an interactive scatter plot.</span>
             </a>
           </li>
+          <li>
+            <a href="#v4">
+              <strong>Embedding Layout</strong>
+              <span>Side-by-side view: YouTube player and transcript with an inline 3D embedding panel.</span>
+            </a>
+          </li>
         </ul>
       </section>
       <div className="ticks"></div>
@@ -54,6 +61,7 @@ function App() {
   if (hash === '#v1') return <TranscriptViewer />
   if (hash === '#v2') return <YoutubeTranscriptViewer />
   if (hash === '#v3') return <YoutubeEmbeddingProjector />
+  if (hash === '#v4') return <EmbeddingLayoutView />
   return <IndexPage />
 }
 

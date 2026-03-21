@@ -175,7 +175,18 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     }
   }
 
+  const mouseDownRef = useRef<{ x: number; y: number } | null>(null)
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    mouseDownRef.current = { x: e.clientX, y: e.clientY }
+  }
+
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const down = mouseDownRef.current
+    if (!down) return
+    const dx = e.clientX - down.x
+    const dy = e.clientY - down.y
+    if (dx * dx + dy * dy > 25) return // >5px movement = drag, not click
     const s = sceneRef.current
     if (!s) return
     const rect = mountRef.current!.getBoundingClientRect()
@@ -189,7 +200,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
   }
 
   return (
-    <div className="scatter-wrap" ref={mountRef} onMouseMove={handleMouseMove} onClick={handleClick}>
+    <div className="scatter-wrap" ref={mountRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onClick={handleClick}>
       {tooltip && (
         <div className="scatter-tooltip" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}>
           {tooltip.text}
