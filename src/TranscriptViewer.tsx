@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { detectAndParseSubtitle, type SubtitleParseResult } from './subtitleParser'
 import './TranscriptViewer.css'
 
 const DEFAULT_TEXT = `The embedding window is a concept from transformer models where a fixed-size context window moves through a sequence of tokens. As the window slides forward, the model attends to a new set of words, creating a representation of that local context. This visualization lets you see how the window advances through your text over time, simulating the way a transformer might process a long document or video transcript in chunks. Try pasting your own text, adjusting the window size to match your model's context length, and setting a playback duration to match the length of your source video or audio. Watch how the highlighted region moves steadily from the beginning to the end of the transcript, pausing and resuming as you explore.`
@@ -24,9 +25,10 @@ interface TranscriptViewerProps {
   onPlayingChange?: (playing: boolean) => void
   onSpeedChange?: (speed: number) => void
   maxSpeed?: number
+  onSubtitleLoad?: (result: SubtitleParseResult) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
@@ -44,6 +46,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const startPositionRef = useRef(0)
   const wordRefsMap = useRef<Map<number, HTMLSpanElement>>(new Map())
   const textAreaRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const words = text.trim() ? text.trim().split(/\s+/) : []
   const overlapPct = Math.min(99, Math.max(0, parseFloat(overlapInput) || 0))
@@ -171,6 +174,38 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     })
   }, [stopPlayback, windowSize, overlapPct, words.length, onScrub])
 
+  const applySubtitleResult = useCallback((parsed: SubtitleParseResult) => {
+    setText(parsed.text)
+    setDurationInput(String(parsed.durationSecs))
+    localStorage.setItem('transcript-text', parsed.text)
+    localStorage.setItem('transcript-duration', String(parsed.durationSecs))
+    setPosition(0)
+    stopPlayback()
+    onSubtitleLoad?.(parsed)
+  }, [stopPlayback, onSubtitleLoad])
+
+  const handleFileLoad = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const raw = ev.target?.result as string
+      const parsed = detectAndParseSubtitle(raw)
+      if (parsed) {
+        applySubtitleResult(parsed)
+      } else {
+        const normalized = raw.replace(/\s+/g, ' ').trim()
+        setText(normalized)
+        localStorage.setItem('transcript-text', normalized)
+        setPosition(0)
+        stopPlayback()
+      }
+    }
+    reader.readAsText(file)
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+  }, [applySubtitleResult, stopPlayback])
+
   useEffect(() => {
     onWindowChange?.({ windowSize, overlapPct, text })
   // onWindowChange intentionally omitted — callers should stabilize with useCallback/useRef
@@ -186,22 +221,34 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   return (
     <div className="transcript-page">
       <div className="controls-panel">
-        <textarea
-          className="paste-area"
-          value={text}
-          onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
-          onBlur={onParamsBlur}
-          onPaste={e => {
-            e.preventDefault()
-            const normalized = e.clipboardData.getData('text').replace(/\s+/g, ' ').trim()
-            setText(normalized)
-            localStorage.setItem('transcript-text', normalized)
-            setPosition(0)
-            stopPlayback()
-          }}
-          placeholder="Paste transcript text here…"
-          rows={3}
-        />
+        <div className="paste-area-row">
+          <textarea
+            className="paste-area"
+            value={text}
+            onChange={e => { setText(e.target.value); localStorage.setItem('transcript-text', e.target.value); setPosition(0); stopPlayback() }}
+            onBlur={onParamsBlur}
+            onPaste={e => {
+              e.preventDefault()
+              const raw = e.clipboardData.getData('text')
+              const parsed = detectAndParseSubtitle(raw)
+              if (parsed) {
+                applySubtitleResult(parsed)
+              } else {
+                const normalized = raw.replace(/\s+/g, ' ').trim()
+                setText(normalized)
+                localStorage.setItem('transcript-text', normalized)
+                setPosition(0)
+                stopPlayback()
+              }
+            }}
+            placeholder="Paste transcript text or .vtt/.srt here…"
+            rows={3}
+          />
+          <button type="button" className="load-file-btn"
+            onClick={() => fileInputRef.current?.click()}>Load file</button>
+          <input ref={fileInputRef} type="file" accept=".vtt,.srt,text/vtt,text/plain"
+            style={{ display: 'none' }} onChange={handleFileLoad} />
+        </div>
         <div className="controls-row">
           <div className="controls-item">
             Window

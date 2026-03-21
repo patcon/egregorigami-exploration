@@ -1,23 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
+import { buildTranscriptData } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
-
-function buildTranscriptData(segments: Array<{ text: string; offset: number }>): {
-  text: string
-  wordTimestamps: number[]
-} {
-  const words: string[] = []
-  const timestamps: number[] = []
-  for (const seg of segments) {
-    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
-    for (const w of segWords) {
-      words.push(w)
-      timestamps.push(seg.offset)
-    }
-  }
-  return { text: words.join(' '), wordTimestamps: timestamps }
-}
 
 function extractVideoId(url: string): string | null {
   try {
@@ -83,6 +68,18 @@ export default function YoutubeTranscriptViewer() {
       setErrorMessage(String(e))
     }
   }
+
+  const handleSubtitleLoad = useCallback((result: { text: string; wordTimestamps: number[]; durationSecs: number }) => {
+    setLoadedText(result.text)
+    setLoadedDuration(String(result.durationSecs))
+    setWordTimestamps(result.wordTimestamps)
+    setLoadedVideoId(null)
+    setLoadCount(c => c + 1)
+    localStorage.setItem('yt-transcript', result.text)
+    localStorage.setItem('yt-duration', String(result.durationSecs))
+    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
+    localStorage.removeItem('yt-video-id')
+  }, [])
 
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
   const externalPosition = (() => {
@@ -184,6 +181,7 @@ export default function YoutubeTranscriptViewer() {
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
         maxSpeed={loadedVideoId ? 2 : undefined}
+        onSubtitleLoad={handleSubtitleLoad}
       />
     </div>
   )

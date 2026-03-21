@@ -5,6 +5,7 @@ import ScatterPlot3D from './ScatterPlot3D'
 import SegmentsListModal from './SegmentsListModal'
 import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { runUmap } from './runUmap'
+import { buildTranscriptData } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './SegmentProjectorModal.css'
 import './EmbeddingLayoutView.css'
@@ -18,22 +19,6 @@ function extractVideoId(url: string): string | null {
   } catch {
     return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
   }
-}
-
-function buildTranscriptData(segments: Array<{ text: string; offset: number }>): {
-  text: string
-  wordTimestamps: number[]
-} {
-  const words: string[] = []
-  const timestamps: number[] = []
-  for (const seg of segments) {
-    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
-    for (const w of segWords) {
-      words.push(w)
-      timestamps.push(seg.offset)
-    }
-  }
-  return { text: words.join(' '), wordTimestamps: timestamps }
 }
 
 function computeChunks(text: string, windowSize: number, overlapPct: number): string[] {
@@ -88,6 +73,21 @@ export default function EmbeddingLayoutView() {
   const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
     windowParamsRef.current = params
     setHasTranscriptText(!!params.text.trim())
+  }, [])
+
+  const handleSubtitleLoad = useCallback((result: { text: string; wordTimestamps: number[]; durationSecs: number }) => {
+    setLoadedText(result.text)
+    setLoadedDuration(String(result.durationSecs))
+    setWordTimestamps(result.wordTimestamps)
+    setLoadedVideoId(null)
+    setLoadCount(c => c + 1)
+    localStorage.setItem('yt-transcript', result.text)
+    localStorage.setItem('yt-duration', String(result.durationSecs))
+    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
+    localStorage.removeItem('yt-video-id')
+    setEmbedPhase({ status: 'idle' })
+    const { windowSize, overlapPct } = windowParamsRef.current
+    setSegments(computeChunks(result.text, windowSize, overlapPct))
   }, [])
 
   const handleParamsBlur = useCallback(() => {
@@ -382,6 +382,7 @@ export default function EmbeddingLayoutView() {
             onPlayingChange={setTranscriptPlaying}
             onSpeedChange={setPlaybackRate}
             maxSpeed={loadedVideoId ? 2 : undefined}
+            onSubtitleLoad={handleSubtitleLoad}
           />
         </div>
 
