@@ -153,6 +153,11 @@
   color: #fff;
 }
 
+.speed-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .word-count {
   font-size: 13px;
   color: var(--text);
