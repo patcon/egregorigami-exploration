@@ -108,14 +108,14 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying])
 
-  // Auto-scroll cursor word into view
+  // Auto-scroll cursor word into view (only while playing)
   useEffect(() => {
-    if (words.length === 0) return
+    if (!isPlaying || words.length === 0) return
     const el = wordRefsMap.current.get(cursorIndex)
     if (el && textAreaRef.current) {
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
-  }, [cursorIndex, words.length])
+  }, [isPlaying, cursorIndex, words.length])
 
   const handleScrubClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
