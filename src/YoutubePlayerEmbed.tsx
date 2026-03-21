@@ -70,6 +70,8 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
               startPoll(playerRef.current!)
             } else {
               stopPoll()
+              // Fire one update so seeks while paused still move the transcript cursor
+              onTimeUpdateRef.current(playerRef.current!.getCurrentTime())
             }
             onPlayStateChangeRef.current?.(isPlaying)
           },

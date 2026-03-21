@@ -101,7 +101,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   }, [])
 
   useEffect(() => {
-    if (externalPosition !== undefined) setPosition(externalPosition)
+    if (externalPosition !== undefined) {
+      setPosition(externalPosition)
+      // Reset RAF baseline so the internal loop doesn't fight the external time source
+      startPositionRef.current = externalPosition
+      startTimeRef.current = null
+    }
   }, [externalPosition])
 
   useEffect(() => {
