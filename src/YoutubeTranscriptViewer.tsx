@@ -20,7 +20,9 @@ export default function YoutubeTranscriptViewer() {
   const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
   const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
   const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
-  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() => localStorage.getItem('yt-video-id'))
+  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
+    extractVideoId(localStorage.getItem('yt-url') ?? '') ? localStorage.getItem('yt-video-id') : null
+  )
   const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
