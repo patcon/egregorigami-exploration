@@ -107,6 +107,7 @@ export default function EmbeddingLayoutView() {
 
   // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const [clickSeekPosition, setClickSeekPosition] = useState<number | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
   const currentWordIndexRef = useRef(0)
   const wordTimestampsRef = useRef(wordTimestamps)
@@ -177,9 +178,13 @@ export default function EmbeddingLayoutView() {
     const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
     const initialCursor = Math.min(windowSize - 1, words.length - 1)
     const wordIndex = Math.min(words.length - 1, initialCursor + idx * step)
-    const ts = wordTimestampsRef.current
+    // Always set a direct word-index position so the transcript cursor jumps
+    // even when no video is loaded (externalPosition would otherwise be undefined)
+    setClickSeekPosition(words.length > 1 ? wordIndex / (words.length - 1) : 0)
+    // Also seek the video if available
     const secs = totalSecsRef.current
     if (!secs) return
+    const ts = wordTimestampsRef.current
     const seekTime = ts && ts.length > 0
       ? ts[Math.min(wordIndex, ts.length - 1)]
       : (words.length > 1 ? (wordIndex / (words.length - 1)) * secs : 0)
@@ -371,7 +376,7 @@ export default function EmbeddingLayoutView() {
             onParamsBlur={handleParamsBlur}
             onCursorChange={handleCursorChange}
             onAllowFasterChange={setAllowFaster}
-            externalPosition={allowFaster ? undefined : externalPosition}
+            externalPosition={(allowFaster ? undefined : externalPosition) ?? clickSeekPosition}
             externalPlaying={allowFaster ? undefined : ytPlaying}
             onScrub={handleScrub}
             onPlayingChange={setTranscriptPlaying}
