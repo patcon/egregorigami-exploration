@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3D from './ScatterPlot3D'
@@ -106,6 +106,30 @@ export default function EmbeddingLayoutView() {
 
   // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const segmentsRef = useRef<string[] | null>(null)
+
+  // Keep ref in sync so cursor handler always sees latest segments
+  useEffect(() => { segmentsRef.current = segments }, [segments])
+
+  const handleCursorChange = useCallback((wordIndex: number) => {
+    const segs = segmentsRef.current
+    if (!segs || segs.length === 0) return
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    const words = text.trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return
+    const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
+    const initialCursor = Math.min(windowSize - 1, words.length - 1)
+    let bestIdx = 0
+    let bestDist = Infinity
+    for (let i = 0; i < segs.length; i++) {
+      const cursor = Math.min(words.length - 1, initialCursor + i * step)
+      const windowStart = Math.max(0, cursor - windowSize + 1)
+      const endIdx = Math.min(words.length - 1, windowStart + windowSize - 1)
+      const dist = Math.abs(endIdx - wordIndex)
+      if (dist < bestDist) { bestDist = dist; bestIdx = i }
+    }
+    setHighlightIndex(bestIdx)
+  }, [])
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)
@@ -277,6 +301,7 @@ export default function EmbeddingLayoutView() {
             initialDuration={loadedDuration ?? undefined}
             onWindowChange={handleWindowChange}
             onParamsBlur={handleParamsBlur}
+            onCursorChange={handleCursorChange}
             externalPosition={externalPosition}
             externalPlaying={ytPlaying}
             onScrub={handleScrub}

@@ -16,6 +16,7 @@ interface TranscriptViewerProps {
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
   onParamsBlur?: () => void
+  onCursorChange?: (wordIndex: number) => void
   externalPosition?: number
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
@@ -24,7 +25,7 @@ interface TranscriptViewerProps {
   maxSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed }: TranscriptViewerProps = {}) {
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState('20')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>('words')
@@ -173,6 +174,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   // onWindowChange intentionally omitted — callers should stabilize with useCallback/useRef
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowSize, overlapPct, text])
+
+  useEffect(() => {
+    onCursorChange?.(cursorIndex)
+  // onCursorChange intentionally omitted
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cursorIndex])
 
   return (
     <div className="transcript-page">
