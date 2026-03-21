@@ -1,0 +1,406 @@
+import { useState, useRef, useCallback } from 'react'
+import TranscriptViewer from './TranscriptViewer'
+import YoutubePlayerEmbed from './YoutubePlayerEmbed'
+import ScatterPlot3D from './ScatterPlot3D'
+import SegmentsListModal from './SegmentsListModal'
+import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
+import { runUmap } from './runUmap'
+import './YoutubeTranscriptViewer.css'
+import './SegmentProjectorModal.css'
+import './EmbeddingLayoutView.css'
+
+function extractVideoId(url: string): string | null {
+  try {
+    const u = new URL(url.trim())
+    if (u.hostname === 'youtu.be') return u.pathname.slice(1)
+    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v')
+    return null
+  } catch {
+    return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
+  }
+}
+
+function buildTranscriptData(segments: Array<{ text: string; offset: number }>): {
+  text: string
+  wordTimestamps: number[]
+} {
+  const words: string[] = []
+  const timestamps: number[] = []
+  for (const seg of segments) {
+    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
+    for (const w of segWords) {
+      words.push(w)
+      timestamps.push(seg.offset)
+    }
+  }
+  return { text: words.join(' '), wordTimestamps: timestamps }
+}
+
+function computeChunks(text: string, windowSize: number, overlapPct: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return []
+  const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
+  const chunks: string[] = []
+  for (let cursor = Math.min(windowSize - 1, words.length - 1); cursor < words.length; cursor += step) {
+    const windowStart = Math.max(0, cursor - windowSize + 1)
+    chunks.push(words.slice(windowStart, windowStart + windowSize).join(' '))
+  }
+  return chunks
+}
+
+type EmbedPhase =
+  | { status: 'idle' }
+  | { status: 'model-loading'; progress: number }
+  | { status: 'embedding'; loaded: number; total: number }
+  | { status: 'umap-running' }
+  | { status: 'done'; points: [number, number, number][] }
+  | { status: 'error'; message: string }
+
+const isProd = import.meta.env.PROD
+
+export default function EmbeddingLayoutView() {
+  const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
+  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
+  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
+  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
+    extractVideoId(localStorage.getItem('yt-url') ?? '') ? localStorage.getItem('yt-video-id') : null
+  )
+  const [loadCount, setLoadCount] = useState(0)
+  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [loadError, setLoadError] = useState('')
+  const [wordTimestamps, setWordTimestamps] = useState<number[] | null>(
+    () => JSON.parse(localStorage.getItem('yt-word-timestamps') ?? 'null')
+  )
+  const [videoTime, setVideoTime] = useState(0)
+  const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
+  const [transcriptPlaying, setTranscriptPlaying] = useState(false)
+  const [ytPlaying, setYtPlaying] = useState(false)
+  const [playbackRate, setPlaybackRate] = useState(1)
+
+  const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(loadedText?.trim()))
+  const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
+    windowSize: 20,
+    overlapPct: 50,
+    text: loadedText ?? '',
+  })
+
+  const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
+    windowParamsRef.current = params
+    setHasTranscriptText(!!params.text.trim())
+  }, [])
+
+  // Embedding state
+  const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(() => {
+    const stored = localStorage.getItem('projector-model')
+    return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
+  })
+  const [embedPhase, setEmbedPhase] = useState<EmbedPhase>({ status: 'idle' })
+  const [segments, setSegments] = useState<string[] | null>(null)
+  const [showSegmentsModal, setShowSegmentsModal] = useState(false)
+
+  // Scatter highlight state
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+
+  const handleLoad = async () => {
+    const videoId = extractVideoId(urlInput)
+    if (!videoId) {
+      setLoadStatus('error')
+      setLoadError('Could not extract a video ID from the input.')
+      return
+    }
+    setLoadStatus('loading')
+    setLoadError('')
+    try {
+      const res = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+      const { text, wordTimestamps } = buildTranscriptData(data.segments)
+      const duration = String(Math.round(data.totalDuration))
+      setLoadedText(text)
+      setLoadedDuration(duration)
+      setLoadedVideoId(videoId)
+      setWordTimestamps(wordTimestamps)
+      setLoadCount(c => c + 1)
+      localStorage.setItem('yt-url', urlInput)
+      localStorage.setItem('yt-transcript', text)
+      localStorage.setItem('yt-duration', duration)
+      localStorage.setItem('yt-video-id', videoId)
+      localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
+      setLoadStatus('idle')
+      // Reset embedding state when new transcript loaded
+      setEmbedPhase({ status: 'idle' })
+      setSegments(null)
+    } catch (e) {
+      setLoadStatus('error')
+      setLoadError(String(e))
+    }
+  }
+
+  const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
+
+  const externalPosition = (() => {
+    if (!totalSecs) return undefined
+    if (wordTimestamps && wordTimestamps.length > 1) {
+      if (videoTime < wordTimestamps[0]) return 0
+      let segFirstIdx = 0
+      for (let i = 1; i < wordTimestamps.length; i++) {
+        if (wordTimestamps[i] > videoTime) break
+        if (wordTimestamps[i] > wordTimestamps[i - 1]) segFirstIdx = i
+      }
+      let segLastIdx = segFirstIdx
+      while (segLastIdx + 1 < wordTimestamps.length && wordTimestamps[segLastIdx + 1] === wordTimestamps[segFirstIdx]) {
+        segLastIdx++
+      }
+      const segStart = wordTimestamps[segFirstIdx]
+      const nextSegStart = segLastIdx + 1 < wordTimestamps.length ? wordTimestamps[segLastIdx + 1] : totalSecs
+      const segDuration = nextSegStart - segStart
+      const segWordCount = segLastIdx - segFirstIdx + 1
+      const wordOffset = segDuration > 0
+        ? Math.min(Math.floor(((videoTime - segStart) / segDuration) * segWordCount), segWordCount - 1)
+        : 0
+      return (segFirstIdx + wordOffset) / (wordTimestamps.length - 1)
+    }
+    return videoTime / totalSecs
+  })()
+
+  const handleScrub = useCallback((pos: number) => {
+    if (!totalSecs) return
+    const t = pos * totalSecs
+    setVideoTime(t)
+    setSeekTarget(t)
+  }, [totalSecs])
+
+  const runEmbeddingOnChunks = async (chunks: string[]) => {
+    if (chunks.length === 0) return
+    setEmbedPhase({ status: 'model-loading', progress: 0 })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      const vectors = await getEmbeddings(chunks, (loaded, total, phaseLabel) => {
+        if (phaseLabel === 'model-loading') {
+          setEmbedPhase({ status: 'model-loading', progress: loaded })
+        } else {
+          setEmbedPhase({ status: 'embedding', loaded, total })
+        }
+      }, selectedModel)
+      setEmbedPhase({ status: 'umap-running' })
+      await new Promise(resolve => setTimeout(resolve, 0))
+      const points = runUmap(vectors)
+      setEmbedPhase({ status: 'done', points })
+    } catch (e) {
+      setEmbedPhase({ status: 'error', message: String(e) })
+    }
+  }
+
+  const handleRunEmbedding = () => {
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    const chunks = computeChunks(text, windowSize, overlapPct)
+    setSegments(chunks)
+    runEmbeddingOnChunks(chunks)
+  }
+
+  const handleShowSegments = () => {
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    const chunks = computeChunks(text, windowSize, overlapPct)
+    setSegments(chunks)
+    setShowSegmentsModal(true)
+  }
+
+  const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status === 'embedding' || embedPhase.status === 'umap-running'
+  const isDone = embedPhase.status === 'done'
+
+  const currentVideoId = extractVideoId(urlInput)
+  const transcriptToolUrl = currentVideoId
+    ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
+    : 'https://www.youtube-transcript.io'
+
+  return (
+    <div className="embedding-layout-wrapper">
+      {/* URL Bar */}
+      <div className="embedding-layout-bar">
+        <div className="embedding-layout-row">
+          <input
+            type="url"
+            className="youtube-url-input"
+            value={urlInput}
+            onChange={e => {
+              const val = e.target.value
+              setUrlInput(val)
+              localStorage.setItem('yt-url', val)
+              if (!extractVideoId(val)) {
+                setLoadedVideoId(null)
+                setWordTimestamps(null)
+                localStorage.removeItem('yt-word-timestamps')
+              }
+            }}
+            onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
+            placeholder="https://www.youtube.com/watch?v=..."
+          />
+          <button className="yt-action-btn" onClick={handleLoad} disabled={isProd || loadStatus === 'loading'}>
+            {loadStatus === 'loading' ? 'Loading…' : 'Load'}
+          </button>
+        </div>
+        {loadStatus === 'error' && <p className="youtube-error">{loadError}</p>}
+        {isProd && (
+          <p className="youtube-notice">
+            {currentVideoId
+              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Get the transcript for this video ↗</a> then paste it into the text area below.</>
+              : <>Paste a YouTube URL above to get started.</>
+            }
+          </p>
+        )}
+      </div>
+
+      {/* Main panels */}
+      <div className="embedding-layout-panels">
+        {/* Left: video + transcript */}
+        <div className="embedding-layout-left">
+          {loadedVideoId && totalSecs && (
+            <YoutubePlayerEmbed
+              videoId={loadedVideoId}
+              onTimeUpdate={setVideoTime}
+              seekTo={seekTarget}
+              playing={transcriptPlaying}
+              onPlayStateChange={setYtPlaying}
+              playbackRate={playbackRate}
+            />
+          )}
+          <TranscriptViewer
+            key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
+            initialText={loadedText ?? undefined}
+            initialDuration={loadedDuration ?? undefined}
+            onWindowChange={handleWindowChange}
+            externalPosition={externalPosition}
+            externalPlaying={ytPlaying}
+            onScrub={handleScrub}
+            onPlayingChange={setTranscriptPlaying}
+            onSpeedChange={setPlaybackRate}
+            maxSpeed={loadedVideoId ? 2 : undefined}
+          />
+        </div>
+
+        {/* Right: embedding panel */}
+        <div className="embedding-layout-right">
+          {/* No transcript yet */}
+          {!hasTranscriptText && (
+            <div className="embedding-panel-placeholder">
+              <span>Load a YouTube video to enable embedding.</span>
+            </div>
+          )}
+
+          {/* Transcript available, not yet embedded */}
+          {hasTranscriptText && !isDone && !isEmbedding && (
+            <>
+              <div className="embedding-panel-form">
+                <select
+                  className="model-select"
+                  value={selectedModel}
+                  onChange={e => {
+                    const v = e.target.value as EmbeddingModelId
+                    setSelectedModel(v)
+                    localStorage.setItem('projector-model', v)
+                  }}
+                >
+                  {EMBEDDING_MODELS.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+                <div className="embedding-panel-form-row">
+                  <button
+                    className="run-embedding-btn"
+                    onClick={handleRunEmbedding}
+                  >
+                    Run Embedding
+                  </button>
+                  <button className="show-segments-btn" onClick={handleShowSegments}>
+                    Show Segments{segments ? ` (${segments.length})` : ''}
+                  </button>
+                </div>
+                {embedPhase.status === 'error' && (
+                  <p className="embedding-panel-error">{embedPhase.message}</p>
+                )}
+              </div>
+              {!segments && (
+                <div className="embedding-panel-placeholder">
+                  <span>Run embedding to visualize segment relationships in 3D.</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Embedding in progress */}
+          {isEmbedding && (
+            <div className="embedding-panel-progress">
+              {embedPhase.status === 'model-loading' && (
+                <div className="progress-wrap" style={{ width: '100%', maxWidth: 300 }}>
+                  <div className="progress-label">
+                    <div className="spinner" />
+                    <span>{embedPhase.progress > 0 ? `Downloading model… ${embedPhase.progress}%` : 'Initializing model…'}</span>
+                  </div>
+                  <div className={`progress-bar ${embedPhase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
+                    <div className="progress-bar-fill" style={{ width: `${embedPhase.progress}%` }} />
+                  </div>
+                </div>
+              )}
+              {embedPhase.status === 'embedding' && (
+                <div className="progress-wrap" style={{ width: '100%', maxWidth: 300 }}>
+                  <div className="progress-label">
+                    <div className="spinner" />
+                    <span>Embedding {embedPhase.loaded + 1} / {embedPhase.total}</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill" style={{ width: `${(embedPhase.loaded / embedPhase.total) * 100}%` }} />
+                  </div>
+                </div>
+              )}
+              {embedPhase.status === 'umap-running' && (
+                <div className="progress-wrap" style={{ width: '100%', maxWidth: 300 }}>
+                  <div className="progress-label">
+                    <div className="spinner" />
+                    <span>Reducing to 3D…</span>
+                  </div>
+                  <div className="progress-bar progress-bar--indeterminate">
+                    <div className="progress-bar-fill" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Embedding done */}
+          {isDone && embedPhase.status === 'done' && segments && (
+            <>
+              <div className="embedding-panel-form" style={{ flexShrink: 0 }}>
+                <div className="embedding-panel-form-row">
+                  <button className="show-segments-btn" onClick={handleShowSegments}>
+                    Show Segments ({segments.length})
+                  </button>
+                  <button
+                    className="run-embedding-btn"
+                    onClick={handleRunEmbedding}
+                  >
+                    Re-run
+                  </button>
+                </div>
+              </div>
+              <div className="embedding-panel-scatter">
+                <ScatterPlot3D
+                  points={embedPhase.points}
+                  labels={segments}
+                  highlightPosition={highlightIndex}
+                  onPointClick={idx => setHighlightIndex(idx)}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {showSegmentsModal && segments && (
+        <SegmentsListModal
+          segments={segments}
+          onClose={() => setShowSegmentsModal(false)}
+        />
+      )}
+    </div>
+  )
+}
