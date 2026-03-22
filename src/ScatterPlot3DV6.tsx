@@ -103,6 +103,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
   const [followMode, setFollowMode] = useState<FollowMode>('static')
   const followModeRef = useRef<FollowMode>('static')
   const prevFollowTargetRef = useRef(new THREE.Vector3())
+  const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
   const normalizedRef = useRef<[number, number, number][]>([])
 
@@ -194,18 +195,26 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         prevFollowTargetRef.current.copy(newTarget)
         controls.update()
       } else if (mode === 'following' && highlightMesh.visible) {
-        controls.enabled = false
+        controls.enabled = true
+        const newTarget = highlightMesh.position.clone()
         const norm = normalizedRef.current
         const hp = highlightPositionRef.current ?? 0
         const a = Math.max(0, Math.min(norm.length - 2, Math.floor(hp)))
-        const pa = new THREE.Vector3(...norm[a])
-        const pb = new THREE.Vector3(...norm[a + 1])
-        const tangent = pb.clone().sub(pa).normalize()
-        const cursorPos = highlightMesh.position.clone()
-        camera.position.copy(cursorPos)
-          .addScaledVector(tangent, -0.6)
-          .add(new THREE.Vector3(0, 0.15, 0))
-        camera.lookAt(cursorPos.clone().addScaledVector(tangent, 0.2))
+        const currTangent = new THREE.Vector3(...norm[a + 1]).sub(new THREE.Vector3(...norm[a])).normalize()
+        // Rotate camera's orbital offset to track path direction change
+        const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
+        const prevTangent = prevPathTangentRef.current
+        if (prevTangent.lengthSq() > 0) {
+          const dot = prevTangent.dot(currTangent)
+          if (dot < 0.9999 && dot > -0.9999) {
+            oldOffset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(prevTangent, currTangent))
+          }
+        }
+        camera.position.copy(newTarget).add(oldOffset)
+        controls.target.copy(newTarget)
+        prevFollowTargetRef.current.copy(newTarget)
+        prevPathTangentRef.current.copy(currTangent)
+        controls.update()
       } else {
         controls.enabled = true
         controls.update()
@@ -309,8 +318,21 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
           const next = modes[(modes.indexOf(followMode) + 1) % modes.length]
           setFollowMode(next)
           followModeRef.current = next
-          if (next === 'tracking' && sceneRef.current?.highlightMesh.visible) {
-            prevFollowTargetRef.current.copy(sceneRef.current.highlightMesh.position)
+          const s = sceneRef.current
+          if (s?.highlightMesh.visible) {
+            if (next === 'tracking') {
+              prevFollowTargetRef.current.copy(s.highlightMesh.position)
+            } else if (next === 'following') {
+              const norm = normalizedRef.current
+              const hp = highlightPositionRef.current ?? 0
+              const a = Math.max(0, Math.min(norm.length - 2, Math.floor(hp)))
+              const tangent = new THREE.Vector3(...norm[a + 1]).sub(new THREE.Vector3(...norm[a])).normalize()
+              const cursorPos = s.highlightMesh.position.clone()
+              s.camera.position.copy(cursorPos).addScaledVector(tangent, -0.6).add(new THREE.Vector3(0, 0.15, 0))
+              s.controls.target.copy(cursorPos)
+              prevFollowTargetRef.current.copy(cursorPos)
+              prevPathTangentRef.current.copy(tangent)
+            }
           }
         }}
       >
