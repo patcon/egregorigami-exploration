@@ -350,7 +350,7 @@ export default function EmbeddingLayoutView() {
       <div className="embedding-layout-panels">
         {/* Left: video + transcript */}
         <div className="embedding-layout-left">
-          {currentVideoId && (
+          {currentVideoId ? (
             <div style={{ position: 'relative' }}>
               <div style={{ visibility: allowFaster ? 'hidden' : 'visible' }}>
                 <YoutubePlayerEmbed
@@ -369,6 +369,12 @@ export default function EmbeddingLayoutView() {
                   </div>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="yt-player-container">
+              <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>Paste a YouTube URL above to load the player</span>
+              </div>
             </div>
           )}
           <TranscriptViewer

@@ -162,7 +162,7 @@ export default function YoutubeTranscriptViewer() {
           </p>
         )}
       </div>
-      {currentVideoId && (
+      {currentVideoId ? (
         <YoutubePlayerEmbed
           videoId={currentVideoId}
           onTimeUpdate={setVideoTime}
@@ -171,6 +171,12 @@ export default function YoutubeTranscriptViewer() {
           onPlayStateChange={setYtPlaying}
           playbackRate={playbackRate}
         />
+      ) : (
+        <div className="yt-player-container">
+          <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>Paste a YouTube URL above to load the player</span>
+          </div>
+        </div>
       )}
       <TranscriptViewer
         key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
