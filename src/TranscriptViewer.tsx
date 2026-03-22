@@ -113,7 +113,11 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   useEffect(() => {
     if (externalPosition !== undefined) {
       setPosition(externalPosition)
-      // Reset RAF baseline so the internal loop doesn't fight the external time source
+      // Stop the internal RAF — the external time source (YouTube player) owns position now
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
       startPositionRef.current = externalPosition
       startTimeRef.current = null
     }
