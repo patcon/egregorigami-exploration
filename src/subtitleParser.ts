@@ -1,3 +1,8 @@
+function decodeHtmlEntities(str: string): string {
+  const doc = new DOMParser().parseFromString(str, 'text/html')
+  return doc.documentElement.textContent ?? str
+}
+
 export interface SubtitleParseResult {
   text: string
   wordTimestamps: number[]  // seconds, one per word
@@ -21,7 +26,7 @@ export function segmentsToVtt(segments: Array<{ text: string; offset: number; du
       ? start + seg.duration
       : (segments[i + 1]?.offset ?? start + 2000)
     lines.push(`${formatVttTime(start)} --> ${formatVttTime(end)}`)
-    lines.push(seg.text.trim())
+    lines.push(decodeHtmlEntities(seg.text.trim()))
     lines.push('')
   }
   return lines.join('\n')
@@ -33,7 +38,7 @@ export function buildTranscriptData(
   const words: string[] = []
   const timestamps: number[] = []
   for (const seg of segments) {
-    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
+    const segWords = decodeHtmlEntities(seg.text.trim()).split(/\s+/).filter(Boolean)
     for (const w of segWords) {
       words.push(w)
       timestamps.push(seg.offset)
