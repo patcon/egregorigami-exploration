@@ -44,7 +44,11 @@ type EmbedPhase =
 const isProd = import.meta.env.PROD
 
 export default function EmbeddingLayoutView() {
-  const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
+  const [urlInput, setUrlInput] = useState(() => {
+    const qsVideoId = new URLSearchParams(window.location.search).get('videoId')
+    if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
+    return localStorage.getItem('yt-url') ?? ''
+  })
   const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
   const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
   const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
