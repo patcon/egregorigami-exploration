@@ -89,9 +89,15 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
       if (position >= 1) setPosition(0)
       startTimeRef.current = null
       setIsPlaying(true)
-      rafRef.current = requestAnimationFrame(tick)
+      // When an external time source (e.g. YouTube player) is active, don't run
+      // the internal RAF — externalPosition updates will drive the cursor instead.
+      // Without this guard, the cursor drifts forward during pre-speech video intros
+      // where externalPosition is stuck at 0 and never triggers its cancel-RAF effect.
+      if (externalPlaying === undefined) {
+        rafRef.current = requestAnimationFrame(tick)
+      }
     }
-  }, [isPlaying, position, stopPlayback, tick])
+  }, [isPlaying, position, externalPlaying, stopPlayback, tick])
 
   // Restart RAF when tick changes (duration changes while playing)
   useEffect(() => {
@@ -130,7 +136,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
       if (position >= 1) setPosition(0)
       startTimeRef.current = null
       setIsPlaying(true)
-      rafRef.current = requestAnimationFrame(tick)
+      // Don't start internal RAF — externalPosition updates drive the cursor
+      // when an external time source is active (same reasoning as handlePlayPause)
     } else if (!externalPlaying && isPlaying) {
       stopPlayback()
     }

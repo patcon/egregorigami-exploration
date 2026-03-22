@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import './ScatterPlot3D.css'
 
 interface Props {
   points: [number, number, number][]
   labels: string[]
-  highlightPosition: number | null  // float: 1.7 = 70% between node 1 and 2
+  highlightPosition: number | null
   onPointClick: (index: number) => void
 }
 
@@ -27,7 +31,71 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick }: Props) {
+function glowPalette(t: number): THREE.Color {
+  // Vivid blue → cyan → bright yellow — optimized for bloom glow
+  const lut = [
+    [0.10, 0.30, 1.00],  // t=0.00  vivid blue
+    [0.00, 0.55, 1.00],  // t=0.25  dodger blue
+    [0.00, 0.90, 0.95],  // t=0.50  cyan
+    [0.60, 1.00, 0.20],  // t=0.75  yellow-green
+    [1.00, 0.95, 0.05],  // t=1.00  bright yellow
+  ]
+  const scaled = Math.min(0.9999, Math.max(0, t)) * (lut.length - 1)
+  const lo = Math.floor(scaled), hi = lo + 1
+  const f = scaled - lo
+  const [r, g, b] = lut[lo].map((v, i) => v + f * (lut[hi][i] - v))
+  return new THREE.Color(r, g, b)
+}
+
+const vertexShader = /* glsl */`
+attribute vec3 aColor;
+attribute float aSeed;
+varying vec3 vColor;
+varying float vSeed;
+
+void main() {
+  vColor = aColor;
+  vSeed = aSeed;
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  // Size scales with camera distance; random seed adds per-point variation
+  gl_PointSize = (1.5 + 2.5 / -mvPosition.z) * (0.6 + 0.8 * aSeed);
+  gl_Position = projectionMatrix * mvPosition;
+}
+`
+
+// Smaller variant for fill particles between nodes
+const fillVertexShader = /* glsl */`
+attribute vec3 aColor;
+attribute float aSeed;
+varying vec3 vColor;
+varying float vSeed;
+
+void main() {
+  vColor = aColor;
+  vSeed = aSeed;
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = (0.7 + 1.2 / -mvPosition.z) * (0.4 + 0.6 * aSeed);
+  gl_Position = projectionMatrix * mvPosition;
+}
+`
+
+const fragmentShader = /* glsl */`
+varying vec3 vColor;
+varying float vSeed;
+uniform float uTime;
+
+void main() {
+  vec2 uv = gl_PointCoord - 0.5;
+  float d = length(uv);
+  if (d > 0.5) discard;
+  float alpha = 1.0 - smoothstep(0.25, 0.5, d);
+  // Each point pulses at its own phase, derived from its random seed
+  float pulse = 0.65 + 0.35 * sin(vSeed * 50.0 + uTime * 2.5);
+  gl_FragColor = vec4(vColor * pulse, alpha);
+}
+`
+
+export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -38,6 +106,8 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     highlightMesh: THREE.Mesh
     raycaster: THREE.Raycaster
     animId: number
+    composer: EffectComposer
+    uniforms: { uTime: { value: number } }
   } | null>(null)
   type FollowMode = 'static' | 'tracking' | 'following'
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
@@ -50,7 +120,6 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
   const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
 
-  // Build scene once
   useEffect(() => {
     const mount = mountRef.current!
     const w = mount.clientWidth
@@ -59,11 +128,13 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(w, h)
     renderer.setPixelRatio(window.devicePixelRatio)
-    const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117'
-    renderer.setClearColor(new THREE.Color(bgColor))
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.0
     mount.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x080b10)
+
     const camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 100)
     camera.position.set(0, 0, 4)
 
@@ -76,39 +147,82 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     const n = normalized.length
 
     const positions = new Float32Array(n * 3)
-    const colors = new Float32Array(n * 3)
+    const aColors = new Float32Array(n * 3)
+    const aSeeds = new Float32Array(n)
     for (let i = 0; i < n; i++) {
       positions[i * 3] = normalized[i][0]
       positions[i * 3 + 1] = normalized[i][1]
       positions[i * 3 + 2] = normalized[i][2]
-      const hue = (1 - i / (n - 1)) * 240 // blue→red
-      const color = new THREE.Color().setHSL(hue / 360, 1, 0.55)
-      colors[i * 3] = color.r
-      colors[i * 3 + 1] = color.g
-      colors[i * 3 + 2] = color.b
+      const c = glowPalette(i / (n - 1))
+      aColors[i * 3] = c.r
+      aColors[i * 3 + 1] = c.g
+      aColors[i * 3 + 2] = c.b
+      aSeeds[i] = Math.random()
     }
 
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    const mat = new THREE.PointsMaterial({ size: 0.04, sizeAttenuation: true, vertexColors: true })
+    geo.setAttribute('aColor', new THREE.BufferAttribute(aColors, 3))
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(aSeeds, 1))
+
+    const uniforms = { uTime: { value: 0 } }
+    const mat = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader,
+      fragmentShader,
+      transparent: true,
+      depthWrite: false,
+    })
+
     const pointsMesh = new THREE.Points(geo, mat)
     scene.add(pointsMesh)
 
-    // Path line through points in transcript order
-    const lineGeo = new THREE.BufferGeometry()
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
-    lineGeo.setAttribute('color', new THREE.BufferAttribute(colors.slice(), 3))
-    const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.35, transparent: true })
-    const lineMesh = new THREE.Line(lineGeo, lineMat)
-    scene.add(lineMesh)
+    // Fill particles — linearly interpolated between adjacent nodes
+    const FILL_PER_SEG = 12
+    const fillCount = (n - 1) * FILL_PER_SEG
+    const fillPositions = new Float32Array(fillCount * 3)
+    const fillColors = new Float32Array(fillCount * 3)
+    const fillSeeds = new Float32Array(fillCount)
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = 0; j < FILL_PER_SEG; j++) {
+        const f = (j + 1) / (FILL_PER_SEG + 1)
+        const idx = i * FILL_PER_SEG + j
+        fillPositions[idx * 3]     = normalized[i][0] + (normalized[i + 1][0] - normalized[i][0]) * f
+        fillPositions[idx * 3 + 1] = normalized[i][1] + (normalized[i + 1][1] - normalized[i][1]) * f
+        fillPositions[idx * 3 + 2] = normalized[i][2] + (normalized[i + 1][2] - normalized[i][2]) * f
+        const c = glowPalette((i + f) / (n - 1))
+        fillColors[idx * 3] = c.r; fillColors[idx * 3 + 1] = c.g; fillColors[idx * 3 + 2] = c.b
+        fillSeeds[idx] = Math.random()
+      }
+    }
+    const fillGeo = new THREE.BufferGeometry()
+    fillGeo.setAttribute('position', new THREE.BufferAttribute(fillPositions, 3))
+    fillGeo.setAttribute('aColor',   new THREE.BufferAttribute(fillColors, 3))
+    fillGeo.setAttribute('aSeed',    new THREE.BufferAttribute(fillSeeds, 1))
+    // Share uTime with node material so both pulse in sync
+    const fillMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: uniforms.uTime },
+      vertexShader: fillVertexShader,
+      fragmentShader,
+      transparent: true,
+      depthWrite: false,
+    })
+    const fillMesh = new THREE.Points(fillGeo, fillMat)
+    scene.add(fillMesh)
 
-    // Highlight mesh (sphere so it stays visible at any zoom level)
-    const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
-    const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
+    // Highlight sphere
+    const hlGeo = new THREE.SphereGeometry(0.05, 16, 16)
+    const hlMat = new THREE.MeshBasicMaterial({ color: 0xff3333 })
     const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
     highlightMesh.visible = false
     scene.add(highlightMesh)
+
+    // Post-processing: bloom
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 1.2, 0.5, 0.15)
+    composer.addPass(bloomPass)
+    composer.addPass(new OutputPass())
 
     const raycaster = new THREE.Raycaster()
     raycaster.params.Points!.threshold = 0.05
@@ -116,6 +230,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     let animId = 0
     const animate = () => {
       animId = requestAnimationFrame(animate)
+      uniforms.uTime.value += 0.016
       // Smoothly lerp sphere towards target position set by the highlight effect
       if (sphereVisibleRef.current) {
         highlightMesh.position.lerp(targetSphereRef.current, 0.2)
@@ -157,7 +272,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
         controls.enabled = true
         controls.update()
       }
-      renderer.render(scene, camera)
+      composer.render()
     }
     animate()
 
@@ -165,18 +280,23 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const nw = mount.clientWidth
       const nh = mount.clientHeight
       renderer.setSize(nw, nh)
+      composer.setSize(nw, nh)
       camera.aspect = nw / nh
       camera.updateProjectionMatrix()
     })
     ro.observe(mount)
 
-    sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId }
+    // Raycasting needs the raw renderer canvas for picking (composer renders to canvas)
+    sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId, composer, uniforms }
 
     return () => {
       cancelAnimationFrame(animId)
       controls.dispose()
+      composer.dispose()
       renderer.dispose()
       ro.disconnect()
+      fillGeo.dispose()
+      fillMat.dispose()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
   }, [points])
@@ -189,8 +309,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const a = Math.max(0, Math.floor(highlightPosition))
       const b = Math.min(normalized.length - 1, Math.ceil(highlightPosition))
       const t = highlightPosition - a
-      const pa = normalized[a]
-      const pb = normalized[b]
+      const pa = normalized[a], pb = normalized[b]
       targetSphereRef.current.set(
         pa[0] + (pb[0] - pa[0]) * t,
         pa[1] + (pb[1] - pa[1]) * t,
@@ -213,25 +332,19 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     s.raycaster.setFromCamera(mouse, s.camera)
     const hits = s.raycaster.intersectObject(s.pointsMesh)
     if (hits.length > 0) {
-      const idx = hits[0].index!
-      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, text: labels[idx] })
+      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top, text: labels[hits[0].index!] })
     } else {
       setTooltip(null)
     }
   }
 
   const mouseDownRef = useRef<{ x: number; y: number } | null>(null)
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    mouseDownRef.current = { x: e.clientX, y: e.clientY }
-  }
-
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { mouseDownRef.current = { x: e.clientX, y: e.clientY } }
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const down = mouseDownRef.current
     if (!down) return
-    const dx = e.clientX - down.x
-    const dy = e.clientY - down.y
-    if (dx * dx + dy * dy > 25) return // >5px movement = drag, not click
+    const dx = e.clientX - down.x, dy = e.clientY - down.y
+    if (dx * dx + dy * dy > 25) return
     const s = sceneRef.current
     if (!s) return
     const rect = mountRef.current!.getBoundingClientRect()

@@ -27,7 +27,28 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick }: Props) {
+function cividis(t: number): THREE.Color {
+  const lut = [
+    [0.000, 0.122, 0.302],  // t=0.0  dark navy
+    [0.122, 0.267, 0.420],  // t=0.1
+    [0.216, 0.342, 0.456],  // t=0.2
+    [0.300, 0.416, 0.469],  // t=0.3
+    [0.379, 0.488, 0.468],  // t=0.4
+    [0.456, 0.560, 0.450],  // t=0.5
+    [0.543, 0.630, 0.414],  // t=0.6
+    [0.643, 0.698, 0.352],  // t=0.7
+    [0.759, 0.764, 0.256],  // t=0.8
+    [0.877, 0.826, 0.125],  // t=0.9
+    [0.996, 0.908, 0.145],  // t=1.0  bright yellow
+  ]
+  const scaled = Math.min(0.9999, Math.max(0, t)) * (lut.length - 1)
+  const lo = Math.floor(scaled), hi = lo + 1
+  const f = scaled - lo
+  const [r, g, b] = lut[lo].map((v, i) => v + f * (lut[hi][i] - v))
+  return new THREE.Color(r, g, b)
+}
+
+export default function ScatterPlot3DV5({ points, labels, highlightPosition, onPointClick }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -38,6 +59,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     highlightMesh: THREE.Mesh
     raycaster: THREE.Raycaster
     animId: number
+    curve: THREE.CatmullRomCurve3
   } | null>(null)
   type FollowMode = 'static' | 'tracking' | 'following'
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
@@ -75,35 +97,61 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     normalizedRef.current = normalized
     const n = normalized.length
 
+    // Points for raycasting (hover/click)
     const positions = new Float32Array(n * 3)
     const colors = new Float32Array(n * 3)
     for (let i = 0; i < n; i++) {
       positions[i * 3] = normalized[i][0]
       positions[i * 3 + 1] = normalized[i][1]
       positions[i * 3 + 2] = normalized[i][2]
-      const hue = (1 - i / (n - 1)) * 240 // blue→red
-      const color = new THREE.Color().setHSL(hue / 360, 1, 0.55)
-      colors[i * 3] = color.r
-      colors[i * 3 + 1] = color.g
-      colors[i * 3 + 2] = color.b
+      const c = cividis(i / (n - 1))
+      colors[i * 3] = c.r
+      colors[i * 3 + 1] = c.g
+      colors[i * 3 + 2] = c.b
     }
 
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    const mat = new THREE.PointsMaterial({ size: 0.04, sizeAttenuation: true, vertexColors: true })
+    const mat = new THREE.PointsMaterial({ size: 0.025, sizeAttenuation: true, vertexColors: true })
     const pointsMesh = new THREE.Points(geo, mat)
     scene.add(pointsMesh)
 
-    // Path line through points in transcript order
-    const lineGeo = new THREE.BufferGeometry()
-    lineGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
-    lineGeo.setAttribute('color', new THREE.BufferAttribute(colors.slice(), 3))
-    const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.35, transparent: true })
-    const lineMesh = new THREE.Line(lineGeo, lineMat)
-    scene.add(lineMesh)
+    // Curved tube path (protein-folding aesthetic)
+    const curve = new THREE.CatmullRomCurve3(
+      normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+    )
 
-    // Highlight mesh (sphere so it stays visible at any zoom level)
+    const TUBE_SEGMENTS = Math.max(64, normalized.length * 6)
+    const RADIAL_SEGMENTS = 10
+    const TUBE_RADIUS = 0.025
+
+    const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEGMENTS, TUBE_RADIUS, RADIAL_SEGMENTS, false)
+
+    const tubeColors = new Float32Array(tubeGeo.attributes.position.count * 3)
+    const vertsPerRing = RADIAL_SEGMENTS + 1
+    for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
+      const ring = Math.floor(v / vertsPerRing)
+      const t = ring / TUBE_SEGMENTS
+      const c = cividis(t)
+      // Alternate brightness between node-to-node segments to show spacing
+      const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
+      const bright = segIdx % 2 === 0 ? 1.2 : 0.7
+      tubeColors[v * 3] = Math.min(1, c.r * bright)
+      tubeColors[v * 3 + 1] = Math.min(1, c.g * bright)
+      tubeColors[v * 3 + 2] = Math.min(1, c.b * bright)
+    }
+    tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
+
+    const tubeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })
+    const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat)
+    scene.add(tubeMesh)
+
+    // Lighting for MeshStandardMaterial
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+    scene.add(new THREE.DirectionalLight(0xffffff, 0.8))
+
+    // Highlight mesh (sphere)
     const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
     const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
     const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
@@ -135,10 +183,9 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       } else if (mode === 'following' && highlightMesh.visible) {
         controls.enabled = true
         const newTarget = highlightMesh.position.clone()
-        const norm = normalizedRef.current
         const hp = highlightPositionRef.current ?? 0
-        const a = Math.max(0, Math.min(norm.length - 2, Math.floor(hp)))
-        const currTangent = new THREE.Vector3(...norm[a + 1]).sub(new THREE.Vector3(...norm[a])).normalize()
+        const t = Math.max(0.0001, Math.min(0.9999, hp / (normalized.length - 1)))
+        const currTangent = curve.getTangent(t)
         // Rotate camera's orbital offset to track path direction change
         const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
         const prevTangent = prevPathTangentRef.current
@@ -170,7 +217,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     })
     ro.observe(mount)
 
-    sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId }
+    sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId, curve }
 
     return () => {
       cancelAnimationFrame(animId)
@@ -181,21 +228,16 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     }
   }, [points])
 
-  // Highlight updates — set target position; RAF lerps sphere towards it each frame
+  // Highlight updates — set target position on curve; RAF lerps sphere towards it each frame
   useEffect(() => {
     highlightPositionRef.current = highlightPosition
+    const s = sceneRef.current
+    if (!s) return
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
-      const a = Math.max(0, Math.floor(highlightPosition))
-      const b = Math.min(normalized.length - 1, Math.ceil(highlightPosition))
-      const t = highlightPosition - a
-      const pa = normalized[a]
-      const pb = normalized[b]
-      targetSphereRef.current.set(
-        pa[0] + (pb[0] - pa[0]) * t,
-        pa[1] + (pb[1] - pa[1]) * t,
-        pa[2] + (pb[2] - pa[2]) * t,
-      )
+      const t = highlightPosition / (normalized.length - 1)
+      const pos = s.curve.getPoint(Math.min(1, Math.max(0, t)))
+      targetSphereRef.current.copy(pos)
       sphereVisibleRef.current = true
     } else {
       sphereVisibleRef.current = false
@@ -264,10 +306,9 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
             if (next === 'tracking') {
               prevFollowTargetRef.current.copy(s.highlightMesh.position)
             } else if (next === 'following') {
-              const norm = normalizedRef.current
               const hp = highlightPositionRef.current ?? 0
-              const a = Math.max(0, Math.min(norm.length - 2, Math.floor(hp)))
-              const tangent = new THREE.Vector3(...norm[a + 1]).sub(new THREE.Vector3(...norm[a])).normalize()
+              const t = Math.max(0.0001, Math.min(0.9999, hp / (normalizedRef.current.length - 1)))
+              const tangent = s.curve.getTangent(t)
               const cursorPos = s.highlightMesh.position.clone()
               s.camera.position.copy(cursorPos).addScaledVector(tangent, -0.6).add(new THREE.Vector3(0, 0.15, 0))
               s.controls.target.copy(cursorPos)

@@ -12,6 +12,37 @@
   height: 100% !important;
 }
 
+.scatter-follow-btn {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  z-index: 10;
+  pointer-events: all;
+  user-select: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.scatter-follow-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+}
+.scatter-follow-btn.tracking {
+  background: rgba(40, 100, 200, 0.35);
+  border-color: rgba(80, 140, 255, 0.6);
+  color: #fff;
+}
+.scatter-follow-btn.following {
+  background: rgba(200, 50, 50, 0.35);
+  border-color: rgba(255, 80, 80, 0.6);
+  color: #fff;
+}
+
 .scatter-tooltip {
   position: absolute;
   pointer-events: none;
