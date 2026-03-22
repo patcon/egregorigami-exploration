@@ -46,6 +46,8 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
+  const targetSphereRef = useRef(new THREE.Vector3())
+  const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
 
   // Build scene once
@@ -114,6 +116,13 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     let animId = 0
     const animate = () => {
       animId = requestAnimationFrame(animate)
+      // Smoothly lerp sphere towards target position set by the highlight effect
+      if (sphereVisibleRef.current) {
+        highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+        highlightMesh.visible = true
+      } else {
+        highlightMesh.visible = false
+      }
       const mode = followModeRef.current
       if (mode === 'tracking' && highlightMesh.visible) {
         controls.enabled = true
@@ -172,11 +181,9 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     }
   }, [points])
 
-  // Highlight updates without scene rebuild — lerp between adjacent nodes for smooth motion
+  // Highlight updates — set target position; RAF lerps sphere towards it each frame
   useEffect(() => {
     highlightPositionRef.current = highlightPosition
-    const s = sceneRef.current
-    if (!s) return
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
       const a = Math.max(0, Math.floor(highlightPosition))
@@ -184,13 +191,14 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const t = highlightPosition - a
       const pa = normalized[a]
       const pb = normalized[b]
-      const x = pa[0] + (pb[0] - pa[0]) * t
-      const y = pa[1] + (pb[1] - pa[1]) * t
-      const z = pa[2] + (pb[2] - pa[2]) * t
-      s.highlightMesh.position.set(x, y, z)
-      s.highlightMesh.visible = true
+      targetSphereRef.current.set(
+        pa[0] + (pb[0] - pa[0]) * t,
+        pa[1] + (pb[1] - pa[1]) * t,
+        pa[2] + (pb[2] - pa[2]) * t,
+      )
+      sphereVisibleRef.current = true
     } else {
-      s.highlightMesh.visible = false
+      sphereVisibleRef.current = false
     }
   }, [highlightPosition])
 

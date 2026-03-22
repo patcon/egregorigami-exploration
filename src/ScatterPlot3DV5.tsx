@@ -68,6 +68,8 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
+  const targetSphereRef = useRef(new THREE.Vector3())
+  const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
 
   // Build scene once
@@ -162,6 +164,13 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     let animId = 0
     const animate = () => {
       animId = requestAnimationFrame(animate)
+      // Smoothly lerp sphere towards target position set by the highlight effect
+      if (sphereVisibleRef.current) {
+        highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+        highlightMesh.visible = true
+      } else {
+        highlightMesh.visible = false
+      }
       const mode = followModeRef.current
       if (mode === 'tracking' && highlightMesh.visible) {
         controls.enabled = true
@@ -219,7 +228,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     }
   }, [points])
 
-  // Highlight updates — follow curve for smooth motion
+  // Highlight updates — set target position on curve; RAF lerps sphere towards it each frame
   useEffect(() => {
     highlightPositionRef.current = highlightPosition
     const s = sceneRef.current
@@ -228,10 +237,10 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     if (highlightPosition !== null && normalized.length > 0) {
       const t = highlightPosition / (normalized.length - 1)
       const pos = s.curve.getPoint(Math.min(1, Math.max(0, t)))
-      s.highlightMesh.position.copy(pos)
-      s.highlightMesh.visible = true
+      targetSphereRef.current.copy(pos)
+      sphereVisibleRef.current = true
     } else {
-      s.highlightMesh.visible = false
+      sphereVisibleRef.current = false
     }
   }, [highlightPosition])
 

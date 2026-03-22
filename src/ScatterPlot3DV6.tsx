@@ -105,6 +105,8 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
+  const targetSphereRef = useRef(new THREE.Vector3())
+  const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
 
   useEffect(() => {
@@ -185,6 +187,13 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     const animate = () => {
       animId = requestAnimationFrame(animate)
       uniforms.uTime.value += 0.016
+      // Smoothly lerp sphere towards target position set by the highlight effect
+      if (sphereVisibleRef.current) {
+        highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+        highlightMesh.visible = true
+      } else {
+        highlightMesh.visible = false
+      }
       const mode = followModeRef.current
       if (mode === 'tracking' && highlightMesh.visible) {
         controls.enabled = true
@@ -246,24 +255,23 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     }
   }, [points])
 
+  // Highlight updates — set target position; RAF lerps sphere towards it each frame
   useEffect(() => {
     highlightPositionRef.current = highlightPosition
-    const s = sceneRef.current
-    if (!s) return
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
       const a = Math.max(0, Math.floor(highlightPosition))
       const b = Math.min(normalized.length - 1, Math.ceil(highlightPosition))
       const t = highlightPosition - a
       const pa = normalized[a], pb = normalized[b]
-      s.highlightMesh.position.set(
+      targetSphereRef.current.set(
         pa[0] + (pb[0] - pa[0]) * t,
         pa[1] + (pb[1] - pa[1]) * t,
         pa[2] + (pb[2] - pa[2]) * t,
       )
-      s.highlightMesh.visible = true
+      sphereVisibleRef.current = true
     } else {
-      s.highlightMesh.visible = false
+      sphereVisibleRef.current = false
     }
   }, [highlightPosition])
 
