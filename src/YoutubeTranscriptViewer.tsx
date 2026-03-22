@@ -146,17 +146,17 @@ export default function YoutubeTranscriptViewer() {
           />
           <button
             className="yt-action-btn"
-            onClick={handleLoad}
-            disabled={isProd || status === 'loading'}
+            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+            disabled={isProd ? !currentVideoId : status === 'loading'}
           >
-            {status === 'loading' ? 'Loading…' : 'Fetch Transcript'}
+            {!isProd && status === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
         </div>
         {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
-              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Download the transcript for this video ↗</a> then paste or load it below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
+              ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
               : <>Paste a YouTube URL above to get started.</>
             }
           </p>

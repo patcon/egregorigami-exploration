@@ -180,8 +180,10 @@ export default function YoutubeEmbeddingProjector() {
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
-          <button className="yt-action-btn" onClick={handleLoad} disabled={isProd || status === 'loading'}>
-            {status === 'loading' ? 'Loading…' : 'Fetch Transcript'}
+          <button className="yt-action-btn"
+            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+            disabled={isProd ? !currentVideoId : status === 'loading'}>
+            {!isProd && status === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
           {hasTranscriptText && (
             <button className="open-projector-btn" onClick={handleOpenProjector}>
@@ -193,7 +195,7 @@ export default function YoutubeEmbeddingProjector() {
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
-              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Download the transcript for this video ↗</a> then paste or load it below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
+              ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
               : <>Paste a YouTube URL above to get started.</>
             }
           </p>
