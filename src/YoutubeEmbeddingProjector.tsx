@@ -233,7 +233,7 @@ export default function YoutubeEmbeddingProjector() {
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
-        maxSpeed={loadedVideoId ? 2 : undefined}
+        maxSpeed={currentVideoId ? 2 : undefined}
         onAllowFasterChange={setAllowFaster}
         onSubtitleLoad={handleSubtitleLoad}
       />

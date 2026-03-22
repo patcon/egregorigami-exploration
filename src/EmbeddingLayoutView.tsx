@@ -384,7 +384,7 @@ export default function EmbeddingLayoutView() {
             onScrub={handleScrub}
             onPlayingChange={setTranscriptPlaying}
             onSpeedChange={setPlaybackRate}
-            maxSpeed={loadedVideoId ? 2 : undefined}
+            maxSpeed={currentVideoId ? 2 : undefined}
             onSubtitleLoad={handleSubtitleLoad}
           />
         </div>
