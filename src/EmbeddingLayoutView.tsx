@@ -65,8 +65,8 @@ export default function EmbeddingLayoutView() {
 
   const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(loadedText?.trim()))
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
-    windowSize: 20,
-    overlapPct: 50,
+    windowSize: 40,
+    overlapPct: 80,
     text: loadedText ?? '',
   })
 

@@ -55,8 +55,8 @@ export default function YoutubeEmbeddingProjector() {
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
-    windowSize: 20,
-    overlapPct: 50,
+    windowSize: 40,
+    overlapPct: 80,
     text: loadedText ?? '',
   })
 

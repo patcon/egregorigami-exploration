@@ -31,9 +31,9 @@ interface TranscriptViewerProps {
 export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
-  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '20')
+  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
-  const [overlapInput, setOverlapInput] = useState(() => localStorage.getItem('transcript-overlap') ?? '50')
+  const [overlapInput, setOverlapInput] = useState(() => localStorage.getItem('transcript-overlap') ?? '80')
   const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
   const [speed, setSpeed] = useState(1)
