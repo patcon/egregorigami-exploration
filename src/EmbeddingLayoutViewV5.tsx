@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
+import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
+import ScatterPlot3DV6 from './ScatterPlot3DV6'
 import SegmentsListModal from './SegmentsListModal'
 import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { runUmap } from './runUmap'
@@ -108,6 +110,11 @@ export default function EmbeddingLayoutViewV5() {
   const [embedPhase, setEmbedPhase] = useState<EmbedPhase>({ status: 'idle' })
   const [segments, setSegments] = useState<string[] | null>(null)
   const [showSegmentsModal, setShowSegmentsModal] = useState(false)
+
+  type RendererType = 'original' | 'cividis-tube' | 'glow'
+  const [rendererType, setRendererType] = useState<RendererType>(() =>
+    (localStorage.getItem('scatter-renderer') as RendererType) ?? 'cividis-tube'
+  )
 
   // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
@@ -504,6 +511,19 @@ export default function EmbeddingLayoutViewV5() {
                     <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
                 </select>
+                <select
+                  className="model-select"
+                  value={rendererType}
+                  onChange={e => {
+                    const v = e.target.value as RendererType
+                    setRendererType(v)
+                    localStorage.setItem('scatter-renderer', v)
+                  }}
+                >
+                  <option value="original">Points + Line</option>
+                  <option value="cividis-tube">Cividis Tube</option>
+                  <option value="glow">Glow (Shader)</option>
+                </select>
                 <div className="embedding-panel-form-row">
                   <button className="show-segments-btn" onClick={handleShowSegments}>
                     Show Segments ({segments.length})
@@ -517,12 +537,9 @@ export default function EmbeddingLayoutViewV5() {
                 </div>
               </div>
               <div className="embedding-panel-scatter">
-                <ScatterPlot3DV5
-                  points={embedPhase.points}
-                  labels={segments}
-                  highlightPosition={highlightIndex}
-                  onPointClick={handlePointClick}
-                />
+                {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} />}
+                {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} />}
+                {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} />}
               </div>
             </>
           )}
