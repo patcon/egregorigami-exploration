@@ -181,7 +181,7 @@ export default function YoutubeEmbeddingProjector() {
             placeholder="https://www.youtube.com/watch?v=..."
           />
           <button className="yt-action-btn" onClick={handleLoad} disabled={isProd || status === 'loading'}>
-            {status === 'loading' ? 'Loading…' : 'Load'}
+            {status === 'loading' ? 'Loading…' : 'Fetch Transcript'}
           </button>
           {hasTranscriptText && (
             <button className="open-projector-btn" onClick={handleOpenProjector}>
@@ -193,18 +193,18 @@ export default function YoutubeEmbeddingProjector() {
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
-              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Get the transcript for this video ↗</a> then paste it into the text area below.</>
+              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Download the transcript for this video ↗</a> then paste or load it below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
               : <>Paste a YouTube URL above to get started.</>
             }
           </p>
         )}
       </div>
 
-      {loadedVideoId && totalSecs && (
+      {currentVideoId && (
         <div style={{ position: 'relative' }}>
           <div style={{ visibility: allowFaster ? 'hidden' : 'visible' }}>
             <YoutubePlayerEmbed
-              videoId={loadedVideoId}
+              videoId={currentVideoId}
               onTimeUpdate={setVideoTime}
               seekTo={allowFaster ? undefined : seekTarget}
               playing={allowFaster ? false : transcriptPlaying}

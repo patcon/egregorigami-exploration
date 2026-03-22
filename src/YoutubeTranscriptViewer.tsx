@@ -149,22 +149,22 @@ export default function YoutubeTranscriptViewer() {
             onClick={handleLoad}
             disabled={isProd || status === 'loading'}
           >
-            {status === 'loading' ? 'Loading…' : 'Load'}
+            {status === 'loading' ? 'Loading…' : 'Fetch Transcript'}
           </button>
         </div>
         {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
-              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Get the transcript for this video ↗</a> then paste it into the text area below.</>
+              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Download the transcript for this video ↗</a> then paste or load it below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
               : <>Paste a YouTube URL above to get started.</>
             }
           </p>
         )}
       </div>
-      {loadedVideoId && totalSecs && (
+      {currentVideoId && (
         <YoutubePlayerEmbed
-          videoId={loadedVideoId}
+          videoId={currentVideoId}
           onTimeUpdate={setVideoTime}
           seekTo={seekTarget}
           playing={transcriptPlaying}
