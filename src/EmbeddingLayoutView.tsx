@@ -378,7 +378,7 @@ export default function EmbeddingLayoutView() {
             onWindowChange={handleWindowChange}
             onParamsBlur={handleParamsBlur}
             onCursorChange={handleCursorChange}
-            onAllowFasterChange={setAllowFaster}
+            onAllowFasterChange={allow => { setAllowFaster(allow); if (!allow) { setYtPlaying(false); setTranscriptPlaying(false) } }}
             externalPosition={(allowFaster ? undefined : externalPosition) ?? clickSeekPosition}
             externalPlaying={allowFaster ? undefined : ytPlaying}
             onScrub={handleScrub}
