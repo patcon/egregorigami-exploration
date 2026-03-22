@@ -1,73 +1,50 @@
-# React + TypeScript + Vite
+# egregorigami
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Explorations of collective intelligence, narrative space, and protein folding.
 
-Currently, two official plugins are available:
+A set of in-browser visualizations built with React + TypeScript + Vite, deployed to GitHub Pages.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**Live:** https://patcon.github.io/egregorigami-exploration/
 
-## React Compiler
+## Views
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Hash | Name | Description |
+|------|------|-------------|
+| `#v1` | Transcript Window Visualizer | Watch an embedding context window slide through pasted text in real time. Configurable window size, overlap %, and playback duration. |
+| `#v2` | YouTube Transcript Visualizer | Paste a YouTube URL and watch the embedding window slide through the synced transcript. |
+| `#v3` | Embedding Projector | Generate sentence embeddings in-browser (via HuggingFace Transformers.js) and explore the 3D semantic space with an interactive scatter plot. |
+| `#v4` | Embedding Layout | Side-by-side view: YouTube player + transcript + inline 3D embedding panel. |
+| `#v5` | Embedding Layout (New Renderers) | Same as v4, with switchable 3D renderers: original points, Cividis tube, and glow shader with bloom. |
 
-## Expanding the ESLint configuration
+## Keyboard shortcuts
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Available in all views:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Space** — play / pause (video, or cursor animation if no video is loaded)
+- **← / →** — seek ±10 seconds in the video; step the cursor one window forward/back in transcript-only view
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Shortcuts are suppressed when a text input or textarea has focus.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Dev setup
+
+```bash
+pnpm install
+pnpm dev        # start dev server (required for YouTube transcript fetching)
+pnpm build      # TypeScript compile + Vite build
+pnpm lint       # ESLint
+pnpm preview    # preview production build locally
+
+# Extract a transcript to stdout (dev server must be running)
+pnpm extract-transcript -- <youtube-url-or-video-id>
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> **Note:** The `/api/transcript` endpoint only exists in the dev server. The YouTube URL input is hidden in production builds (`import.meta.env.PROD` guard). Load a transcript in dev, and it will be cached in `localStorage` for use in production.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Tech
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- React 19 + TypeScript, built with Vite
+- Three.js for 3D rendering (OrbitControls, post-processing bloom)
+- `@huggingface/transformers` for in-browser sentence embeddings (`Xenova/all-MiniLM-L6-v2`)
+- `umap-js` for 3D dimensionality reduction
+- `youtube-transcript-plus` for server-side transcript fetching (dev only)
+- Deployed via GitHub Actions to GitHub Pages
