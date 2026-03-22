@@ -63,6 +63,22 @@ void main() {
 }
 `
 
+// Smaller variant for fill particles between nodes
+const fillVertexShader = /* glsl */`
+attribute vec3 aColor;
+attribute float aSeed;
+varying vec3 vColor;
+varying float vSeed;
+
+void main() {
+  vColor = aColor;
+  vSeed = aSeed;
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  gl_PointSize = (0.7 + 1.2 / -mvPosition.z) * (0.4 + 0.6 * aSeed);
+  gl_Position = projectionMatrix * mvPosition;
+}
+`
+
 const fragmentShader = /* glsl */`
 varying vec3 vColor;
 varying float vSeed;
@@ -161,6 +177,39 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     const pointsMesh = new THREE.Points(geo, mat)
     scene.add(pointsMesh)
 
+    // Fill particles — linearly interpolated between adjacent nodes
+    const FILL_PER_SEG = 12
+    const fillCount = (n - 1) * FILL_PER_SEG
+    const fillPositions = new Float32Array(fillCount * 3)
+    const fillColors = new Float32Array(fillCount * 3)
+    const fillSeeds = new Float32Array(fillCount)
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = 0; j < FILL_PER_SEG; j++) {
+        const f = (j + 1) / (FILL_PER_SEG + 1)
+        const idx = i * FILL_PER_SEG + j
+        fillPositions[idx * 3]     = normalized[i][0] + (normalized[i + 1][0] - normalized[i][0]) * f
+        fillPositions[idx * 3 + 1] = normalized[i][1] + (normalized[i + 1][1] - normalized[i][1]) * f
+        fillPositions[idx * 3 + 2] = normalized[i][2] + (normalized[i + 1][2] - normalized[i][2]) * f
+        const c = glowPalette((i + f) / (n - 1))
+        fillColors[idx * 3] = c.r; fillColors[idx * 3 + 1] = c.g; fillColors[idx * 3 + 2] = c.b
+        fillSeeds[idx] = Math.random()
+      }
+    }
+    const fillGeo = new THREE.BufferGeometry()
+    fillGeo.setAttribute('position', new THREE.BufferAttribute(fillPositions, 3))
+    fillGeo.setAttribute('aColor',   new THREE.BufferAttribute(fillColors, 3))
+    fillGeo.setAttribute('aSeed',    new THREE.BufferAttribute(fillSeeds, 1))
+    // Share uTime with node material so both pulse in sync
+    const fillMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: uniforms.uTime },
+      vertexShader: fillVertexShader,
+      fragmentShader,
+      transparent: true,
+      depthWrite: false,
+    })
+    const fillMesh = new THREE.Points(fillGeo, fillMat)
+    scene.add(fillMesh)
+
     // Highlight sphere
     const hlGeo = new THREE.SphereGeometry(0.05, 16, 16)
     const hlMat = new THREE.MeshBasicMaterial({ color: 0xff3333 })
@@ -246,6 +295,8 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       composer.dispose()
       renderer.dispose()
       ro.disconnect()
+      fillGeo.dispose()
+      fillMat.dispose()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
   }, [points])
