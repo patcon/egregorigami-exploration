@@ -31,19 +31,14 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-function cividis(t: number): THREE.Color {
+function glowPalette(t: number): THREE.Color {
+  // Vivid blue → cyan → bright yellow — optimized for bloom glow
   const lut = [
-    [0.000, 0.122, 0.302],
-    [0.122, 0.267, 0.420],
-    [0.216, 0.342, 0.456],
-    [0.300, 0.416, 0.469],
-    [0.379, 0.488, 0.468],
-    [0.456, 0.560, 0.450],
-    [0.543, 0.630, 0.414],
-    [0.643, 0.698, 0.352],
-    [0.759, 0.764, 0.256],
-    [0.877, 0.826, 0.125],
-    [0.996, 0.908, 0.145],
+    [0.10, 0.30, 1.00],  // t=0.00  vivid blue
+    [0.00, 0.55, 1.00],  // t=0.25  dodger blue
+    [0.00, 0.90, 0.95],  // t=0.50  cyan
+    [0.60, 1.00, 0.20],  // t=0.75  yellow-green
+    [1.00, 0.95, 0.05],  // t=1.00  bright yellow
   ]
   const scaled = Math.min(0.9999, Math.max(0, t)) * (lut.length - 1)
   const lo = Math.floor(scaled), hi = lo + 1
@@ -142,7 +137,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       positions[i * 3] = normalized[i][0]
       positions[i * 3 + 1] = normalized[i][1]
       positions[i * 3 + 2] = normalized[i][2]
-      const c = cividis(i / (n - 1))
+      const c = glowPalette(i / (n - 1))
       aColors[i * 3] = c.r
       aColors[i * 3 + 1] = c.g
       aColors[i * 3 + 2] = c.b
