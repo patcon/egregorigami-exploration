@@ -35,7 +35,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     controls: OrbitControls
     scene: THREE.Scene
     pointsMesh: THREE.Points
-    highlightMesh: THREE.Points
+    highlightMesh: THREE.Mesh
     raycaster: THREE.Raycaster
     animId: number
   } | null>(null)
@@ -95,11 +95,10 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     const lineMesh = new THREE.Line(lineGeo, lineMat)
     scene.add(lineMesh)
 
-    // Highlight mesh (single point)
-    const hlGeo = new THREE.BufferGeometry()
-    hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3))
-    const hlMat = new THREE.PointsMaterial({ size: 0.12, sizeAttenuation: true, color: 0xff2222 })
-    const highlightMesh = new THREE.Points(hlGeo, hlMat)
+    // Highlight mesh (sphere so it stays visible at any zoom level)
+    const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
+    const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
+    const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
     highlightMesh.visible = false
     scene.add(highlightMesh)
 
@@ -148,9 +147,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const x = pa[0] + (pb[0] - pa[0]) * t
       const y = pa[1] + (pb[1] - pa[1]) * t
       const z = pa[2] + (pb[2] - pa[2]) * t
-      const posAttr = s.highlightMesh.geometry.getAttribute('position') as THREE.BufferAttribute
-      posAttr.setXYZ(0, x, y, z)
-      posAttr.needsUpdate = true
+      s.highlightMesh.position.set(x, y, z)
       s.highlightMesh.visible = true
     } else {
       s.highlightMesh.visible = false

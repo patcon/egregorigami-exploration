@@ -61,20 +61,28 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
       containerRef.current.innerHTML = ''
       containerRef.current.appendChild(div)
 
-      playerRef.current = new window.YT.Player(div, {
+      // Don't assign playerRef.current here — the object returned by new YT.Player()
+      // is not fully initialized until onReady fires. Assigning it early means
+      // playVideo/pauseVideo don't exist yet, causing crashes in sibling effects.
+      new window.YT.Player(div, {
         videoId,
         playerVars: { rel: 0, modestbranding: 1 },
         events: {
+          onReady: (event: YT.PlayerEvent) => {
+            // Only expose the player once it's fully initialized
+            playerRef.current = event.target
+          },
           onStateChange: (event: YT.OnStateChangeEvent) => {
+            if (!playerRef.current) return  // guard against post-destroy async events
             const isPlaying = event.data === window.YT.PlayerState.PLAYING
             const isPaused = event.data === window.YT.PlayerState.PAUSED
             if (isPlaying) {
-              startPoll(playerRef.current!)
+              startPoll(playerRef.current)
               onPlayStateChangeRef.current?.(true)
             } else if (isPaused) {
               stopPoll()
               // Fire one update so seeks while paused still move the transcript cursor
-              onTimeUpdateRef.current(playerRef.current!.getCurrentTime())
+              onTimeUpdateRef.current(playerRef.current.getCurrentTime())
               onPlayStateChangeRef.current?.(false)
             } else {
               // BUFFERING or other transient states — stop polling but don't

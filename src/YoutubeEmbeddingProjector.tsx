@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import SegmentProjectorModal from './SegmentProjectorModal'
+import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './YoutubeEmbeddingProjector.css'
 
@@ -14,22 +15,6 @@ function extractVideoId(url: string): string | null {
   } catch {
     return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
   }
-}
-
-function buildTranscriptData(segments: Array<{ text: string; offset: number }>): {
-  text: string
-  wordTimestamps: number[]
-} {
-  const words: string[] = []
-  const timestamps: number[] = []
-  for (const seg of segments) {
-    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
-    for (const w of segWords) {
-      words.push(w)
-      timestamps.push(seg.offset)
-    }
-  }
-  return { text: words.join(' '), wordTimestamps: timestamps }
 }
 
 function computeChunks(text: string, windowSize: number, overlapPct: number): string[] {
@@ -48,7 +33,11 @@ function computeChunks(text: string, windowSize: number, overlapPct: number): st
 const isProd = import.meta.env.PROD
 
 export default function YoutubeEmbeddingProjector() {
-  const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
+  const [urlInput, setUrlInput] = useState(() => {
+    const qsVideoId = new URLSearchParams(window.location.search).get('videoId')
+    if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
+    return localStorage.getItem('yt-url') ?? ''
+  })
   const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
   const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
   const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
@@ -70,8 +59,8 @@ export default function YoutubeEmbeddingProjector() {
 
   // Track current window params from TranscriptViewer without re-renders
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
-    windowSize: 20,
-    overlapPct: 50,
+    windowSize: 40,
+    overlapPct: 80,
     text: loadedText ?? '',
   })
 
@@ -107,6 +96,7 @@ export default function YoutubeEmbeddingProjector() {
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
       localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
+      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
       setStatus('idle')
     } catch (e) {
       setStatus('error')
@@ -155,6 +145,18 @@ export default function YoutubeEmbeddingProjector() {
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
     : 'https://www.youtube-transcript.io'
 
+  const handleSubtitleLoad = useCallback((result: { text: string; wordTimestamps: number[]; durationSecs: number }) => {
+    setLoadedText(result.text)
+    setLoadedDuration(String(result.durationSecs))
+    setWordTimestamps(result.wordTimestamps)
+    setLoadedVideoId(null)
+    setLoadCount(c => c + 1)
+    localStorage.setItem('yt-transcript', result.text)
+    localStorage.setItem('yt-duration', String(result.durationSecs))
+    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
+    localStorage.removeItem('yt-video-id')
+  }, [])
+
   const handleOpenProjector = () => {
     const { windowSize, overlapPct, text } = windowParamsRef.current
     const chunks = computeChunks(text, windowSize, overlapPct)
@@ -182,8 +184,10 @@ export default function YoutubeEmbeddingProjector() {
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
-          <button className="yt-action-btn" onClick={handleLoad} disabled={isProd || status === 'loading'}>
-            {status === 'loading' ? 'Loading…' : 'Load'}
+          <button className="yt-action-btn"
+            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+            disabled={isProd ? !currentVideoId : status === 'loading'}>
+            {!isProd && status === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
           {hasTranscriptText && (
             <button className="open-projector-btn" onClick={handleOpenProjector}>
@@ -195,18 +199,18 @@ export default function YoutubeEmbeddingProjector() {
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
-              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Get the transcript for this video ↗</a> then paste it into the text area below.</>
+              ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
               : <>Paste a YouTube URL above to get started.</>
             }
           </p>
         )}
       </div>
 
-      {loadedVideoId && totalSecs && (
+      {currentVideoId ? (
         <div style={{ position: 'relative' }}>
           <div style={{ visibility: allowFaster ? 'hidden' : 'visible' }}>
             <YoutubePlayerEmbed
-              videoId={loadedVideoId}
+              videoId={currentVideoId}
               onTimeUpdate={setVideoTime}
               seekTo={allowFaster ? undefined : seekTarget}
               playing={allowFaster ? false : transcriptPlaying}
@@ -215,12 +219,18 @@ export default function YoutubeEmbeddingProjector() {
             />
           </div>
           {allowFaster && (
-            <div className="yt-player-container" style={{ position: 'absolute', inset: 0, margin: 0 }}>
+            <div className="yt-player-container" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, margin: '0 auto' }}>
               <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>YouTube paused — allow faster enabled</span>
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="yt-player-container">
+          <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>Paste a YouTube URL above to load the player</span>
+          </div>
         </div>
       )}
       <TranscriptViewer
@@ -233,8 +243,9 @@ export default function YoutubeEmbeddingProjector() {
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
-        maxSpeed={loadedVideoId ? 2 : undefined}
-        onAllowFasterChange={setAllowFaster}
+        maxSpeed={currentVideoId ? 2 : undefined}
+        onAllowFasterChange={allow => { setAllowFaster(allow); if (!allow) { setYtPlaying(false); setTranscriptPlaying(false) } }}
+        onSubtitleLoad={handleSubtitleLoad}
       />
 
       {modalSegments && (

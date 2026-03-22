@@ -1,23 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
+import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
-
-function buildTranscriptData(segments: Array<{ text: string; offset: number }>): {
-  text: string
-  wordTimestamps: number[]
-} {
-  const words: string[] = []
-  const timestamps: number[] = []
-  for (const seg of segments) {
-    const segWords = seg.text.trim().split(/\s+/).filter(Boolean)
-    for (const w of segWords) {
-      words.push(w)
-      timestamps.push(seg.offset)
-    }
-  }
-  return { text: words.join(' '), wordTimestamps: timestamps }
-}
 
 function extractVideoId(url: string): string | null {
   try {
@@ -33,7 +18,11 @@ function extractVideoId(url: string): string | null {
 const isProd = import.meta.env.PROD
 
 export default function YoutubeTranscriptViewer() {
-  const [urlInput, setUrlInput] = useState(() => localStorage.getItem('yt-url') ?? '')
+  const [urlInput, setUrlInput] = useState(() => {
+    const qsVideoId = new URLSearchParams(window.location.search).get('videoId')
+    if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
+    return localStorage.getItem('yt-url') ?? ''
+  })
   const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
   const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
   const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
@@ -77,12 +66,25 @@ export default function YoutubeTranscriptViewer() {
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
       localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
+      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
       setStatus('idle')
     } catch (e) {
       setStatus('error')
       setErrorMessage(String(e))
     }
   }
+
+  const handleSubtitleLoad = useCallback((result: { text: string; wordTimestamps: number[]; durationSecs: number }) => {
+    setLoadedText(result.text)
+    setLoadedDuration(String(result.durationSecs))
+    setWordTimestamps(result.wordTimestamps)
+    setLoadedVideoId(null)
+    setLoadCount(c => c + 1)
+    localStorage.setItem('yt-transcript', result.text)
+    localStorage.setItem('yt-duration', String(result.durationSecs))
+    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
+    localStorage.removeItem('yt-video-id')
+  }, [])
 
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
   const externalPosition = (() => {
@@ -148,31 +150,37 @@ export default function YoutubeTranscriptViewer() {
           />
           <button
             className="yt-action-btn"
-            onClick={handleLoad}
-            disabled={isProd || status === 'loading'}
+            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+            disabled={isProd ? !currentVideoId : status === 'loading'}
           >
-            {status === 'loading' ? 'Loading…' : 'Load'}
+            {!isProd && status === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
         </div>
         {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
-              ? <><a href={transcriptToolUrl} target="_blank" rel="noopener">Get the transcript for this video ↗</a> then paste it into the text area below.</>
+              ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
               : <>Paste a YouTube URL above to get started.</>
             }
           </p>
         )}
       </div>
-      {loadedVideoId && totalSecs && (
+      {currentVideoId ? (
         <YoutubePlayerEmbed
-          videoId={loadedVideoId}
+          videoId={currentVideoId}
           onTimeUpdate={setVideoTime}
           seekTo={seekTarget}
           playing={transcriptPlaying}
           onPlayStateChange={setYtPlaying}
           playbackRate={playbackRate}
         />
+      ) : (
+        <div className="yt-player-container">
+          <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>Paste a YouTube URL above to load the player</span>
+          </div>
+        </div>
       )}
       <TranscriptViewer
         key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
@@ -183,7 +191,8 @@ export default function YoutubeTranscriptViewer() {
         onScrub={handleScrub}
         onPlayingChange={setTranscriptPlaying}
         onSpeedChange={setPlaybackRate}
-        maxSpeed={loadedVideoId ? 2 : undefined}
+        maxSpeed={currentVideoId ? 2 : undefined}
+        onSubtitleLoad={handleSubtitleLoad}
       />
     </div>
   )

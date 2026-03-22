@@ -20,7 +20,9 @@ export default defineConfig({
             return
           }
           try {
-            const segments = await YoutubeTranscript.fetchTranscript(videoId)
+            let segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' }).catch(
+              () => YoutubeTranscript.fetchTranscript(videoId)
+            )
             const last = segments[segments.length - 1]
             const totalDuration = last ? last.offset + last.duration : 0
             res.writeHead(200, { 'Content-Type': 'application/json' })
