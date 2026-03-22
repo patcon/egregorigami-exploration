@@ -39,10 +39,12 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     raycaster: THREE.Raycaster
     animId: number
   } | null>(null)
+  type FollowMode = 'static' | 'tracking' | 'following'
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
-  const [followCursor, setFollowCursor] = useState(false)
-  const followCursorRef = useRef(false)
+  const [followMode, setFollowMode] = useState<FollowMode>('static')
+  const followModeRef = useRef<FollowMode>('static')
   const prevFollowTargetRef = useRef(new THREE.Vector3())
+  const highlightPositionRef = useRef<number | null>(null)
   const normalizedRef = useRef<[number, number, number][]>([])
 
   // Build scene once
@@ -111,14 +113,32 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     let animId = 0
     const animate = () => {
       animId = requestAnimationFrame(animate)
-      if (followCursorRef.current && highlightMesh.visible) {
+      const mode = followModeRef.current
+      if (mode === 'tracking' && highlightMesh.visible) {
+        controls.enabled = true
         const newTarget = highlightMesh.position.clone()
         const delta = newTarget.clone().sub(prevFollowTargetRef.current)
         camera.position.add(delta)
         controls.target.copy(newTarget)
         prevFollowTargetRef.current.copy(newTarget)
+        controls.update()
+      } else if (mode === 'following' && highlightMesh.visible) {
+        controls.enabled = false
+        const norm = normalizedRef.current
+        const hp = highlightPositionRef.current ?? 0
+        const a = Math.max(0, Math.min(norm.length - 2, Math.floor(hp)))
+        const pa = new THREE.Vector3(...norm[a])
+        const pb = new THREE.Vector3(...norm[a + 1])
+        const tangent = pb.clone().sub(pa).normalize()
+        const cursorPos = highlightMesh.position.clone()
+        camera.position.copy(cursorPos)
+          .addScaledVector(tangent, -0.6)
+          .add(new THREE.Vector3(0, 0.15, 0))
+        camera.lookAt(cursorPos.clone().addScaledVector(tangent, 0.2))
+      } else {
+        controls.enabled = true
+        controls.update()
       }
-      controls.update()
       renderer.render(scene, camera)
     }
     animate()
@@ -145,6 +165,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
 
   // Highlight updates without scene rebuild — lerp between adjacent nodes for smooth motion
   useEffect(() => {
+    highlightPositionRef.current = highlightPosition
     const s = sceneRef.current
     if (!s) return
     const normalized = normalizedRef.current
@@ -214,18 +235,19 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
         </div>
       )}
       <button
-        className={`scatter-follow-btn${followCursor ? ' active' : ''}`}
+        className={`scatter-follow-btn${followMode !== 'static' ? ` ${followMode}` : ''}`}
         onClick={e => {
           e.stopPropagation()
-          const next = !followCursor
-          setFollowCursor(next)
-          followCursorRef.current = next
-          if (next && sceneRef.current?.highlightMesh.visible) {
+          const modes: FollowMode[] = ['static', 'tracking', 'following']
+          const next = modes[(modes.indexOf(followMode) + 1) % modes.length]
+          setFollowMode(next)
+          followModeRef.current = next
+          if (next === 'tracking' && sceneRef.current?.highlightMesh.visible) {
             prevFollowTargetRef.current.copy(sceneRef.current.highlightMesh.position)
           }
         }}
       >
-        {followCursor ? 'Following ◎' : 'Follow ◎'}
+        {followMode === 'static' ? '◎ Static' : followMode === 'tracking' ? '◉ Tracking' : '⬤ Following'}
       </button>
     </div>
   )
