@@ -126,9 +126,12 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       const ring = Math.floor(v / vertsPerRing)
       const t = ring / TUBE_SEGMENTS
       const c = cividis(t)
-      tubeColors[v * 3] = c.r
-      tubeColors[v * 3 + 1] = c.g
-      tubeColors[v * 3 + 2] = c.b
+      // Alternate brightness between node-to-node segments to show spacing
+      const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
+      const bright = segIdx % 2 === 0 ? 1.2 : 0.7
+      tubeColors[v * 3] = Math.min(1, c.r * bright)
+      tubeColors[v * 3 + 1] = Math.min(1, c.g * bright)
+      tubeColors[v * 3 + 2] = Math.min(1, c.b * bright)
     }
     tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
 
