@@ -40,6 +40,9 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     animId: number
   } | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
+  const [followCursor, setFollowCursor] = useState(false)
+  const followCursorRef = useRef(false)
+  const prevFollowTargetRef = useRef(new THREE.Vector3())
   const normalizedRef = useRef<[number, number, number][]>([])
 
   // Build scene once
@@ -108,6 +111,13 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     let animId = 0
     const animate = () => {
       animId = requestAnimationFrame(animate)
+      if (followCursorRef.current && highlightMesh.visible) {
+        const newTarget = highlightMesh.position.clone()
+        const delta = newTarget.clone().sub(prevFollowTargetRef.current)
+        camera.position.add(delta)
+        controls.target.copy(newTarget)
+        prevFollowTargetRef.current.copy(newTarget)
+      }
       controls.update()
       renderer.render(scene, camera)
     }
@@ -203,6 +213,20 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
           {tooltip.text}
         </div>
       )}
+      <button
+        className={`scatter-follow-btn${followCursor ? ' active' : ''}`}
+        onClick={e => {
+          e.stopPropagation()
+          const next = !followCursor
+          setFollowCursor(next)
+          followCursorRef.current = next
+          if (next && sceneRef.current?.highlightMesh.visible) {
+            prevFollowTargetRef.current.copy(sceneRef.current.highlightMesh.position)
+          }
+        }}
+      >
+        {followCursor ? 'Following ◎' : 'Follow ◎'}
+      </button>
     </div>
   )
 }
