@@ -3,6 +3,7 @@ import TranscriptViewer from './TranscriptViewer'
 import YoutubeTranscriptViewer from './YoutubeTranscriptViewer'
 import YoutubeEmbeddingProjector from './YoutubeEmbeddingProjector'
 import EmbeddingLayoutView from './EmbeddingLayoutView'
+import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
 import './App.css'
 
 function useHash() {
@@ -46,6 +47,12 @@ function IndexPage() {
             <a href="#v4">
               <strong>Embedding Layout</strong>
               <span>Side-by-side view: YouTube player and transcript with an inline 3D embedding panel.</span>
+            </a>
+          </li>
+          <li>
+            <a href="#v5">
+              <strong>Embedding Layout (Cividis)</strong>
+              <span>Same as v4, with a curved tube path colored by the Cividis scale.</span>
             </a>
           </li>
         </ul>
@@ -98,6 +105,7 @@ function App() {
   if (hash === '#v2') return <><GitHubCorner /><YoutubeTranscriptViewer /></>
   if (hash === '#v3') return <><GitHubCorner /><YoutubeEmbeddingProjector /></>
   if (hash === '#v4') return <><GitHubCorner /><EmbeddingLayoutView /></>
+  if (hash === '#v5') return <><GitHubCorner /><EmbeddingLayoutViewV5 /></>
   return <><GitHubCorner /><IndexPage /></>
 }
 
