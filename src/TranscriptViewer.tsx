@@ -234,6 +234,27 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cursorIndex])
 
+  // Global keyboard controls (only when no external video source is active)
+  useEffect(() => {
+    if (externalPlaying !== undefined) return
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        handlePlayPause()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleStep(1)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handleStep(-1)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [externalPlaying, handlePlayPause, handleStep])
+
   return (
     <div className="transcript-page">
       <div className="controls-panel">

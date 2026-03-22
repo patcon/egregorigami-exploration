@@ -124,6 +124,33 @@ export default function EmbeddingLayoutViewV5() {
   const wordTimestampsRef = useRef(wordTimestamps)
   useEffect(() => { wordTimestampsRef.current = wordTimestamps }, [wordTimestamps])
   const totalSecsRef = useRef<number | null>(null)
+  const videoTimeRef = useRef(0)
+  useEffect(() => { videoTimeRef.current = videoTime }, [videoTime])
+
+  // Global keyboard controls: space=play/pause, arrows=seek ±10s
+  useEffect(() => {
+    const SEEK_DELTA = 10
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        setYtPlaying(p => !p)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        const newT = videoTimeRef.current + SEEK_DELTA
+        setVideoTime(newT)
+        setSeekTarget(newT)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        const newT = Math.max(0, videoTimeRef.current - SEEK_DELTA)
+        setVideoTime(newT)
+        setSeekTarget(newT)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // Keep ref in sync so cursor handler always sees latest segments
   useEffect(() => { segmentsRef.current = segments }, [segments])

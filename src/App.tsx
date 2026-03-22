@@ -51,8 +51,8 @@ function IndexPage() {
           </li>
           <li>
             <a href="#v5">
-              <strong>Embedding Layout (Cividis)</strong>
-              <span>Same as v4, with a curved tube path colored by the Cividis scale.</span>
+              <strong>Embedding Layout (New Renderers)</strong>
+              <span>Same as v4, with switchable renderers: original points, Cividis tube, and glow shader.</span>
             </a>
           </li>
         </ul>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
@@ -39,6 +39,33 @@ export default function YoutubeTranscriptViewer() {
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
   const [ytPlaying, setYtPlaying] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
+  const videoTimeRef = useRef(0)
+  useEffect(() => { videoTimeRef.current = videoTime }, [videoTime])
+
+  // Global keyboard controls: space=play/pause, arrows=seek ±10s
+  useEffect(() => {
+    const SEEK_DELTA = 10
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        setYtPlaying(p => !p)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        const newT = videoTimeRef.current + SEEK_DELTA
+        setVideoTime(newT)
+        setSeekTarget(newT)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        const newT = Math.max(0, videoTimeRef.current - SEEK_DELTA)
+        setVideoTime(newT)
+        setSeekTarget(newT)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const handleLoad = async () => {
     const videoId = extractVideoId(urlInput)

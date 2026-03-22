@@ -12,6 +12,9 @@ interface Props {
   labels: string[]
   highlightPosition: number | null
   onPointClick: (index: number) => void
+  fillPerSeg?: number     // interpolated fill points per segment (default 12)
+  fillJitter?: number     // random scatter radius around the line (default 0)
+  fillBrightness?: number // brightness multiplier for fill particles (default 1)
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -83,6 +86,7 @@ const fragmentShader = /* glsl */`
 varying vec3 vColor;
 varying float vSeed;
 uniform float uTime;
+uniform float uBrightness;
 
 void main() {
   vec2 uv = gl_PointCoord - 0.5;
@@ -91,11 +95,11 @@ void main() {
   float alpha = 1.0 - smoothstep(0.25, 0.5, d);
   // Each point pulses at its own phase, derived from its random seed
   float pulse = 0.65 + 0.35 * sin(vSeed * 50.0 + uTime * 2.5);
-  gl_FragColor = vec4(vColor * pulse, alpha);
+  gl_FragColor = vec4(vColor * pulse * uBrightness, alpha);
 }
 `
 
-export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick }: Props) {
+export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 12, fillJitter = 0.03, fillBrightness = 1.8 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -165,7 +169,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     geo.setAttribute('aColor', new THREE.BufferAttribute(aColors, 3))
     geo.setAttribute('aSeed', new THREE.BufferAttribute(aSeeds, 1))
 
-    const uniforms = { uTime: { value: 0 } }
+    const uniforms = { uTime: { value: 0 }, uBrightness: { value: 1.0 } }
     const mat = new THREE.ShaderMaterial({
       uniforms,
       vertexShader,
@@ -177,19 +181,18 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     const pointsMesh = new THREE.Points(geo, mat)
     scene.add(pointsMesh)
 
-    // Fill particles — linearly interpolated between adjacent nodes
-    const FILL_PER_SEG = 12
-    const fillCount = (n - 1) * FILL_PER_SEG
+    // Fill particles — interpolated between adjacent nodes with optional jitter
+    const fillCount = (n - 1) * fillPerSeg
     const fillPositions = new Float32Array(fillCount * 3)
     const fillColors = new Float32Array(fillCount * 3)
     const fillSeeds = new Float32Array(fillCount)
     for (let i = 0; i < n - 1; i++) {
-      for (let j = 0; j < FILL_PER_SEG; j++) {
-        const f = (j + 1) / (FILL_PER_SEG + 1)
-        const idx = i * FILL_PER_SEG + j
-        fillPositions[idx * 3]     = normalized[i][0] + (normalized[i + 1][0] - normalized[i][0]) * f
-        fillPositions[idx * 3 + 1] = normalized[i][1] + (normalized[i + 1][1] - normalized[i][1]) * f
-        fillPositions[idx * 3 + 2] = normalized[i][2] + (normalized[i + 1][2] - normalized[i][2]) * f
+      for (let j = 0; j < fillPerSeg; j++) {
+        const f = (j + 1) / (fillPerSeg + 1)
+        const idx = i * fillPerSeg + j
+        fillPositions[idx * 3]     = normalized[i][0] + (normalized[i + 1][0] - normalized[i][0]) * f + (Math.random() - 0.5) * 2 * fillJitter
+        fillPositions[idx * 3 + 1] = normalized[i][1] + (normalized[i + 1][1] - normalized[i][1]) * f + (Math.random() - 0.5) * 2 * fillJitter
+        fillPositions[idx * 3 + 2] = normalized[i][2] + (normalized[i + 1][2] - normalized[i][2]) * f + (Math.random() - 0.5) * 2 * fillJitter
         const c = glowPalette((i + f) / (n - 1))
         fillColors[idx * 3] = c.r; fillColors[idx * 3 + 1] = c.g; fillColors[idx * 3 + 2] = c.b
         fillSeeds[idx] = Math.random()
@@ -199,9 +202,9 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     fillGeo.setAttribute('position', new THREE.BufferAttribute(fillPositions, 3))
     fillGeo.setAttribute('aColor',   new THREE.BufferAttribute(fillColors, 3))
     fillGeo.setAttribute('aSeed',    new THREE.BufferAttribute(fillSeeds, 1))
-    // Share uTime with node material so both pulse in sync
+    // Share uTime with node material; use fillBrightness for fill-specific brightness
     const fillMat = new THREE.ShaderMaterial({
-      uniforms: { uTime: uniforms.uTime },
+      uniforms: { uTime: uniforms.uTime, uBrightness: { value: fillBrightness } },
       vertexShader: fillVertexShader,
       fragmentShader,
       transparent: true,
@@ -299,7 +302,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       fillMat.dispose()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
-  }, [points])
+  }, [points, fillPerSeg, fillJitter, fillBrightness])
 
   // Highlight updates — set target position; RAF lerps sphere towards it each frame
   useEffect(() => {
