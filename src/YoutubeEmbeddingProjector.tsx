@@ -215,7 +215,7 @@ export default function YoutubeEmbeddingProjector() {
             />
           </div>
           {allowFaster && (
-            <div className="yt-player-container" style={{ position: 'absolute', inset: 0, margin: 0 }}>
+            <div className="yt-player-container" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, margin: '0 auto' }}>
               <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>YouTube paused — allow faster enabled</span>
               </div>
