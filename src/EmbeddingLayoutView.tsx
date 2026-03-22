@@ -130,7 +130,7 @@ export default function EmbeddingLayoutView() {
             ? (wordIndex / windowParamsRef.current.text.trim().split(/\s+/).filter(Boolean).length) * totalSecs
             : 0)
       setVideoTime(seekTime)
-      setSeekTarget(seekTime)
+      if (seekTime > 0) setSeekTarget(seekTime)
     }
     allowFasterPrevRef.current = allowFaster
   }, [allowFaster])
