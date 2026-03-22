@@ -5,7 +5,7 @@ import ScatterPlot3D from './ScatterPlot3D'
 import SegmentsListModal from './SegmentsListModal'
 import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { runUmap } from './runUmap'
-import { buildTranscriptData } from './subtitleParser'
+import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './SegmentProjectorModal.css'
 import './EmbeddingLayoutView.css'
@@ -217,7 +217,7 @@ export default function EmbeddingLayoutView() {
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
       localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
-      localStorage.setItem('transcript-raw-text', text)
+      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
       setLoadStatus('idle')
       // Reset embedding state when new transcript loaded
       setEmbedPhase({ status: 'idle' })

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import SegmentProjectorModal from './SegmentProjectorModal'
-import { buildTranscriptData } from './subtitleParser'
+import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './YoutubeEmbeddingProjector.css'
 
@@ -92,7 +92,7 @@ export default function YoutubeEmbeddingProjector() {
       localStorage.setItem('yt-duration', duration)
       localStorage.setItem('yt-video-id', videoId)
       localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
-      localStorage.setItem('transcript-raw-text', text)
+      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
       setStatus('idle')
     } catch (e) {
       setStatus('error')

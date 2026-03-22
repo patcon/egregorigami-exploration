@@ -4,6 +4,29 @@ export interface SubtitleParseResult {
   durationSecs: number
 }
 
+function formatVttTime(ms: number): string {
+  const totalSecs = ms / 1000
+  const h = Math.floor(totalSecs / 3600)
+  const m = Math.floor((totalSecs % 3600) / 60)
+  const s = totalSecs % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s.toFixed(3).padStart(6, '0')}`
+}
+
+export function segmentsToVtt(segments: Array<{ text: string; offset: number; duration?: number }>): string {
+  const lines = ['WEBVTT', '']
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    const start = seg.offset
+    const end = seg.duration != null
+      ? start + seg.duration
+      : (segments[i + 1]?.offset ?? start + 2000)
+    lines.push(`${formatVttTime(start)} --> ${formatVttTime(end)}`)
+    lines.push(seg.text.trim())
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
 export function buildTranscriptData(
   segments: Array<{ text: string; offset: number }>
 ): { text: string; wordTimestamps: number[] } {
