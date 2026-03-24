@@ -133,9 +133,14 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     const pointsMesh = new THREE.Points(geo, mat)
     scene.add(pointsMesh)
 
-    // Curved tube path (protein-folding aesthetic)
+    // Curved tube path (protein-folding aesthetic).
+    // Use centripetal parameterization so the curve never overshoots or loops
+    // when adjacent segments are far apart in 3D space — prevents the sphere
+    // from visually reversing direction as it follows the curve.
     const curve = new THREE.CatmullRomCurve3(
-      normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+      normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+      false,
+      'centripetal'
     )
 
     const TUBE_SEGMENTS = Math.max(64, normalized.length * 6)
