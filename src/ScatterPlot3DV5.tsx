@@ -178,13 +178,22 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     raycaster.params.Points!.threshold = 0.05
 
     let animId = 0
+    let firstFrame = true
     const animate = () => {
       animId = requestAnimationFrame(animate)
-      // Smoothly lerp sphere towards target position set by the highlight effect
+      // On the first visible frame, teleport the sphere to its target and sync
+      // prevFollowTargetRef so tracking mode starts with zero delta (no drift).
       if (sphereVisibleRef.current) {
-        highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+        if (firstFrame) {
+          highlightMesh.position.copy(targetSphereRef.current)
+          prevFollowTargetRef.current.copy(targetSphereRef.current)
+          firstFrame = false
+        } else {
+          highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+        }
         highlightMesh.visible = true
       } else {
+        firstFrame = false
         highlightMesh.visible = false
       }
       const mode = followModeRef.current
