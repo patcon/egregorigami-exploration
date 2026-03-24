@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import './ScatterPlot3D.css'
+import type { CameraState, FollowMode } from './scatterTypes'
 
 interface Props {
   points: [number, number, number][]
   labels: string[]
   highlightPosition: number | null  // float: 1.7 = 70% between node 1 and 2
   onPointClick: (index: number) => void
+  initialCameraState?: CameraState
+  onCameraChange?: (state: CameraState) => void
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -27,7 +30,7 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick }: Props) {
+export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -39,10 +42,9 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     raycaster: THREE.Raycaster
     animId: number
   } | null>(null)
-  type FollowMode = 'static' | 'tracking' | 'following'
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
-  const [followMode, setFollowMode] = useState<FollowMode>('static')
-  const followModeRef = useRef<FollowMode>('static')
+  const [followMode, setFollowMode] = useState<FollowMode>(() => initialCameraState?.followMode ?? 'static')
+  const followModeRef = useRef<FollowMode>(initialCameraState?.followMode ?? 'static')
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
@@ -70,6 +72,20 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
+
+    if (initialCameraState) {
+      camera.position.set(...initialCameraState.position)
+      controls.target.set(...initialCameraState.target)
+    }
+
+    const onControlsChange = () => {
+      onCameraChange?.({
+        position: [camera.position.x, camera.position.y, camera.position.z],
+        target: [controls.target.x, controls.target.y, controls.target.z],
+        followMode: followModeRef.current,
+      })
+    }
+    controls.addEventListener('change', onControlsChange)
 
     const normalized = normalize(points)
     normalizedRef.current = normalized
@@ -174,6 +190,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
 
     return () => {
       cancelAnimationFrame(animId)
+      controls.removeEventListener('change', onControlsChange)
       controls.dispose()
       renderer.dispose()
       ro.disconnect()
@@ -274,6 +291,13 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
               prevFollowTargetRef.current.copy(cursorPos)
               prevPathTangentRef.current.copy(tangent)
             }
+          }
+          if (s) {
+            onCameraChange?.({
+              position: [s.camera.position.x, s.camera.position.y, s.camera.position.z],
+              target: [s.controls.target.x, s.controls.target.y, s.controls.target.z],
+              followMode: next,
+            })
           }
         }}
       >

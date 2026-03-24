@@ -4,6 +4,7 @@ import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
 import ScatterPlot3DV6 from './ScatterPlot3DV6'
+import type { CameraState } from './scatterTypes'
 import SegmentsListModal from './SegmentsListModal'
 import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { runUmap } from './runUmap'
@@ -120,6 +121,7 @@ export default function EmbeddingLayoutViewV5() {
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [clickSeekPosition, setClickSeekPosition] = useState<number | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
+  const cameraStateRef = useRef<CameraState | null>(null)
   const currentWordIndexRef = useRef(0)
   const wordTimestampsRef = useRef(wordTimestamps)
   useEffect(() => { wordTimestampsRef.current = wordTimestamps }, [wordTimestamps])
@@ -327,6 +329,7 @@ export default function EmbeddingLayoutViewV5() {
     const { windowSize, overlapPct, text } = windowParamsRef.current
     const chunks = computeChunks(text, windowSize, overlapPct)
     setSegments(chunks)
+    cameraStateRef.current = null
     runEmbeddingOnChunks(chunks)
   }
 
@@ -564,9 +567,9 @@ export default function EmbeddingLayoutViewV5() {
                 </div>
               </div>
               <div className="embedding-panel-scatter">
-                {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} />}
-                {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} />}
-                {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} />}
+                {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
               </div>
             </>
           )}

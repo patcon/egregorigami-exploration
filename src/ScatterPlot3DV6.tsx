@@ -6,6 +6,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import './ScatterPlot3D.css'
+import type { CameraState, FollowMode } from './scatterTypes'
 
 interface Props {
   points: [number, number, number][]
@@ -15,6 +16,8 @@ interface Props {
   fillPerSeg?: number     // interpolated fill points per segment (default 12)
   fillJitter?: number     // random scatter radius around the line (default 0)
   fillBrightness?: number // brightness multiplier for fill particles (default 1)
+  initialCameraState?: CameraState
+  onCameraChange?: (state: CameraState) => void
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -99,7 +102,7 @@ void main() {
 }
 `
 
-export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 12, fillJitter = 0.03, fillBrightness = 1.8 }: Props) {
+export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 12, fillJitter = 0.03, fillBrightness = 1.8, initialCameraState, onCameraChange }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -113,10 +116,9 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     composer: EffectComposer
     uniforms: { uTime: { value: number } }
   } | null>(null)
-  type FollowMode = 'static' | 'tracking' | 'following'
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
-  const [followMode, setFollowMode] = useState<FollowMode>('static')
-  const followModeRef = useRef<FollowMode>('static')
+  const [followMode, setFollowMode] = useState<FollowMode>(() => initialCameraState?.followMode ?? 'static')
+  const followModeRef = useRef<FollowMode>(initialCameraState?.followMode ?? 'static')
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
@@ -145,6 +147,20 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.dampingFactor = 0.08
+
+    if (initialCameraState) {
+      camera.position.set(...initialCameraState.position)
+      controls.target.set(...initialCameraState.target)
+    }
+
+    const onControlsChange = () => {
+      onCameraChange?.({
+        position: [camera.position.x, camera.position.y, camera.position.z],
+        target: [controls.target.x, controls.target.y, controls.target.z],
+        followMode: followModeRef.current,
+      })
+    }
+    controls.addEventListener('change', onControlsChange)
 
     const normalized = normalize(points)
     normalizedRef.current = normalized
@@ -294,6 +310,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
 
     return () => {
       cancelAnimationFrame(animId)
+      controls.removeEventListener('change', onControlsChange)
       controls.dispose()
       composer.dispose()
       renderer.dispose()
@@ -390,6 +407,13 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
               prevFollowTargetRef.current.copy(cursorPos)
               prevPathTangentRef.current.copy(tangent)
             }
+          }
+          if (s) {
+            onCameraChange?.({
+              position: [s.camera.position.x, s.camera.position.y, s.camera.position.z],
+              target: [s.controls.target.x, s.controls.target.y, s.controls.target.z],
+              followMode: next,
+            })
           }
         }}
       >
