@@ -70,7 +70,8 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
-  const targetSphereRef = useRef(new THREE.Vector3())
+  const targetSphereTRef = useRef(0)   // target curve parameter [0,1]
+  const currentSphereTRef = useRef(0)  // animated curve parameter (lerps toward target)
   const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
 
@@ -186,15 +187,18 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     let firstFrame = true
     const animate = () => {
       animId = requestAnimationFrame(animate)
-      // On the first visible frame, teleport the sphere to its target and sync
-      // prevFollowTargetRef so tracking mode starts with zero delta (no drift).
+      // Lerp the curve parameter so the sphere travels along the tube path.
+      // On the first visible frame, snap to target and seed prevFollowTargetRef.
       if (sphereVisibleRef.current) {
         if (firstFrame) {
-          highlightMesh.position.copy(targetSphereRef.current)
-          prevFollowTargetRef.current.copy(targetSphereRef.current)
+          currentSphereTRef.current = targetSphereTRef.current
+          const spherePos = curve.getPoint(currentSphereTRef.current)
+          highlightMesh.position.copy(spherePos)
+          prevFollowTargetRef.current.copy(spherePos)
           firstFrame = false
         } else {
-          highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+          currentSphereTRef.current += (targetSphereTRef.current - currentSphereTRef.current) * 0.2
+          highlightMesh.position.copy(curve.getPoint(currentSphereTRef.current))
         }
         highlightMesh.visible = true
       } else {
@@ -213,9 +217,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       } else if (mode === 'following' && highlightMesh.visible) {
         controls.enabled = true
         const newTarget = highlightMesh.position.clone()
-        const hp = highlightPositionRef.current ?? 0
-        const t = Math.max(0.0001, Math.min(0.9999, hp / (normalized.length - 1)))
-        const currTangent = curve.getTangent(t)
+        const currTangent = curve.getTangent(Math.max(0.0001, Math.min(0.9999, currentSphereTRef.current)))
         // Rotate camera's orbital offset to track path direction change
         const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
         const prevTangent = prevPathTangentRef.current
@@ -262,13 +264,9 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
   // Highlight updates — set target position on curve; RAF lerps sphere towards it each frame
   useEffect(() => {
     highlightPositionRef.current = highlightPosition
-    const s = sceneRef.current
-    if (!s) return
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
-      const t = highlightPosition / (normalized.length - 1)
-      const pos = s.curve.getPoint(Math.min(1, Math.max(0, t)))
-      targetSphereRef.current.copy(pos)
+      targetSphereTRef.current = Math.min(1, Math.max(0, highlightPosition / (normalized.length - 1)))
       sphereVisibleRef.current = true
     } else {
       sphereVisibleRef.current = false

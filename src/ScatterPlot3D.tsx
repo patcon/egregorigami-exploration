@@ -48,7 +48,8 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
   const prevFollowTargetRef = useRef(new THREE.Vector3())
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(null)
-  const targetSphereRef = useRef(new THREE.Vector3())
+  const targetSphereTRef = useRef(0)   // target float segment index
+  const currentSphereTRef = useRef(0)  // animated segment index (lerps toward target)
   const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
 
@@ -133,15 +134,33 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     let firstFrame = true
     const animate = () => {
       animId = requestAnimationFrame(animate)
-      // On the first visible frame, teleport the sphere to its target and sync
-      // prevFollowTargetRef so tracking mode starts with zero delta (no drift).
+      // Lerp the segment index so the sphere travels along the piecewise-linear path.
+      // On the first visible frame, snap to target and seed prevFollowTargetRef.
       if (sphereVisibleRef.current) {
         if (firstFrame) {
-          highlightMesh.position.copy(targetSphereRef.current)
-          prevFollowTargetRef.current.copy(targetSphereRef.current)
+          currentSphereTRef.current = targetSphereTRef.current
+          const ct = currentSphereTRef.current
+          const norm = normalizedRef.current
+          const a = Math.max(0, Math.floor(ct)), b = Math.min(norm.length - 1, Math.ceil(ct))
+          const f = ct - a, pa = norm[a], pb = norm[b]
+          highlightMesh.position.set(
+            pa[0] + (pb[0] - pa[0]) * f,
+            pa[1] + (pb[1] - pa[1]) * f,
+            pa[2] + (pb[2] - pa[2]) * f,
+          )
+          prevFollowTargetRef.current.copy(highlightMesh.position)
           firstFrame = false
         } else {
-          highlightMesh.position.lerp(targetSphereRef.current, 0.2)
+          currentSphereTRef.current += (targetSphereTRef.current - currentSphereTRef.current) * 0.2
+          const ct = currentSphereTRef.current
+          const norm = normalizedRef.current
+          const a = Math.max(0, Math.floor(ct)), b = Math.min(norm.length - 1, Math.ceil(ct))
+          const f = ct - a, pa = norm[a], pb = norm[b]
+          highlightMesh.position.set(
+            pa[0] + (pb[0] - pa[0]) * f,
+            pa[1] + (pb[1] - pa[1]) * f,
+            pa[2] + (pb[2] - pa[2]) * f,
+          )
         }
         highlightMesh.visible = true
       } else {
@@ -207,21 +226,12 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     }
   }, [points])
 
-  // Highlight updates — set target position; RAF lerps sphere towards it each frame
+  // Highlight updates — set target segment index; RAF lerps along the path each frame
   useEffect(() => {
     highlightPositionRef.current = highlightPosition
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
-      const a = Math.max(0, Math.floor(highlightPosition))
-      const b = Math.min(normalized.length - 1, Math.ceil(highlightPosition))
-      const t = highlightPosition - a
-      const pa = normalized[a]
-      const pb = normalized[b]
-      targetSphereRef.current.set(
-        pa[0] + (pb[0] - pa[0]) * t,
-        pa[1] + (pb[1] - pa[1]) * t,
-        pa[2] + (pb[2] - pa[2]) * t,
-      )
+      targetSphereTRef.current = Math.min(normalized.length - 1, Math.max(0, highlightPosition))
       sphereVisibleRef.current = true
     } else {
       sphereVisibleRef.current = false
