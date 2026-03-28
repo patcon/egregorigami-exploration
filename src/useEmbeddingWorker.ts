@@ -43,9 +43,15 @@ export function useEmbeddingWorker() {
     getWorker().postMessage({ type: 'embed', texts, modelId })
   }, [getWorker])
 
+  const cancelEmbedding = useCallback(() => {
+    workerRef.current?.terminate()
+    workerRef.current = null
+    setPhase({ status: 'idle' })
+  }, [])
+
   const resetPhase = useCallback(() => {
     setPhase({ status: 'idle' })
   }, [])
 
-  return { phase, runEmbedding, resetPhase }
+  return { phase, runEmbedding, cancelEmbedding, resetPhase }
 }

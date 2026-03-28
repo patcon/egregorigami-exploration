@@ -97,7 +97,7 @@ export default function EmbeddingLayoutView() {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const { phase: embedPhase, runEmbedding, resetPhase: resetEmbedPhase } = useEmbeddingWorker()
+  const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase } = useEmbeddingWorker()
   const [segments, setSegments] = useState<string[] | null>(null)
   const [showSegmentsModal, setShowSegmentsModal] = useState(false)
 
@@ -459,6 +459,7 @@ export default function EmbeddingLayoutView() {
                   <div className="progress-label">
                     <div className="spinner" />
                     <span>{embedPhase.progress > 0 ? `Downloading model… ${embedPhase.progress}%` : 'Initializing model…'}</span>
+                    <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
                   </div>
                   <div className={`progress-bar ${embedPhase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
                     <div className="progress-bar-fill" style={{ width: `${embedPhase.progress}%` }} />
@@ -470,6 +471,7 @@ export default function EmbeddingLayoutView() {
                   <div className="progress-label">
                     <div className="spinner" />
                     <span>Embedding {embedPhase.loaded + 1} / {embedPhase.total}</span>
+                    <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
                   </div>
                   <div className="progress-bar">
                     <div className="progress-bar-fill" style={{ width: `${(embedPhase.loaded / embedPhase.total) * 100}%` }} />
@@ -481,6 +483,7 @@ export default function EmbeddingLayoutView() {
                   <div className="progress-label">
                     <div className="spinner" />
                     <span>Reducing to 3D…</span>
+                    <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
                   </div>
                   <div className="progress-bar progress-bar--indeterminate">
                     <div className="progress-bar-fill" />

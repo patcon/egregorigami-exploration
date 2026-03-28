@@ -16,7 +16,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const { phase, runEmbedding } = useEmbeddingWorker()
+  const { phase, runEmbedding, cancelEmbedding } = useEmbeddingWorker()
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [dotPosition, setDotPosition] = useState<number | null>(null) // float for smooth interpolation
   const [isPlaying, setIsPlaying] = useState(false)
@@ -154,6 +154,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                     <div className="progress-label">
                       <div className="spinner" />
                       <span>{phase.progress > 0 ? `Downloading model… ${phase.progress}%` : 'Initializing model…'}</span>
+                      <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
                     </div>
                     <div className={`progress-bar ${phase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
                       <div className="progress-bar-fill" style={{ width: `${phase.progress}%` }} />
@@ -165,6 +166,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                     <div className="progress-label">
                       <div className="spinner" />
                       <span>Embedding {phase.loaded + 1} / {phase.total}</span>
+                      <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
                     </div>
                     <div className="progress-bar">
                       <div className="progress-bar-fill" style={{ width: `${(phase.loaded / phase.total) * 100}%` }} />
@@ -176,6 +178,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                     <div className="progress-label">
                       <div className="spinner" />
                       <span>Reducing to 3D…</span>
+                      <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
                     </div>
                     <div className="progress-bar progress-bar--indeterminate">
                       <div className="progress-bar-fill" />

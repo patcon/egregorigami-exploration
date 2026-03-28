@@ -217,6 +217,22 @@
   gap: 8px;
 }
 
+.cancel-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #555);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.cancel-btn:hover {
+  opacity: 1;
+}
+
 /* CSS spinner */
 .spinner {
   width: 14px;
