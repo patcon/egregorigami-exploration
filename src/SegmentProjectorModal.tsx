@@ -1,18 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
-import { runUmap } from './runUmap'
+import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
+import { useEmbeddingWorker } from './useEmbeddingWorker'
 import ScatterPlot3D from './ScatterPlot3D'
 import './SegmentProjectorModal.css'
 
 const PLAYBACK_DURATION = 10 // seconds to walk all segments
-
-type Phase =
-  | { status: 'idle' }
-  | { status: 'model-loading'; progress: number }
-  | { status: 'embedding'; loaded: number; total: number }
-  | { status: 'umap-running' }
-  | { status: 'done'; points: [number, number, number][] }
-  | { status: 'error'; message: string }
 
 interface Props {
   segments: string[]
@@ -24,7 +16,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const [phase, setPhase] = useState<Phase>({ status: 'idle' })
+  const { phase, runEmbedding } = useEmbeddingWorker()
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [dotPosition, setDotPosition] = useState<number | null>(null) // float for smooth interpolation
   const [isPlaying, setIsPlaying] = useState(false)
@@ -87,24 +79,8 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
 
   useEffect(() => () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }, [])
 
-  const handleEmbed = async () => {
-    setPhase({ status: 'model-loading', progress: 0 })
-    await new Promise(resolve => setTimeout(resolve, 0)) // flush render before heavy work
-    try {
-      const vectors = await getEmbeddings(segments, (loaded, total, phaseLabel) => {
-        if (phaseLabel === 'model-loading') {
-          setPhase({ status: 'model-loading', progress: loaded })
-        } else {
-          setPhase({ status: 'embedding', loaded, total })
-        }
-      }, selectedModel)
-      setPhase({ status: 'umap-running' })
-      await new Promise(resolve => setTimeout(resolve, 0))
-      const points = runUmap(vectors)
-      setPhase({ status: 'done', points })
-    } catch (e) {
-      setPhase({ status: 'error', message: String(e) })
-    }
+  const handleEmbed = () => {
+    runEmbedding(segments, selectedModel)
   }
 
   const isDone = phase.status === 'done'

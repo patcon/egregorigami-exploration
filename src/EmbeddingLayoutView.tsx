@@ -3,8 +3,8 @@ import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3D from './ScatterPlot3D'
 import SegmentsListModal from './SegmentsListModal'
-import { getEmbeddings, EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
-import { runUmap } from './runUmap'
+import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
+import { useEmbeddingWorker } from './useEmbeddingWorker'
 import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './SegmentProjectorModal.css'
@@ -32,14 +32,6 @@ function computeChunks(text: string, windowSize: number, overlapPct: number): st
   }
   return chunks
 }
-
-type EmbedPhase =
-  | { status: 'idle' }
-  | { status: 'model-loading'; progress: number }
-  | { status: 'embedding'; loaded: number; total: number }
-  | { status: 'umap-running' }
-  | { status: 'done'; points: [number, number, number][] }
-  | { status: 'error'; message: string }
 
 const isProd = import.meta.env.PROD
 
@@ -89,7 +81,7 @@ export default function EmbeddingLayoutView() {
     localStorage.setItem('yt-duration', String(result.durationSecs))
     localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
     localStorage.removeItem('yt-video-id')
-    setEmbedPhase({ status: 'idle' })
+    resetEmbedPhase()
     const { windowSize, overlapPct } = windowParamsRef.current
     setSegments(computeChunks(result.text, windowSize, overlapPct))
   }, [])
@@ -105,7 +97,7 @@ export default function EmbeddingLayoutView() {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const [embedPhase, setEmbedPhase] = useState<EmbedPhase>({ status: 'idle' })
+  const { phase: embedPhase, runEmbedding, resetPhase: resetEmbedPhase } = useEmbeddingWorker()
   const [segments, setSegments] = useState<string[] | null>(null)
   const [showSegmentsModal, setShowSegmentsModal] = useState(false)
 
@@ -251,7 +243,7 @@ export default function EmbeddingLayoutView() {
       localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
       setLoadStatus('idle')
       // Reset embedding state when new transcript loaded
-      setEmbedPhase({ status: 'idle' })
+      resetEmbedPhase()
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
     } catch (e) {
@@ -295,25 +287,9 @@ export default function EmbeddingLayoutView() {
     setSeekTarget(t)
   }, [totalSecs])
 
-  const runEmbeddingOnChunks = async (chunks: string[]) => {
+  const runEmbeddingOnChunks = (chunks: string[]) => {
     if (chunks.length === 0) return
-    setEmbedPhase({ status: 'model-loading', progress: 0 })
-    await new Promise(resolve => setTimeout(resolve, 0))
-    try {
-      const vectors = await getEmbeddings(chunks, (loaded, total, phaseLabel) => {
-        if (phaseLabel === 'model-loading') {
-          setEmbedPhase({ status: 'model-loading', progress: loaded })
-        } else {
-          setEmbedPhase({ status: 'embedding', loaded, total })
-        }
-      }, selectedModel)
-      setEmbedPhase({ status: 'umap-running' })
-      await new Promise(resolve => setTimeout(resolve, 0))
-      const points = runUmap(vectors)
-      setEmbedPhase({ status: 'done', points })
-    } catch (e) {
-      setEmbedPhase({ status: 'error', message: String(e) })
-    }
+    runEmbedding(chunks, selectedModel)
   }
 
   const handleRunEmbedding = () => {
