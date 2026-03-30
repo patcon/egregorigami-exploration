@@ -6,7 +6,7 @@ import SegmentsListModal from './SegmentsListModal'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import { buildShareUrl, readShareParam } from './shareUrl'
-import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
+import { buildTranscriptData, segmentsToVtt, detectAndParseSubtitle } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './SegmentProjectorModal.css'
 import './EmbeddingLayoutView.css'
@@ -120,13 +120,17 @@ export default function EmbeddingLayoutView() {
     if (!shared) return
     if (shared.modelId) { setSelectedModel(shared.modelId as EmbeddingModelId); localStorage.setItem('projector-model', shared.modelId) }
     if (shared.videoId) setUrlInput(`https://www.youtube.com/watch?v=${shared.videoId}`)
-    if (shared.text) {
-      setLoadedText(shared.text)
-      localStorage.setItem('yt-transcript', shared.text)
+    if (shared.rawText) {
+      const parsed = detectAndParseSubtitle(shared.rawText)
+      const processedText = parsed?.text ?? shared.rawText
+      localStorage.setItem('transcript-raw-text', shared.rawText)
+      localStorage.setItem('transcript-text', processedText)
+      localStorage.setItem('yt-transcript', processedText)
+      setLoadedText(processedText)
       setLoadCount(c => c + 1)
-      windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: shared.text }
+      windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: processedText }
       setHasTranscriptText(true)
-      const chunks = computeChunks(shared.text, shared.windowSize, shared.overlapPct)
+      const chunks = computeChunks(processedText, shared.windowSize, shared.overlapPct)
       setSegments(chunks)
       if (shared.points) restorePoints(shared.points)
     }
@@ -138,7 +142,7 @@ export default function EmbeddingLayoutView() {
     const payload = {
       windowSize, overlapPct, videoId,
       modelId: selectedModel,
-      ...(loadedText ? { text: loadedText } : {}),
+      ...(localStorage.getItem('transcript-raw-text') ? { rawText: localStorage.getItem('transcript-raw-text')! } : {}),
       ...(embedPhase.status === 'done' ? { points: embedPhase.points } : {}),
     }
     const url = buildShareUrl(payload, '#v4')

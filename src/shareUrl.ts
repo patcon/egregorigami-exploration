@@ -6,7 +6,7 @@ export interface SharePayload {
   videoId?: string
   modelId?: string
   rendererType?: string
-  text?: string
+  rawText?: string
   points?: [number, number, number][]
 }
 
