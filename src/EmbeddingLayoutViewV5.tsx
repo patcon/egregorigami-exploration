@@ -127,19 +127,30 @@ export default function EmbeddingLayoutViewV5() {
   useEffect(() => {
     const shared = readShareParam()
     if (!shared) return
-    setLoadedText(shared.text)
-    windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: shared.text }
-    setHasTranscriptText(true)
-    const chunks = computeChunks(shared.text, shared.windowSize, shared.overlapPct)
-    setSegments(chunks)
-    restorePoints(shared.points)
+    if (shared.modelId) { setSelectedModel(shared.modelId as EmbeddingModelId); localStorage.setItem('projector-model', shared.modelId) }
+    if (shared.rendererType) { setRendererType(shared.rendererType as RendererType); localStorage.setItem('scatter-renderer', shared.rendererType) }
+    if (shared.videoId) setUrlInput(`https://www.youtube.com/watch?v=${shared.videoId}`)
+    if (shared.text) {
+      setLoadedText(shared.text)
+      windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: shared.text }
+      setHasTranscriptText(true)
+      const chunks = computeChunks(shared.text, shared.windowSize, shared.overlapPct)
+      setSegments(chunks)
+      if (shared.points) restorePoints(shared.points)
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleShare = () => {
-    if (embedPhase.status !== 'done' || !segments || !loadedText) return
     const { windowSize, overlapPct } = windowParamsRef.current
     const videoId = extractVideoId(urlInput) ?? undefined
-    const url = buildShareUrl({ text: loadedText, points: embedPhase.points, windowSize, overlapPct, videoId }, '#v5')
+    const payload = {
+      windowSize, overlapPct, videoId,
+      modelId: selectedModel,
+      rendererType,
+      ...(loadedText ? { text: loadedText } : {}),
+      ...(embedPhase.status === 'done' ? { points: embedPhase.points } : {}),
+    }
+    const url = buildShareUrl(payload, '#v5')
     navigator.clipboard.writeText(url).then(() => {
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 2000)
@@ -376,6 +387,9 @@ export default function EmbeddingLayoutViewV5() {
             disabled={isProd ? !currentVideoId : loadStatus === 'loading'}>
             {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
+          <button className="show-segments-btn" onClick={handleShare}>
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
         </div>
         {loadStatus === 'error' && <p className="youtube-error">{loadError}</p>}
         {isProd && (
@@ -567,9 +581,6 @@ export default function EmbeddingLayoutViewV5() {
                     onClick={handleRunEmbedding}
                   >
                     Run Embedding
-                  </button>
-                  <button className="show-segments-btn" onClick={handleShare}>
-                    {shareCopied ? 'Copied!' : 'Share'}
                   </button>
                 </div>
               </div>

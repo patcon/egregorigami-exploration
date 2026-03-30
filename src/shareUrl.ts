@@ -1,11 +1,13 @@
 import { deflate, inflate } from 'pako'
 
 export interface SharePayload {
-  text: string
-  points: [number, number, number][]
   windowSize: number
   overlapPct: number
   videoId?: string
+  modelId?: string
+  rendererType?: string
+  text?: string
+  points?: [number, number, number][]
 }
 
 export function encodeSharePayload(payload: SharePayload): string {
