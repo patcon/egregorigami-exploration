@@ -4,6 +4,7 @@ import YoutubeTranscriptViewer from './YoutubeTranscriptViewer'
 import YoutubeEmbeddingProjector from './YoutubeEmbeddingProjector'
 import EmbeddingLayoutView from './EmbeddingLayoutView'
 import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
+import MicTranscriptViewer from './MicTranscriptViewer'
 import './App.css'
 
 function useHash() {
@@ -53,6 +54,12 @@ function IndexPage() {
             <a href="#v5">
               <strong>Embedding Layout (New Renderers)</strong>
               <span>Same as v4, with switchable renderers: original points, Cividis tube, and glow shader.</span>
+            </a>
+          </li>
+          <li>
+            <a href="#v6">
+              <strong>Live Mic Transcript Visualizer</strong>
+              <span>Record speech via your microphone and watch the embedding window slide through the live transcript.</span>
             </a>
           </li>
         </ul>
@@ -106,6 +113,7 @@ function App() {
   if (hash === '#v3') return <><GitHubCorner /><YoutubeEmbeddingProjector /></>
   if (hash === '#v4') return <><GitHubCorner /><EmbeddingLayoutView /></>
   if (hash === '#v5') return <><GitHubCorner /><EmbeddingLayoutViewV5 /></>
+  if (hash === '#v6') return <><GitHubCorner /><MicTranscriptViewer /></>
   return <><GitHubCorner /><IndexPage /></>
 }
 
