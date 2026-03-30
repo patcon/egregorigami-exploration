@@ -12,11 +12,9 @@ function getSpeechRecognition(): AnyRecognition | null {
 
 export default function MicTranscriptViewer() {
   const [isRecording, setIsRecording] = useState(false)
-  const [finalTranscript, setFinalTranscript] = useState('')
-  const [interimTranscript, setInterimTranscript] = useState('')
+  const [liveText, setLiveText] = useState<string | undefined>(undefined)
   const [recordedDuration, setRecordedDuration] = useState<number | null>(null)
   const [viewerKey, setViewerKey] = useState(0)
-  const [viewerText, setViewerText] = useState('')
   const [viewerDuration, setViewerDuration] = useState('')
   const [supported] = useState(() => !!getSpeechRecognition())
 
@@ -36,17 +34,13 @@ export default function MicTranscriptViewer() {
     finalRef.current = ''
 
     recognition.onresult = (event: AnyRecognition) => {
-      let interim = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
           finalRef.current += result[0].transcript + ' '
-        } else {
-          interim += result[0].transcript
         }
       }
-      setFinalTranscript(finalRef.current)
-      setInterimTranscript(interim)
+      setLiveText(finalRef.current)
     }
 
     recognition.onerror = (event: AnyRecognition) => {
@@ -62,8 +56,7 @@ export default function MicTranscriptViewer() {
 
     recognitionRef.current = recognition
     startTimeRef.current = Date.now()
-    setFinalTranscript('')
-    setInterimTranscript('')
+    setLiveText('')
     recognition.start()
     setIsRecording(true)
   }, [])
@@ -72,11 +65,10 @@ export default function MicTranscriptViewer() {
     recognitionRef.current?.stop()
   }, [])
 
+  // When recording ends, remount the viewer to lock in the correct duration
   useEffect(() => {
-    if (!isRecording && finalRef.current && recordedDuration !== null) {
-      const text = finalRef.current.trim()
+    if (!isRecording && recordedDuration !== null && finalRef.current) {
       const duration = String(Math.max(1, Math.round(recordedDuration)))
-      setViewerText(text)
       setViewerDuration(duration)
       setViewerKey(k => k + 1)
     }
@@ -113,23 +105,18 @@ export default function MicTranscriptViewer() {
             ● Recording
           </span>
         )}
-        {isRecording && (finalTranscript || interimTranscript) && (
-          <span style={{ color: '#aaa', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-            {finalTranscript}
-            <em style={{ color: '#555' }}>{interimTranscript}</em>
-          </span>
-        )}
-        {!isRecording && viewerText && (
+        {!isRecording && viewerDuration && (
           <span style={{ color: '#666', fontSize: '0.8rem' }}>
-            {viewerDuration}s recorded — transcript loaded below
+            {viewerDuration}s recorded
           </span>
         )}
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <TranscriptViewer
           key={viewerKey}
-          initialText={viewerText || undefined}
+          initialText={liveText}
           initialDuration={viewerDuration || undefined}
+          externalRawText={isRecording ? liveText : undefined}
         />
       </div>
     </div>

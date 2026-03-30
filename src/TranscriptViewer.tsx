@@ -19,6 +19,7 @@ interface TranscriptViewerProps {
   onParamsBlur?: () => void
   onCursorChange?: (wordIndex: number) => void
   onAllowFasterChange?: (allow: boolean) => void
+  externalRawText?: string
   externalPosition?: number
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
@@ -28,7 +29,7 @@ interface TranscriptViewerProps {
   onSubtitleLoad?: (result: SubtitleParseResult) => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
@@ -115,6 +116,14 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (externalRawText === undefined) return
+    const normalized = externalRawText.replace(/\s+/g, ' ').trim()
+    setRawText(externalRawText)
+    setText(normalized)
+    // Don't reset position — let playback continue over the growing text
+  }, [externalRawText])
 
   useEffect(() => {
     if (externalPosition !== undefined) {
