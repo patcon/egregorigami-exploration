@@ -5,6 +5,7 @@ import ScatterPlot3D from './ScatterPlot3D'
 import SegmentsListModal from './SegmentsListModal'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
+import { buildShareUrl, readShareParam } from './shareUrl'
 import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import './YoutubeTranscriptViewer.css'
 import './SegmentProjectorModal.css'
@@ -97,8 +98,9 @@ export default function EmbeddingLayoutView() {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase } = useEmbeddingWorker()
+  const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
   const [segments, setSegments] = useState<string[] | null>(null)
+  const [shareCopied, setShareCopied] = useState(false)
   const [showSegmentsModal, setShowSegmentsModal] = useState(false)
 
   // Scatter highlight state
@@ -111,6 +113,29 @@ export default function EmbeddingLayoutView() {
   const totalSecsRef = useRef<number | null>(null)
   const videoTimeRef = useRef(0)
   useEffect(() => { videoTimeRef.current = videoTime }, [videoTime])
+
+  // Restore from share URL on mount
+  useEffect(() => {
+    const shared = readShareParam()
+    if (!shared) return
+    setLoadedText(shared.text)
+    windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: shared.text }
+    setHasTranscriptText(true)
+    const chunks = computeChunks(shared.text, shared.windowSize, shared.overlapPct)
+    setSegments(chunks)
+    restorePoints(shared.points)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleShare = () => {
+    if (embedPhase.status !== 'done' || !segments || !loadedText) return
+    const { windowSize, overlapPct } = windowParamsRef.current
+    const videoId = extractVideoId(urlInput) ?? undefined
+    const url = buildShareUrl({ text: loadedText, points: embedPhase.points, windowSize, overlapPct, videoId }, '#v4')
+    navigator.clipboard.writeText(url).then(() => {
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    })
+  }
 
   // Global keyboard controls: space=play/pause, arrows=seek ±10s
   useEffect(() => {
@@ -519,6 +544,9 @@ export default function EmbeddingLayoutView() {
                     onClick={handleRunEmbedding}
                   >
                     Run Embedding
+                  </button>
+                  <button className="show-segments-btn" onClick={handleShare}>
+                    {shareCopied ? 'Copied!' : 'Share'}
                   </button>
                 </div>
               </div>

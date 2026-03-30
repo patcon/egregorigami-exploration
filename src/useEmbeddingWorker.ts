@@ -53,5 +53,9 @@ export function useEmbeddingWorker() {
     setPhase({ status: 'idle' })
   }, [])
 
-  return { phase, runEmbedding, cancelEmbedding, resetPhase }
+  const restorePoints = useCallback((points: [number, number, number][]) => {
+    setPhase({ status: 'done', points })
+  }, [])
+
+  return { phase, runEmbedding, cancelEmbedding, resetPhase, restorePoints }
 }
