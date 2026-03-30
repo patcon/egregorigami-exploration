@@ -159,21 +159,27 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     }
   }, [isPlaying, autoScroll, cursorIndex, words.length])
 
-  const handleScrubClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    setPosition(newPos)
-    onScrub?.(newPos)
-    stopPlayback()
-  }, [stopPlayback, onScrub])
+  const scrubRectRef = useRef<DOMRect | null>(null)
 
-  const handleScrubMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.buttons !== 1) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const newPos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  const applyScrubPos = useCallback((clientX: number) => {
+    if (!scrubRectRef.current) return
+    const newPos = Math.max(0, Math.min(1, (clientX - scrubRectRef.current.left) / scrubRectRef.current.width))
     setPosition(newPos)
     onScrub?.(newPos)
   }, [onScrub])
+
+  const handleScrubPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    scrubRectRef.current = e.currentTarget.getBoundingClientRect()
+    stopPlayback()
+    applyScrubPos(e.clientX)
+  }, [stopPlayback, applyScrubPos])
+
+  const handleScrubPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    applyScrubPos(e.clientX)
+  }, [applyScrubPos])
 
   const handleStep = useCallback((dir: 1 | -1) => {
     stopPlayback()
@@ -391,8 +397,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
         </div>
         <div
           className="scrub-bar"
-          onClick={handleScrubClick}
-          onMouseMove={handleScrubMouseMove}
+          onPointerDown={handleScrubPointerDown}
+          onPointerMove={handleScrubPointerMove}
         >
           <div className="scrub-progress" style={{ width: `${position * 100}%` }} />
           <div className="scrub-thumb" style={{ left: `${position * 100}%` }} />
