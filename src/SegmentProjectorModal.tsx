@@ -97,6 +97,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   }
 
   const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     scrubRectRef.current = e.currentTarget.getBoundingClientRect()
     stopPlayback()
