@@ -133,10 +133,13 @@ export default function EmbeddingLayoutViewV5() {
     if (shared.rawText) {
       const parsed = detectAndParseSubtitle(shared.rawText)
       const processedText = parsed?.text ?? shared.rawText
+      const duration = parsed?.durationSecs ? String(parsed.durationSecs) : null
       localStorage.setItem('transcript-raw-text', shared.rawText)
       localStorage.setItem('transcript-text', processedText)
       localStorage.setItem('yt-transcript', processedText)
+      if (duration) localStorage.setItem('yt-duration', duration)
       setLoadedText(processedText)
+      if (duration) setLoadedDuration(duration)
       setLoadCount(c => c + 1)
       windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: processedText }
       setHasTranscriptText(true)
