@@ -122,6 +122,8 @@ export default function EmbeddingLayoutView() {
     if (shared.videoId) setUrlInput(`https://www.youtube.com/watch?v=${shared.videoId}`)
     if (shared.text) {
       setLoadedText(shared.text)
+      localStorage.setItem('yt-transcript', shared.text)
+      setLoadCount(c => c + 1)
       windowParamsRef.current = { ...windowParamsRef.current, windowSize: shared.windowSize, overlapPct: shared.overlapPct, text: shared.text }
       setHasTranscriptText(true)
       const chunks = computeChunks(shared.text, shared.windowSize, shared.overlapPct)
