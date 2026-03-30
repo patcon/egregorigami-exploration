@@ -6,33 +6,13 @@ import SegmentsListModal from './SegmentsListModal'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import { buildShareUrl, readShareParam } from './shareUrl'
-import { buildTranscriptData, segmentsToVtt, detectAndParseSubtitle } from './subtitleParser'
+import { detectAndParseSubtitle } from './subtitleParser'
+import { extractVideoId, computeChunks, computeExternalPosition } from './videoUtils'
+import { useVideoKeyboardControls } from './useVideoKeyboardControls'
+import { useYoutubeTranscript } from './useYoutubeTranscript'
 import './YoutubeTranscriptViewer.css'
 import './SegmentProjectorModal.css'
 import './EmbeddingLayoutView.css'
-
-function extractVideoId(url: string): string | null {
-  try {
-    const u = new URL(url.trim())
-    if (u.hostname === 'youtu.be') return u.pathname.slice(1)
-    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v')
-    return null
-  } catch {
-    return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
-  }
-}
-
-function computeChunks(text: string, windowSize: number, overlapPct: number): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return []
-  const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
-  const chunks: string[] = []
-  for (let cursor = Math.min(windowSize - 1, words.length - 1); cursor < words.length; cursor += step) {
-    const windowStart = Math.max(0, cursor - windowSize + 1)
-    chunks.push(words.slice(windowStart, windowStart + windowSize).join(' '))
-  }
-  return chunks
-}
 
 const isProd = import.meta.env.PROD
 
@@ -42,58 +22,21 @@ export default function EmbeddingLayoutView() {
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
     return localStorage.getItem('yt-url') ?? ''
   })
-  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
-  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
-  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
-    extractVideoId(localStorage.getItem('yt-url') ?? '') ? localStorage.getItem('yt-video-id') : null
-  )
-  const [loadCount, setLoadCount] = useState(0)
-  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'error'>('idle')
-  const [loadError, setLoadError] = useState('')
-  const [wordTimestamps, setWordTimestamps] = useState<number[] | null>(
-    () => JSON.parse(localStorage.getItem('yt-word-timestamps') ?? 'null')
-  )
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
   const [ytPlaying, setYtPlaying] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [allowFaster, setAllowFaster] = useState(false)
+  const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(localStorage.getItem('yt-transcript')?.trim()))
 
-  const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(loadedText?.trim()))
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
     windowSize: 40,
     overlapPct: 80,
-    text: loadedText ?? '',
+    text: localStorage.getItem('yt-transcript') ?? '',
   })
 
-  const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
-    windowParamsRef.current = params
-    setHasTranscriptText(!!params.text.trim())
-  }, [])
-
-  const handleSubtitleLoad = useCallback((result: { text: string; wordTimestamps: number[]; durationSecs: number }) => {
-    setLoadedText(result.text)
-    setLoadedDuration(String(result.durationSecs))
-    setWordTimestamps(result.wordTimestamps)
-    setLoadedVideoId(null)
-    setLoadCount(c => c + 1)
-    localStorage.setItem('yt-transcript', result.text)
-    localStorage.setItem('yt-duration', String(result.durationSecs))
-    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
-    localStorage.removeItem('yt-video-id')
-    resetEmbedPhase()
-    const { windowSize, overlapPct } = windowParamsRef.current
-    setSegments(computeChunks(result.text, windowSize, overlapPct))
-  }, [])
-
-  const handleParamsBlur = useCallback(() => {
-    const { windowSize, overlapPct, text } = windowParamsRef.current
-    if (!text.trim()) return
-    setSegments(computeChunks(text, windowSize, overlapPct))
-  }, [])
-
-  // Embedding state
+  // Embedding state — declared early so callbacks below can reference resetEmbedPhase/setSegments
   const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(() => {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
@@ -102,6 +45,39 @@ export default function EmbeddingLayoutView() {
   const [segments, setSegments] = useState<string[] | null>(null)
   const [shareCopied, setShareCopied] = useState(false)
   const [showSegmentsModal, setShowSegmentsModal] = useState(false)
+
+  const {
+    loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
+    status, errorMessage: loadError, handleLoad, handleSubtitleLoad,
+    setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,
+  } = useYoutubeTranscript(urlInput, {
+    onLoaded: ({ text }) => {
+      resetEmbedPhase()
+      const { windowSize, overlapPct } = windowParamsRef.current
+      setSegments(computeChunks(text, windowSize, overlapPct))
+      setHasTranscriptText(true)
+    },
+    onSubtitleLoaded: ({ text }) => {
+      resetEmbedPhase()
+      const { windowSize, overlapPct } = windowParamsRef.current
+      setSegments(computeChunks(text, windowSize, overlapPct))
+      setHasTranscriptText(true)
+    },
+  })
+
+  // Aliases to match original variable names used in JSX
+  const loadStatus = status
+
+  const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
+    windowParamsRef.current = params
+    setHasTranscriptText(!!params.text.trim())
+  }, [])
+
+  const handleParamsBlur = useCallback(() => {
+    const { windowSize, overlapPct, text } = windowParamsRef.current
+    if (!text.trim()) return
+    setSegments(computeChunks(text, windowSize, overlapPct))
+  }, [])
 
   // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
@@ -113,6 +89,8 @@ export default function EmbeddingLayoutView() {
   const totalSecsRef = useRef<number | null>(null)
   const videoTimeRef = useRef(0)
   useEffect(() => { videoTimeRef.current = videoTime }, [videoTime])
+
+  useVideoKeyboardControls(videoTimeRef, setVideoTime, setSeekTarget, setYtPlaying)
 
   // Restore from share URL on mount
   useEffect(() => {
@@ -154,31 +132,6 @@ export default function EmbeddingLayoutView() {
       setTimeout(() => setShareCopied(false), 2000)
     })
   }
-
-  // Global keyboard controls: space=play/pause, arrows=seek ±10s
-  useEffect(() => {
-    const SEEK_DELTA = 10
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
-      if (e.key === ' ') {
-        e.preventDefault()
-        setYtPlaying(p => !p)
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        const newT = videoTimeRef.current + SEEK_DELTA
-        setVideoTime(newT)
-        setSeekTarget(newT)
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        const newT = Math.max(0, videoTimeRef.current - SEEK_DELTA)
-        setVideoTime(newT)
-        setSeekTarget(newT)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
 
   // Keep ref in sync so cursor handler always sees latest segments
   useEffect(() => { segmentsRef.current = segments }, [segments])
@@ -258,70 +211,10 @@ export default function EmbeddingLayoutView() {
     setSeekTarget(seekTime)
   }, [])
 
-  const handleLoad = async () => {
-    const videoId = extractVideoId(urlInput)
-    if (!videoId) {
-      setLoadStatus('error')
-      setLoadError('Could not extract a video ID from the input.')
-      return
-    }
-    setLoadStatus('loading')
-    setLoadError('')
-    try {
-      const res = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
-      const { text, wordTimestamps } = buildTranscriptData(data.segments)
-      const duration = String(Math.round(data.totalDuration))
-      setLoadedText(text)
-      setLoadedDuration(duration)
-      setLoadedVideoId(videoId)
-      setWordTimestamps(wordTimestamps)
-      setLoadCount(c => c + 1)
-      localStorage.setItem('yt-url', urlInput)
-      localStorage.setItem('yt-transcript', text)
-      localStorage.setItem('yt-duration', duration)
-      localStorage.setItem('yt-video-id', videoId)
-      localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
-      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
-      setLoadStatus('idle')
-      // Reset embedding state when new transcript loaded
-      resetEmbedPhase()
-      const { windowSize, overlapPct } = windowParamsRef.current
-      setSegments(computeChunks(text, windowSize, overlapPct))
-    } catch (e) {
-      setLoadStatus('error')
-      setLoadError(String(e))
-    }
-  }
-
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
   totalSecsRef.current = totalSecs
 
-  const externalPosition = (() => {
-    if (!totalSecs) return undefined
-    if (wordTimestamps && wordTimestamps.length > 1) {
-      if (videoTime < wordTimestamps[0]) return 0
-      let segFirstIdx = 0
-      for (let i = 1; i < wordTimestamps.length; i++) {
-        if (wordTimestamps[i] > videoTime) break
-        if (wordTimestamps[i] > wordTimestamps[i - 1]) segFirstIdx = i
-      }
-      let segLastIdx = segFirstIdx
-      while (segLastIdx + 1 < wordTimestamps.length && wordTimestamps[segLastIdx + 1] === wordTimestamps[segFirstIdx]) {
-        segLastIdx++
-      }
-      const segStart = wordTimestamps[segFirstIdx]
-      const nextSegStart = segLastIdx + 1 < wordTimestamps.length ? wordTimestamps[segLastIdx + 1] : totalSecs
-      const segDuration = nextSegStart - segStart
-      const segWordCount = segLastIdx - segFirstIdx + 1
-      const wordOffset = segDuration > 0
-        ? Math.min(Math.floor(((videoTime - segStart) / segDuration) * segWordCount), segWordCount - 1)
-        : 0
-      return (segFirstIdx + wordOffset) / (wordTimestamps.length - 1)
-    }
-    return videoTime / totalSecs
-  })()
+  const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 
   const handleScrub = useCallback((pos: number) => {
     if (!totalSecs) return

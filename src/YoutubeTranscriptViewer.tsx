@@ -1,19 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
-import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
+import { extractVideoId, computeExternalPosition } from './videoUtils'
+import { useVideoKeyboardControls } from './useVideoKeyboardControls'
+import { useYoutubeTranscript } from './useYoutubeTranscript'
 import './YoutubeTranscriptViewer.css'
-
-function extractVideoId(url: string): string | null {
-  try {
-    const u = new URL(url.trim())
-    if (u.hostname === 'youtu.be') return u.pathname.slice(1)
-    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v')
-    return null
-  } catch {
-    return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
-  }
-}
 
 const isProd = import.meta.env.PROD
 
@@ -23,17 +14,11 @@ export default function YoutubeTranscriptViewer() {
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
     return localStorage.getItem('yt-url') ?? ''
   })
-  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
-  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
-  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
-    extractVideoId(localStorage.getItem('yt-url') ?? '') ? localStorage.getItem('yt-video-id') : null
-  )
-  const [loadCount, setLoadCount] = useState(0)
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
-  const [errorMessage, setErrorMessage] = useState('')
-  const [wordTimestamps, setWordTimestamps] = useState<number[] | null>(
-    () => JSON.parse(localStorage.getItem('yt-word-timestamps') ?? 'null')
-  )
+  const {
+    loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
+    status, errorMessage, handleLoad, handleSubtitleLoad,
+    setLoadedVideoId, setWordTimestamps,
+  } = useYoutubeTranscript(urlInput)
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
@@ -42,105 +27,10 @@ export default function YoutubeTranscriptViewer() {
   const videoTimeRef = useRef(0)
   useEffect(() => { videoTimeRef.current = videoTime }, [videoTime])
 
-  // Global keyboard controls: space=play/pause, arrows=seek ±10s
-  useEffect(() => {
-    const SEEK_DELTA = 10
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
-      if (e.key === ' ') {
-        e.preventDefault()
-        setYtPlaying(p => !p)
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        const newT = videoTimeRef.current + SEEK_DELTA
-        setVideoTime(newT)
-        setSeekTarget(newT)
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        const newT = Math.max(0, videoTimeRef.current - SEEK_DELTA)
-        setVideoTime(newT)
-        setSeekTarget(newT)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
-  const handleLoad = async () => {
-    const videoId = extractVideoId(urlInput)
-    if (!videoId) {
-      setStatus('error')
-      setErrorMessage('Could not extract a video ID from the input.')
-      return
-    }
-    setStatus('loading')
-    setErrorMessage('')
-    try {
-      const res = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`)
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error ?? `HTTP ${res.status}`)
-      }
-      const { text, wordTimestamps } = buildTranscriptData(data.segments)
-      const duration = String(Math.round(data.totalDuration))
-      setLoadedText(text)
-      setLoadedDuration(duration)
-      setLoadedVideoId(videoId)
-      setWordTimestamps(wordTimestamps)
-      setLoadCount(c => c + 1)
-      localStorage.setItem('yt-transcript', text)
-      localStorage.setItem('yt-duration', duration)
-      localStorage.setItem('yt-video-id', videoId)
-      localStorage.setItem('yt-word-timestamps', JSON.stringify(wordTimestamps))
-      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
-      setStatus('idle')
-    } catch (e) {
-      setStatus('error')
-      setErrorMessage(String(e))
-    }
-  }
-
-  const handleSubtitleLoad = useCallback((result: { text: string; wordTimestamps: number[]; durationSecs: number }) => {
-    setLoadedText(result.text)
-    setLoadedDuration(String(result.durationSecs))
-    setWordTimestamps(result.wordTimestamps)
-    setLoadedVideoId(null)
-    setLoadCount(c => c + 1)
-    localStorage.setItem('yt-transcript', result.text)
-    localStorage.setItem('yt-duration', String(result.durationSecs))
-    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
-    localStorage.removeItem('yt-video-id')
-  }, [])
+  useVideoKeyboardControls(videoTimeRef, setVideoTime, setSeekTarget, setYtPlaying)
 
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
-  const externalPosition = (() => {
-    if (!totalSecs) return undefined
-    if (wordTimestamps && wordTimestamps.length > 1) {
-      if (videoTime < wordTimestamps[0]) return 0
-      // Find first word index of the current segment (last segment whose offset <= videoTime)
-      let segFirstIdx = 0
-      for (let i = 1; i < wordTimestamps.length; i++) {
-        if (wordTimestamps[i] > videoTime) break
-        if (wordTimestamps[i] > wordTimestamps[i - 1]) segFirstIdx = i
-      }
-      // Find last word index of this segment
-      let segLastIdx = segFirstIdx
-      while (segLastIdx + 1 < wordTimestamps.length && wordTimestamps[segLastIdx + 1] === wordTimestamps[segFirstIdx]) {
-        segLastIdx++
-      }
-      // Interpolate within the segment using the next segment's start as the boundary
-      const segStart = wordTimestamps[segFirstIdx]
-      const nextSegStart = segLastIdx + 1 < wordTimestamps.length ? wordTimestamps[segLastIdx + 1] : totalSecs
-      const segDuration = nextSegStart - segStart
-      const segWordCount = segLastIdx - segFirstIdx + 1
-      const wordOffset = segDuration > 0
-        ? Math.min(Math.floor(((videoTime - segStart) / segDuration) * segWordCount), segWordCount - 1)
-        : 0
-      return (segFirstIdx + wordOffset) / (wordTimestamps.length - 1)
-    }
-    return videoTime / totalSecs
-  })()
+  const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 
   const handleScrub = (pos: number) => {
     if (!totalSecs) return
