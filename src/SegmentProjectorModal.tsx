@@ -84,6 +84,17 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   }
 
   const isDone = phase.status === 'done'
+
+  const handleDownload = () => {
+    if (phase.status !== 'done') return
+    const blob = new Blob([JSON.stringify(phase.points)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'embeddings-3d.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
   const scrubPosition = dotPosition !== null ? dotPosition / (segments.length - 1) : 0
 
   const scrubRectRef = useRef<DOMRect | null>(null)
@@ -129,6 +140,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
             <span className="player-counter">
               {highlightIndex !== null ? highlightIndex + 1 : '—'} / {segments.length}
             </span>
+            <button className="player-btn" onClick={handleDownload} title="Download 3D points as JSON">⬇</button>
           </div>
         )}
 

@@ -257,6 +257,17 @@ export default function EmbeddingLayoutViewV5() {
   const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status === 'embedding' || embedPhase.status === 'umap-running'
   const isDone = embedPhase.status === 'done'
 
+  const handleDownload = () => {
+    if (embedPhase.status !== 'done') return
+    const blob = new Blob([JSON.stringify(embedPhase.points)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'embeddings-3d.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const currentVideoId = extractVideoId(urlInput)
   const transcriptToolUrl = currentVideoId
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
@@ -483,6 +494,9 @@ export default function EmbeddingLayoutViewV5() {
                     onClick={handleRunEmbedding}
                   >
                     Run Embedding
+                  </button>
+                  <button className="show-segments-btn" onClick={handleDownload} title="Download 3D points as JSON">
+                    ⬇ <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>Download 3D points as JSON</span>
                   </button>
                 </div>
               </div>
