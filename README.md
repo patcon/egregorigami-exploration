@@ -16,6 +16,19 @@ A set of in-browser visualizations built with React + TypeScript + Vite, deploye
 | `#v4` | Embedding Layout | Side-by-side view: YouTube player + transcript + inline 3D embedding panel. |
 | `#v5` | Embedding Layout (New Renderers) | Same as v4, with switchable 3D renderers: original points, Cividis tube, and glow shader with bloom. |
 
+## Usage: Embedding Layout (v5)
+
+1. Select **"embedding layout (new renderers)"**
+2. Paste the YouTube URL
+3. Click **Fetch Transcript**
+4. Download the VTT file once the transcript is scraped
+5. Back in the app, click **Load** to load the VTT file
+6. Adjust **"window"** and **"overlap %"** (see note below)
+7. Select a model
+8. Click **Run Embedding**
+
+> **Note on window size:** Defaults were tuned for shorter videos. A longer window means lower resolution — it may better capture broad thematic sweeps. Smaller windows can crisscross everywhere across a 2.5h transcript.
+
 ## Keyboard shortcuts
 
 Available in all views:
