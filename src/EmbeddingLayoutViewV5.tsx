@@ -25,6 +25,13 @@ export default function EmbeddingLayoutViewV5() {
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
     return localStorage.getItem('yt-url') ?? ''
   })
+  useEffect(() => {
+    const videoId = extractVideoId(urlInput)
+    const url = new URL(window.location.href)
+    if (videoId) { url.searchParams.set('videoId', videoId) } else { url.searchParams.delete('videoId') }
+    history.replaceState(null, '', url.toString())
+  }, [urlInput])
+
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
