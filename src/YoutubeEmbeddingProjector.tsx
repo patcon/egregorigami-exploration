@@ -28,6 +28,13 @@ export default function YoutubeEmbeddingProjector() {
   const [ytPlaying, setYtPlaying] = useState(false)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [allowFaster, setAllowFaster] = useState(false)
+  useEffect(() => {
+    const videoId = extractVideoId(urlInput)
+    const url = new URL(window.location.href)
+    if (videoId) { url.searchParams.set('videoId', videoId) } else { url.searchParams.delete('videoId') }
+    history.replaceState(null, '', url.toString())
+  }, [urlInput])
+
   const videoTimeRef = useRef(0)
   useEffect(() => { videoTimeRef.current = videoTime }, [videoTime])
 
