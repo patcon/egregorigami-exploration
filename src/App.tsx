@@ -53,7 +53,7 @@ function IndexPage() {
           <li>
             <a href="#v5">
               <strong>Embedding Layout (New Renderers)</strong>
-              <span>Same as v4, with switchable renderers: original points, Cividis tube, and glow shader.</span>
+              <span>Same as v4, with switchable renderers: original points, Cividis tube, and glow shader. (default)</span>
             </a>
           </li>
           <li>
@@ -67,6 +67,26 @@ function IndexPage() {
       <div className="ticks"></div>
       <section id="spacer"></section>
     </>
+  )
+}
+
+function IndexLink() {
+  return (
+    <a
+      href="#index"
+      style={{
+        position: 'fixed',
+        bottom: '1rem',
+        left: '1rem',
+        zIndex: 9999,
+        fontSize: '0.75rem',
+        opacity: 0.5,
+        textDecoration: 'none',
+        color: 'inherit',
+      }}
+    >
+      Version Index
+    </a>
   )
 }
 
@@ -108,13 +128,14 @@ function GitHubCorner() {
 
 function App() {
   const hash = useHash()
-  if (hash === '#v1') return <><GitHubCorner /><TranscriptViewer /></>
-  if (hash === '#v2') return <><GitHubCorner /><YoutubeTranscriptViewer /></>
-  if (hash === '#v3') return <><GitHubCorner /><YoutubeEmbeddingProjector /></>
-  if (hash === '#v4') return <><GitHubCorner /><EmbeddingLayoutView /></>
-  if (hash === '#v5') return <><GitHubCorner /><EmbeddingLayoutViewV5 /></>
-  if (hash === '#v6') return <><GitHubCorner /><MicTranscriptViewer /></>
-  return <><GitHubCorner /><IndexPage /></>
+  if (hash === '#v1') return <><GitHubCorner /><IndexLink /><TranscriptViewer /></>
+  if (hash === '#v2') return <><GitHubCorner /><IndexLink /><YoutubeTranscriptViewer /></>
+  if (hash === '#v3') return <><GitHubCorner /><IndexLink /><YoutubeEmbeddingProjector /></>
+  if (hash === '#v4') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutView /></>
+  if (hash === '#v5') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV5 /></>
+  if (hash === '#v6') return <><GitHubCorner /><IndexLink /><MicTranscriptViewer /></>
+  if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
+  return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV5 /></>
 }
 
 export default App
