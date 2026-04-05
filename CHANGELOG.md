@@ -10,6 +10,9 @@
 
 ## Prior work (selected)
 
+- Add cancel button to embedding progress bar
+- Move share button to URL bar, always visible
+- Fix transcript textarea not showing shared text on load
 - Stream live mic transcript into textarea during recording
 - Add live mic transcript visualizer (v6)
 - Extract shared utilities to reduce duplication across sub-app views
