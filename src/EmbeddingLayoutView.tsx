@@ -100,6 +100,7 @@ export default function EmbeddingLayoutView() {
   useEffect(() => {
     const shared = readShareParam()
     if (!shared) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (shared.modelId) { setSelectedModel(shared.modelId as EmbeddingModelId); localStorage.setItem('projector-model', shared.modelId) }
     if (shared.videoId) setUrlInput(`https://www.youtube.com/watch?v=${shared.videoId}`)
     if (shared.rawText) {
@@ -152,6 +153,7 @@ export default function EmbeddingLayoutView() {
         : (windowParamsRef.current.text.trim().split(/\s+/).filter(Boolean).length > 0
             ? (wordIndex / windowParamsRef.current.text.trim().split(/\s+/).filter(Boolean).length) * totalSecs
             : 0)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVideoTime(seekTime)
       if (seekTime > 0) setSeekTarget(seekTime)
     }
@@ -216,7 +218,7 @@ export default function EmbeddingLayoutView() {
   }, [])
 
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
-  totalSecsRef.current = totalSecs
+  useEffect(() => { totalSecsRef.current = totalSecs })
 
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 

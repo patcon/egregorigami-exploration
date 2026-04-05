@@ -22,7 +22,7 @@ export default defineConfig({
             return
           }
           try {
-            let segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' }).catch(
+            const segments = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' }).catch(
               () => YoutubeTranscript.fetchTranscript(videoId)
             )
             const last = segments[segments.length - 1]

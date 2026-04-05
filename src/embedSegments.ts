@@ -21,7 +21,7 @@ export async function getEmbeddings(
   if (!pipelineCache.has(modelId)) {
     const { pipeline } = await import('@huggingface/transformers')
     const instance = await pipeline('feature-extraction', modelId, {
-      progress_callback: (info: any) => {
+      progress_callback: (info: { progress?: number }) => {
         const pct = info?.progress ?? 0
         onProgress(Math.round(pct), 100, 'model-loading')
       },

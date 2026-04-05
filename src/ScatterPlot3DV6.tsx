@@ -346,6 +346,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       fillMat.dispose()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, fillPerSeg, fillJitter, fillBrightness])
 
   // Highlight updates — set target segment index; RAF lerps along the path each frame

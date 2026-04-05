@@ -227,7 +227,7 @@ export default function EmbeddingLayoutViewV5() {
   }, [])
 
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
-  totalSecsRef.current = totalSecs
+  useEffect(() => { totalSecsRef.current = totalSecs })
 
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 
@@ -505,9 +505,11 @@ export default function EmbeddingLayoutViewV5() {
                 </div>
               </div>
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                {/* eslint-disable react-hooks/refs */}
                 {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
                 {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
                 {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                {/* eslint-enable react-hooks/refs */}
               </div>
             </>
           )}

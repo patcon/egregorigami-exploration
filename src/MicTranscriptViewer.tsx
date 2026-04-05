@@ -69,6 +69,7 @@ export default function MicTranscriptViewer() {
   useEffect(() => {
     if (!isRecording && recordedDuration !== null && finalRef.current) {
       const duration = String(Math.max(1, Math.round(recordedDuration)))
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setViewerDuration(duration)
       setViewerKey(k => k + 1)
     }

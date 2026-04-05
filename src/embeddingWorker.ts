@@ -13,7 +13,7 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
       if (!pipelineCache.has(cmd.modelId)) {
         const { pipeline } = await import('@huggingface/transformers')
         const instance = await pipeline('feature-extraction', cmd.modelId, {
-          progress_callback: (info: any) => {
+          progress_callback: (info: { progress?: number }) => {
             const pct = info?.progress ?? 0
             self.postMessage({ type: 'progress:model-loading', progress: Math.round(pct) } satisfies WorkerEvent)
           },

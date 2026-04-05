@@ -223,6 +223,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       ro.disconnect()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points])
 
   // Highlight updates — set target segment index; RAF lerps along the path each frame

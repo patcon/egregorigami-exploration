@@ -21,9 +21,11 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const onTimeUpdateRef = useRef(onTimeUpdate)
-  onTimeUpdateRef.current = onTimeUpdate
   const onPlayStateChangeRef = useRef(onPlayStateChange)
-  onPlayStateChangeRef.current = onPlayStateChange
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate
+    onPlayStateChangeRef.current = onPlayStateChange
+  })
 
   // Load YT IFrame API once
   useEffect(() => {
@@ -122,7 +124,6 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
         playerRef.current = null
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId])
 
   // Seek when seekTo changes

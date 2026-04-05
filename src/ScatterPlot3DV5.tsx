@@ -258,6 +258,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       ro.disconnect()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points])
 
   // Highlight updates — set target position on curve; RAF lerps sphere towards it each frame

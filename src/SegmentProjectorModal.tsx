@@ -23,6 +23,7 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   const rafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const tickStartPosRef = useRef(0)
+  const tickFnRef = useRef<FrameRequestCallback | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -59,8 +60,10 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
       stopPlayback()
       return
     }
-    rafRef.current = requestAnimationFrame(tick)
+    if (tickFnRef.current) rafRef.current = requestAnimationFrame(tickFnRef.current)
   }, [segments.length, stopPlayback])
+
+  useEffect(() => { tickFnRef.current = tick }, [tick])
 
   const handlePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -72,9 +75,9 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
       if (atEnd) { setDotPosition(0); setHighlightIndex(0) }
       startTimeRef.current = null
       setIsPlaying(true)
-      rafRef.current = requestAnimationFrame(tick)
+      if (tickFnRef.current) rafRef.current = requestAnimationFrame(tickFnRef.current)
     }
-  }, [isPlaying, dotPosition, segments.length, stopPlayback, tick])
+  }, [isPlaying, dotPosition, segments.length, stopPlayback])
 
   useEffect(() => () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }, [])
 
