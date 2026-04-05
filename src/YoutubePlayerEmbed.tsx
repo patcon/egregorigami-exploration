@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import './YoutubePlayerEmbed.css'
 
 declare global {
   interface Window {
@@ -148,8 +147,8 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
   }, [playbackRate])
 
   return (
-    <div className="yt-player-container">
-      <div className="yt-player-aspect">
+    <div className="w-full max-w-[640px] mx-auto mb-4">
+      <div className="yt-player-aspect relative w-full aspect-video">
         <div ref={containerRef} />
       </div>
     </div>

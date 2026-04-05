@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Migrate styling from hand-written CSS files to Tailwind CSS v4; all 8 component CSS files replaced with utility classes in JSX; animations, `color-mix()` rules, and pseudo-element styles retained in `index.css`
+
 - Fix white screen when invalid YouTube URL is entered (e.g. `?v=bad`) — `extractVideoId` now validates the 11-char video ID format for YouTube URL inputs, not just raw strings
 
 - Make v5 the default landing page; index nav moved to `#index` (also accessible via "Version Index" link on all pages)

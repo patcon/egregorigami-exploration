@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { YoutubeTranscript } from 'youtube-transcript-plus'
 
 // https://vite.dev/config/
@@ -7,6 +8,7 @@ export default defineConfig({
   base: '/egregorigami-exploration/',
   optimizeDeps: { exclude: ['@huggingface/transformers'] },
   plugins: [
+    tailwindcss(),
     react(),
     {
       name: 'transcript-api',

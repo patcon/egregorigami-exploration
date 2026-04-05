@@ -4,7 +4,6 @@ import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import { extractVideoId, computeExternalPosition } from './videoUtils'
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
-import './YoutubeTranscriptViewer.css'
 
 const isProd = import.meta.env.PROD
 
@@ -52,12 +51,12 @@ export default function YoutubeTranscriptViewer() {
     : 'https://www.youtube-transcript.io'
 
   return (
-    <div className="youtube-viewer-wrapper">
-      <div className="youtube-bar">
-        <div className="youtube-row">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="sticky top-0 bg-bg z-[11] px-5 py-2.5 border-b border-border flex flex-col gap-1.5">
+        <div className="flex gap-2">
           <input
             type="url"
-            className="youtube-url-input"
+            className="flex-1 py-1.5 px-2.5 border border-border rounded-md bg-code-bg text-text-h text-sm focus:outline-2 focus:outline-accent focus:outline-offset-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
             value={urlInput}
             onChange={e => {
               const val = e.target.value
@@ -73,14 +72,14 @@ export default function YoutubeTranscriptViewer() {
             placeholder="https://www.youtube.com/watch?v=..."
           />
           <button
-            className="yt-action-btn"
+            className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
             disabled={isProd ? !currentVideoId : status === 'loading'}
           >
             {!isProd && status === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
         </div>
-        {status === 'error' && <p className="youtube-error">{errorMessage}</p>}
+        {status === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{errorMessage}</p>}
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
@@ -100,9 +99,9 @@ export default function YoutubeTranscriptViewer() {
           playbackRate={playbackRate}
         />
       ) : (
-        <div className="yt-player-container">
-          <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>Paste a YouTube URL above to load the player</span>
+        <div className="w-full max-w-[640px] mx-auto mb-4">
+          <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
+            <span className="text-text opacity-40 text-[13px]">Paste a YouTube URL above to load the player</span>
           </div>
         </div>
       )}

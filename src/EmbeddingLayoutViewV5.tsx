@@ -13,9 +13,6 @@ import { detectAndParseSubtitle } from './subtitleParser'
 import { extractVideoId, computeChunks, computeExternalPosition } from './videoUtils'
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
-import './YoutubeTranscriptViewer.css'
-import './SegmentProjectorModal.css'
-import './EmbeddingLayoutView.css'
 
 const isProd = import.meta.env.PROD
 
@@ -281,13 +278,13 @@ export default function EmbeddingLayoutViewV5() {
     : 'https://www.youtube-transcript.io'
 
   return (
-    <div className="embedding-layout-wrapper">
+    <div className="flex flex-col h-screen overflow-hidden">
       {/* URL Bar */}
-      <div className="embedding-layout-bar">
-        <div className="embedding-layout-row">
+      <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
+        <div className="flex gap-2 items-center">
           <input
             type="url"
-            className="youtube-url-input"
+            className="flex-1 py-1.5 px-2.5 border border-border rounded-md bg-code-bg text-text-h text-sm focus:outline-2 focus:outline-accent focus:outline-offset-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
             value={urlInput}
             onChange={e => {
               const val = e.target.value
@@ -302,16 +299,16 @@ export default function EmbeddingLayoutViewV5() {
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
-          <button className="yt-action-btn"
+          <button className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
             disabled={isProd ? !currentVideoId : loadStatus === 'loading'}>
             {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
           </button>
-          <button className="show-segments-btn" onClick={handleShare}>
+          <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShare}>
             {shareCopied ? 'Copied!' : 'Share'}
           </button>
         </div>
-        {loadStatus === 'error' && <p className="youtube-error">{loadError}</p>}
+        {loadStatus === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{loadError}</p>}
         {isProd && (
           <p className="youtube-notice">
             {currentVideoId
@@ -323,11 +320,11 @@ export default function EmbeddingLayoutViewV5() {
       </div>
 
       {/* Main panels */}
-      <div className="embedding-layout-panels">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: video + transcript */}
-        <div className="embedding-layout-left">
+        <div className="flex-1 min-w-0 flex flex-col border-r border-border overflow-hidden">
           {currentVideoId ? (
-            <div style={{ position: 'relative' }}>
+            <div className="relative">
               <div style={{ visibility: allowFaster ? 'hidden' : 'visible' }}>
                 <YoutubePlayerEmbed
                   videoId={currentVideoId}
@@ -339,17 +336,17 @@ export default function EmbeddingLayoutViewV5() {
                 />
               </div>
               {allowFaster && (
-                <div className="yt-player-container" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, margin: '0 auto' }}>
-                  <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>YouTube paused — allow faster enabled</span>
+                <div className="absolute inset-0 w-full max-w-[640px] mx-auto">
+                  <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
+                    <span className="text-text opacity-40 text-[13px]">YouTube paused — allow faster enabled</span>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="yt-player-container">
-              <div className="yt-player-aspect" style={{ background: 'var(--code-bg)', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: 'var(--text)', opacity: 0.4, fontSize: 13 }}>Paste a YouTube URL above to load the player</span>
+            <div className="w-full max-w-[640px] mx-auto mb-4">
+              <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
+                <span className="text-text opacity-40 text-[13px]">Paste a YouTube URL above to load the player</span>
               </div>
             </div>
           )}
@@ -372,10 +369,10 @@ export default function EmbeddingLayoutViewV5() {
         </div>
 
         {/* Right: embedding panel */}
-        <div className="embedding-layout-right">
+        <div className="w-[420px] flex-shrink-0 flex flex-col overflow-hidden">
           {/* No transcript yet */}
           {!hasTranscriptText && (
-            <div className="embedding-panel-placeholder">
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-6 text-text opacity-50 text-sm text-center">
               <span>Load a YouTube video to enable embedding.</span>
             </div>
           )}
@@ -383,9 +380,9 @@ export default function EmbeddingLayoutViewV5() {
           {/* Transcript available, not yet embedded */}
           {hasTranscriptText && !isDone && !isEmbedding && (
             <>
-              <div className="embedding-panel-form">
+              <div className="flex-shrink-0 p-4 border-b border-border flex flex-col gap-2.5">
                 <select
-                  className="model-select"
+                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
                   value={selectedModel}
                   onChange={e => {
                     const v = e.target.value as EmbeddingModelId
@@ -397,23 +394,23 @@ export default function EmbeddingLayoutViewV5() {
                     <option key={m.id} value={m.id}>{m.label}</option>
                   ))}
                 </select>
-                <div className="embedding-panel-form-row">
+                <div className="flex gap-2 items-center">
                   <button
-                    className="run-embedding-btn"
+                    className="py-2 px-[18px] rounded-md border-0 bg-accent text-white text-sm cursor-pointer font-semibold whitespace-nowrap hover:opacity-[0.88]"
                     onClick={handleRunEmbedding}
                   >
                     Run Embedding
                   </button>
-                  <button className="show-segments-btn" onClick={handleShowSegments}>
+                  <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShowSegments}>
                     Show Segments{segments ? ` (${segments.length})` : ''}
                   </button>
                 </div>
                 {embedPhase.status === 'error' && (
-                  <p className="embedding-panel-error">{embedPhase.message}</p>
+                  <p className="text-[#e53e3e] text-[13px] m-0 py-3 px-4">{embedPhase.message}</p>
                 )}
               </div>
               {!segments && (
-                <div className="embedding-panel-placeholder">
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-6 text-text opacity-50 text-sm text-center">
                   <span>Run embedding to visualize segment relationships in 3D.</span>
                 </div>
               )}
@@ -422,13 +419,13 @@ export default function EmbeddingLayoutViewV5() {
 
           {/* Embedding in progress */}
           {isEmbedding && (
-            <div className="embedding-panel-progress">
+            <div className="flex-1 flex flex-col items-center justify-center py-8 px-6 gap-4">
               {embedPhase.status === 'model-loading' && (
-                <div className="progress-wrap" style={{ width: '100%', maxWidth: 300 }}>
-                  <div className="progress-label">
+                <div className="flex flex-col gap-2 text-[13px] text-text w-full max-w-[300px]">
+                  <div className="flex items-center gap-2">
                     <div className="spinner" />
                     <span>{embedPhase.progress > 0 ? `Downloading model… ${embedPhase.progress}%` : 'Initializing model…'}</span>
-                    <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
+                    <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
                   </div>
                   <div className={`progress-bar ${embedPhase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
                     <div className="progress-bar-fill" style={{ width: `${embedPhase.progress}%` }} />
@@ -436,11 +433,11 @@ export default function EmbeddingLayoutViewV5() {
                 </div>
               )}
               {embedPhase.status === 'embedding' && (
-                <div className="progress-wrap" style={{ width: '100%', maxWidth: 300 }}>
-                  <div className="progress-label">
+                <div className="flex flex-col gap-2 text-[13px] text-text w-full max-w-[300px]">
+                  <div className="flex items-center gap-2">
                     <div className="spinner" />
                     <span>Embedding {embedPhase.loaded + 1} / {embedPhase.total}</span>
-                    <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
+                    <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
                   </div>
                   <div className="progress-bar">
                     <div className="progress-bar-fill" style={{ width: `${(embedPhase.loaded / embedPhase.total) * 100}%` }} />
@@ -448,11 +445,11 @@ export default function EmbeddingLayoutViewV5() {
                 </div>
               )}
               {embedPhase.status === 'umap-running' && (
-                <div className="progress-wrap" style={{ width: '100%', maxWidth: 300 }}>
-                  <div className="progress-label">
+                <div className="flex flex-col gap-2 text-[13px] text-text w-full max-w-[300px]">
+                  <div className="flex items-center gap-2">
                     <div className="spinner" />
                     <span>Reducing to 3D…</span>
-                    <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
+                    <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
                   </div>
                   <div className="progress-bar progress-bar--indeterminate">
                     <div className="progress-bar-fill" />
@@ -465,9 +462,9 @@ export default function EmbeddingLayoutViewV5() {
           {/* Embedding done */}
           {isDone && embedPhase.status === 'done' && segments && (
             <>
-              <div className="embedding-panel-form" style={{ flexShrink: 0 }}>
+              <div className="flex-shrink-0 p-4 border-b border-border flex flex-col gap-2.5">
                 <select
-                  className="model-select"
+                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
                   value={selectedModel}
                   onChange={e => {
                     const v = e.target.value as EmbeddingModelId
@@ -480,7 +477,7 @@ export default function EmbeddingLayoutViewV5() {
                   ))}
                 </select>
                 <select
-                  className="model-select"
+                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
                   value={rendererType}
                   onChange={e => {
                     const v = e.target.value as RendererType
@@ -492,22 +489,22 @@ export default function EmbeddingLayoutViewV5() {
                   <option value="cividis-tube">Cividis Tube</option>
                   <option value="glow">Glow (Shader)</option>
                 </select>
-                <div className="embedding-panel-form-row">
-                  <button className="show-segments-btn" onClick={handleShowSegments}>
+                <div className="flex gap-2 items-center">
+                  <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShowSegments}>
                     Show Segments ({segments.length})
                   </button>
                   <button
-                    className="run-embedding-btn"
+                    className="py-2 px-[18px] rounded-md border-0 bg-accent text-white text-sm cursor-pointer font-semibold whitespace-nowrap hover:opacity-[0.88]"
                     onClick={handleRunEmbedding}
                   >
                     Run Embedding
                   </button>
-                  <button className="show-segments-btn" onClick={handleDownload} title="Download 3D points as JSON">
-                    ⬇ <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}>Download 3D points as JSON</span>
+                  <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">
+                    ⬇ <span className="sr-only">Download 3D points as JSON</span>
                   </button>
                 </div>
               </div>
-              <div className="embedding-panel-scatter">
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
                 {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
                 {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}

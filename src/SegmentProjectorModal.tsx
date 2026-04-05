@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import ScatterPlot3D from './ScatterPlot3D'
-import './SegmentProjectorModal.css'
 
 const PLAYBACK_DURATION = 10 // seconds to walk all segments
 
@@ -121,37 +120,37 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
   }
 
   return (
-    <div className="projector-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="projector-panel">
-        <div className="projector-header">
-          <h2>Segment Projector</h2>
-          <button className="projector-close" onClick={onClose}>✕</button>
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-bg border border-border rounded-[10px] w-full max-w-[900px] max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between py-3.5 px-5 border-b border-border flex-shrink-0">
+          <h2 className="m-0 text-[17px] text-text-h">Segment Projector</h2>
+          <button className="bg-transparent border-0 text-text text-lg cursor-pointer py-1 px-2 rounded leading-none hover:bg-code-bg" onClick={onClose}>✕</button>
         </div>
 
         {isDone && (
-          <div className="projector-player">
-            <button className="player-btn" onClick={handlePlayPause}>
+          <div className="flex items-center gap-2.5 py-2 px-4 border-b border-border flex-shrink-0">
+            <button className="bg-transparent border border-border rounded-md text-text-h text-base w-[34px] h-[30px] cursor-pointer flex items-center justify-center flex-shrink-0 hover:bg-code-bg" onClick={handlePlayPause}>
               {isPlaying ? '⏸' : dotPosition !== null && dotPosition >= segments.length - 1 ? '↺' : '▶'}
             </button>
-            <div className="player-scrub" onPointerDown={handleScrubPointerDown} onPointerMove={handleScrubPointerMove}>
-              <div className="player-scrub-fill" style={{ width: `${scrubPosition * 100}%` }} />
-              <div className="player-scrub-thumb" style={{ left: `${scrubPosition * 100}%` }} />
+            <div className="flex-1 h-[6px] bg-code-bg rounded-[3px] relative cursor-pointer py-2 -my-2 select-none touch-none" onPointerDown={handleScrubPointerDown} onPointerMove={handleScrubPointerMove}>
+              <div className="absolute left-0 top-0 h-full bg-accent rounded-[3px] pointer-events-none" style={{ width: `${scrubPosition * 100}%` }} />
+              <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-accent pointer-events-none" style={{ left: `${scrubPosition * 100}%` }} />
             </div>
-            <span className="player-counter">
+            <span className="text-xs text-text tabular-nums whitespace-nowrap min-w-[56px] text-right">
               {highlightIndex !== null ? highlightIndex + 1 : '—'} / {segments.length}
             </span>
-            <button className="player-btn" onClick={handleDownload} title="Download 3D points as JSON">⬇</button>
+            <button className="bg-transparent border border-border rounded-md text-text-h text-base w-[34px] h-[30px] cursor-pointer flex items-center justify-center flex-shrink-0 hover:bg-code-bg" onClick={handleDownload} title="Download 3D points as JSON">⬇</button>
           </div>
         )}
 
-        <div className={`projector-body ${isDone ? 'projector-body--split' : ''}`}>
-          <div className="projector-list-col">
+        <div className={`flex flex-1 min-h-0 ${isDone ? 'flex-row' : 'flex-col'}`}>
+          <div className={`flex flex-col min-h-0 overflow-hidden ${isDone ? 'w-[280px] flex-shrink-0 border-r border-border' : 'w-full'}`}>
             {!isDone && (
-              <div className="projector-controls">
+              <div className="py-3 px-4 border-b border-border flex-shrink-0">
                 {phase.status === 'idle' && (
-                  <div className="embed-controls">
+                  <div className="flex gap-2 items-center">
                     <select
-                      className="model-select"
+                      className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
                       value={selectedModel}
                       onChange={e => { const v = e.target.value as EmbeddingModelId; setSelectedModel(v); localStorage.setItem('projector-model', v) }}
                     >
@@ -159,15 +158,15 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                         <option key={m.id} value={m.id}>{m.label}</option>
                       ))}
                     </select>
-                    <button onClick={handleEmbed} className="embed-btn">Embed All</button>
+                    <button onClick={handleEmbed} className="py-2 px-[18px] rounded-md border-0 bg-accent text-white text-sm cursor-pointer font-semibold hover:opacity-[0.88]">Embed All</button>
                   </div>
                 )}
                 {phase.status === 'model-loading' && (
-                  <div className="progress-wrap">
-                    <div className="progress-label">
+                  <div className="flex flex-col gap-2 text-[13px] text-text">
+                    <div className="flex items-center gap-2">
                       <div className="spinner" />
                       <span>{phase.progress > 0 ? `Downloading model… ${phase.progress}%` : 'Initializing model…'}</span>
-                      <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
+                      <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
                     </div>
                     <div className={`progress-bar ${phase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
                       <div className="progress-bar-fill" style={{ width: `${phase.progress}%` }} />
@@ -175,11 +174,11 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                   </div>
                 )}
                 {phase.status === 'embedding' && (
-                  <div className="progress-wrap">
-                    <div className="progress-label">
+                  <div className="flex flex-col gap-2 text-[13px] text-text">
+                    <div className="flex items-center gap-2">
                       <div className="spinner" />
                       <span>Embedding {phase.loaded + 1} / {phase.total}</span>
-                      <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
+                      <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
                     </div>
                     <div className="progress-bar">
                       <div className="progress-bar-fill" style={{ width: `${(phase.loaded / phase.total) * 100}%` }} />
@@ -187,11 +186,11 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                   </div>
                 )}
                 {phase.status === 'umap-running' && (
-                  <div className="progress-wrap">
-                    <div className="progress-label">
+                  <div className="flex flex-col gap-2 text-[13px] text-text">
+                    <div className="flex items-center gap-2">
                       <div className="spinner" />
                       <span>Reducing to 3D…</span>
-                      <button className="cancel-btn" onClick={cancelEmbedding}>Cancel</button>
+                      <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
                     </div>
                     <div className="progress-bar progress-bar--indeterminate">
                       <div className="progress-bar-fill" />
@@ -199,27 +198,27 @@ export default function SegmentProjectorModal({ segments, onClose }: Props) {
                   </div>
                 )}
                 {phase.status === 'error' && (
-                  <p className="projector-error">{phase.message}</p>
+                  <p className="text-[#e53e3e] text-[13px] m-0">{phase.message}</p>
                 )}
               </div>
             )}
 
-            <ul className="segment-list" ref={listRef}>
+            <ul className="list-none p-0 m-0 overflow-y-auto flex-1 min-h-0" ref={listRef}>
               {segments.map((seg, i) => (
                 <li
                   key={i}
-                  className={`segment-item ${highlightIndex === i ? 'segment-item--active' : ''}`}
+                  className={`flex gap-2 py-2 px-3.5 border-b border-border cursor-pointer text-[13px] items-start transition-colors duration-[120ms] hover:bg-code-bg ${highlightIndex === i ? 'segment-item--active' : ''}`}
                   onClick={() => { stopPlayback(); setDotPosition(i); setHighlightIndex(i) }}
                 >
-                  <span className="segment-index">{i + 1}</span>
-                  <span className="segment-text">{seg}</span>
+                  <span className="text-text opacity-50 min-w-[28px] flex-shrink-0 text-right tabular-nums pt-[1px]">{i + 1}</span>
+                  <span className="text-text-h leading-[1.45]">{seg}</span>
                 </li>
               ))}
             </ul>
           </div>
 
           {isDone && (
-            <div className="projector-canvas-col">
+            <div className="flex-1 min-h-0 flex">
               <ScatterPlot3D
                 points={phase.points}
                 labels={segments}

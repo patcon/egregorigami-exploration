@@ -5,7 +5,6 @@ import YoutubeEmbeddingProjector from './YoutubeEmbeddingProjector'
 import EmbeddingLayoutView from './EmbeddingLayoutView'
 import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
 import MicTranscriptViewer from './MicTranscriptViewer'
-import './App.css'
 
 function useHash() {
   const [hash, setHash] = useState(window.location.hash)
@@ -20,52 +19,52 @@ function useHash() {
 function IndexPage() {
   return (
     <>
-      <section id="center">
+      <section id="center" className="flex flex-col gap-[25px] content-center items-center flex-1 max-[1024px]:px-5 max-[1024px]:pt-8 max-[1024px]:pb-6 max-[1024px]:gap-[18px]">
         <div>
           <h1>egregorigami</h1>
           <p>Explorations of collective intelligence, narrative space, and protein folding.</p>
         </div>
-        <ul className="app-list">
+        <ul className="list-none p-0 m-0 flex flex-col gap-2 text-left">
           <li>
-            <a href="#v1">
-              <strong>Transcript Window Visualizer</strong>
-              <span>Watch an embedding context window slide through a transcript in real time.</span>
+            <a href="#v1" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Transcript Window Visualizer</strong>
+              <span className="text-sm text-text">Watch an embedding context window slide through a transcript in real time.</span>
             </a>
           </li>
           <li>
-            <a href="#v2">
-              <strong>YouTube Transcript Visualizer</strong>
-              <span>Paste a YouTube URL and watch the embedding window slide through the transcript.</span>
+            <a href="#v2" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">YouTube Transcript Visualizer</strong>
+              <span className="text-sm text-text">Paste a YouTube URL and watch the embedding window slide through the transcript.</span>
             </a>
           </li>
           <li>
-            <a href="#v3">
-              <strong>Embedding Projector</strong>
-              <span>Generate sentence embeddings in-browser and explore the 3D semantic space with an interactive scatter plot.</span>
+            <a href="#v3" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Embedding Projector</strong>
+              <span className="text-sm text-text">Generate sentence embeddings in-browser and explore the 3D semantic space with an interactive scatter plot.</span>
             </a>
           </li>
           <li>
-            <a href="#v4">
-              <strong>Embedding Layout</strong>
-              <span>Side-by-side view: YouTube player and transcript with an inline 3D embedding panel.</span>
+            <a href="#v4" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Embedding Layout</strong>
+              <span className="text-sm text-text">Side-by-side view: YouTube player and transcript with an inline 3D embedding panel.</span>
             </a>
           </li>
           <li>
-            <a href="#v5">
-              <strong>Embedding Layout (New Renderers)</strong>
-              <span>Same as v4, with switchable renderers: original points, Cividis tube, and glow shader. (default)</span>
+            <a href="#v5" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Embedding Layout (New Renderers)</strong>
+              <span className="text-sm text-text">Same as v4, with switchable renderers: original points, Cividis tube, and glow shader. (default)</span>
             </a>
           </li>
           <li>
-            <a href="#v6">
-              <strong>Live Mic Transcript Visualizer</strong>
-              <span>Record speech via your microphone and watch the embedding window slide through the live transcript.</span>
+            <a href="#v6" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Live Mic Transcript Visualizer</strong>
+              <span className="text-sm text-text">Record speech via your microphone and watch the embedding window slide through the live transcript.</span>
             </a>
           </li>
         </ul>
       </section>
       <div className="ticks"></div>
-      <section id="spacer"></section>
+      <section id="spacer" className="h-[88px] border-t border-border max-[1024px]:h-12"></section>
     </>
   )
 }
@@ -74,16 +73,7 @@ function IndexLink() {
   return (
     <a
       href="#index"
-      style={{
-        position: 'fixed',
-        bottom: '1rem',
-        left: '1rem',
-        zIndex: 9999,
-        fontSize: '0.75rem',
-        opacity: 0.5,
-        textDecoration: 'none',
-        color: 'inherit',
-      }}
+      className="fixed bottom-4 left-4 z-[9999] text-xs opacity-50 no-underline text-inherit"
     >
       Version Index
     </a>
@@ -97,18 +87,13 @@ function GitHubCorner() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Fork me on GitHub"
-      style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        zIndex: 9999,
-      }}
+      className="fixed top-0 right-0 z-[9999]"
     >
       <svg
         width="80"
         height="80"
         viewBox="0 0 250 250"
-        style={{ fill: '#151513', color: '#fff', position: 'absolute', top: 0, right: 0 }}
+        className="fill-[#151513] text-white absolute top-0 right-0"
         aria-hidden="true"
       >
         <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z" />

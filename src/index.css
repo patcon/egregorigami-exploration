@@ -1,3 +1,6 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ─── */
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -44,12 +47,23 @@
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
 }
 
+/* ─── Tailwind theme — maps CSS vars to utility classes ─── */
+@theme inline {
+  --color-text: var(--text);
+  --color-text-h: var(--text-h);
+  --color-bg: var(--bg);
+  --color-border: var(--border);
+  --color-code-bg: var(--code-bg);
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-border: var(--accent-border);
+  --color-social-bg: var(--social-bg);
+  --font-mono: var(--mono);
+}
+
+/* ─── Base styles ─── */
 #root {
   width: 1126px;
   max-width: 100%;
@@ -82,6 +96,7 @@ h1 {
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
@@ -91,21 +106,145 @@ h2 {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }
 
-code,
-.counter {
+code {
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
   color: var(--text-h);
-}
-
-code {
   font-size: 15px;
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ─── YouTube iframe (injected by YouTube API — no className available) ─── */
+.yt-player-aspect iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 4px;
+}
+
+/* ─── Ticks decoration (pseudo-elements, not expressible as Tailwind classes) ─── */
+.ticks {
+  position: relative;
+  width: 100%;
+}
+
+.ticks::before,
+.ticks::after {
+  content: '';
+  position: absolute;
+  top: -4.5px;
+  border: 5px solid transparent;
+}
+
+.ticks::before {
+  left: 0;
+  border-left-color: var(--border);
+}
+
+.ticks::after {
+  right: 0;
+  border-right-color: var(--border);
+}
+
+/* ─── Word highlighting (class names toggled by JS logic in TranscriptViewer) ─── */
+.word {
+  display: inline;
+}
+
+.word.in-window {
+  background: color-mix(in srgb, var(--accent-bg) 50%, var(--accent-border) 50%);
+  border-radius: 2px;
+  padding: 1px 0;
+}
+
+.word.cursor {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 2px;
+  padding: 1px 0;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ─── Scrub bar hover (child selector hover not expressible as Tailwind) ─── */
+.scrub-bar:hover {
+  height: 6px;
+  margin-top: 6px;
+}
+
+.scrub-bar:hover .scrub-thumb {
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+/* ─── Notice (uses color-mix — hard to express as arbitrary Tailwind value) ─── */
+.youtube-notice {
+  font-size: 13px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0;
+}
+
+.youtube-notice a {
+  color: var(--accent);
+}
+
+/* ─── Active segment (uses color-mix) ─── */
+.segment-item--active {
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg));
+}
+
+/* ─── Spinner (uses color-mix for border) ─── */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Progress bar (uses !important override in indeterminate mode) ─── */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--code-bg);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.15s ease;
+}
+
+.progress-bar--indeterminate .progress-bar-fill {
+  width: 40% !important;
+  position: absolute;
+  animation: indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0%   { left: -40%; }
+  100% { left: 100%; }
 }

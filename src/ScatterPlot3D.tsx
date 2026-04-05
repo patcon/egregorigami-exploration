@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import './ScatterPlot3D.css'
 import type { CameraState, FollowMode } from './scatterTypes'
 
 interface Props {
@@ -280,15 +279,24 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
     if (hits.length > 0) onPointClick(hits[0].index!)
   }
 
+  const followBtnClass = [
+    'absolute bottom-2 left-2 text-[11px] py-[3px] px-2 cursor-pointer z-10 pointer-events-auto select-none transition-[background,color,border-color] duration-150 rounded border hover:bg-black/75 hover:text-white',
+    followMode === 'tracking'
+      ? 'bg-[rgba(40,100,200,0.35)] border-[rgba(80,140,255,0.6)] text-white'
+      : followMode === 'following'
+      ? 'bg-[rgba(200,50,50,0.35)] border-[rgba(255,80,80,0.6)] text-white'
+      : 'bg-black/55 text-white/65 border-white/[0.18]',
+  ].join(' ')
+
   return (
-    <div className="scatter-wrap" ref={mountRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div className="relative w-full h-full min-h-0 cursor-crosshair [&_canvas]:block [&_canvas]:!w-full [&_canvas]:!h-full" ref={mountRef} onMouseMove={handleMouseMove} onMouseDown={handleMouseDown} onClick={handleClick}>
       {tooltip && (
-        <div className="scatter-tooltip" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}>
+        <div className="absolute pointer-events-none bg-black/80 text-white text-xs py-[5px] px-2 rounded max-w-[240px] whitespace-pre-wrap z-10 leading-[1.4]" style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}>
           {tooltip.text}
         </div>
       )}
       <button
-        className={`scatter-follow-btn${followMode !== 'static' ? ` ${followMode}` : ''}`}
+        className={followBtnClass}
         onClick={e => {
           e.stopPropagation()
           const modes: FollowMode[] = ['static', 'tracking', 'following']
