@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix white screen when invalid YouTube URL is entered (e.g. `?v=bad`) — `extractVideoId` now validates the 11-char video ID format for YouTube URL inputs, not just raw strings
+
 - Make v5 the default landing page; index nav moved to `#index` (also accessible via "Version Index" link on all pages)
 - Sync `?videoId=` querystring in real time as YouTube URL is typed into any view (v2, v3, v4, v5)
 - Add download button for 3D embedding points (v3 modal + v5 inline panel) — exports `embeddings-3d.json` once embeddings are complete

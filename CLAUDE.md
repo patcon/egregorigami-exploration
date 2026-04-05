@@ -16,6 +16,10 @@ pnpm extract-transcript -- <youtube-url-or-video-id>
 
 Use `pnpm` — not `npm`.
 
+## Changelog
+
+Update `CHANGELOG.md` under `## Unreleased` for every user-facing change. Do this in the same commit as the change itself.
+
 ## Architecture
 
 Single-page React + TypeScript app built with Vite. Hash-based routing in `App.tsx` dispatches to three views (`#v1`, `#v2`, `#v3`). No router library.
