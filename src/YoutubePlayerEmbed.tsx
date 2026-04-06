@@ -14,17 +14,20 @@ interface YoutubePlayerEmbedProps {
   playing?: boolean
   onPlayStateChange?: (playing: boolean) => void
   playbackRate?: number
+  onVideoDuration?: (secs: number) => void
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const onTimeUpdateRef = useRef(onTimeUpdate)
   const onPlayStateChangeRef = useRef(onPlayStateChange)
+  const onVideoDurationRef = useRef(onVideoDuration)
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate
     onPlayStateChangeRef.current = onPlayStateChange
+    onVideoDurationRef.current = onVideoDuration
   })
 
   // Load YT IFrame API once
@@ -72,6 +75,8 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
           onReady: (event: YT.PlayerEvent) => {
             // Only expose the player once it's fully initialized
             playerRef.current = event.target
+            const dur = event.target.getDuration()
+            if (dur > 0) onVideoDurationRef.current?.(dur)
           },
           onStateChange: (event: YT.OnStateChangeEvent) => {
             if (!playerRef.current) return  // guard against post-destroy async events

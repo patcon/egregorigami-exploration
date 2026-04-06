@@ -65,6 +65,7 @@ export default function EmbeddingLayoutViewV7() {
   } = useYoutubeTranscript(urlInput, {
     onLoaded: ({ text }) => {
       resetEmbedPhase()
+      setVideoDuration(null)
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
       setHasTranscriptText(true)
@@ -229,6 +230,10 @@ export default function EmbeddingLayoutViewV7() {
   const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
   useEffect(() => { totalSecsRef.current = totalSecs })
 
+  const [videoDuration, setVideoDuration] = useState<number | null>(null)
+  const durationMismatch = videoDuration !== null && totalSecs !== null
+    && Math.abs(videoDuration - totalSecs) > Math.max(10, totalSecs * 0.05)
+
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 
   const handleScrub = useCallback((pos: number) => {
@@ -299,24 +304,11 @@ export default function EmbeddingLayoutViewV7() {
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
-          <button className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
-            disabled={isProd ? !currentVideoId : loadStatus === 'loading'}>
-            {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
-          </button>
           <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShare}>
             {shareCopied ? 'Copied!' : 'Share'}
           </button>
         </div>
         {loadStatus === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{loadError}</p>}
-        {isProd && (
-          <p className="youtube-notice">
-            {currentVideoId
-              ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
-              : <>Paste a YouTube URL above to get started.</>
-            }
-          </p>
-        )}
       </div>
 
       {/* Main panels */}
@@ -333,6 +325,7 @@ export default function EmbeddingLayoutViewV7() {
                   playing={videoHidden ? false : transcriptPlaying}
                   onPlayStateChange={videoHidden ? undefined : setYtPlaying}
                   playbackRate={playbackRate}
+                  onVideoDuration={setVideoDuration}
                 />
               </div>
               {videoHidden && (
@@ -350,6 +343,11 @@ export default function EmbeddingLayoutViewV7() {
               </div>
             </div>
           )}
+          {durationMismatch && (
+            <p className="text-[13px] text-[#b7791f] m-0 px-4 py-2 border-b border-border">
+              ⚠ Transcript duration ({totalSecs}s) doesn't match video ({Math.round(videoDuration!)}s) — transcript may be out of date.
+            </p>
+          )}
           <TranscriptViewer
             key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
             initialText={loadedText ?? undefined}
@@ -364,6 +362,16 @@ export default function EmbeddingLayoutViewV7() {
             onSpeedChange={setPlaybackRate}
             hideSegmentsMode
             onSubtitleLoad={handleSubtitleLoad}
+            label="Transcript"
+            prependTextareaButtons={
+              <button
+                className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+                disabled={isProd ? !currentVideoId : loadStatus === 'loading'}
+              >
+                {!isProd && loadStatus === 'loading' ? 'Loading…' : `Load${isProd ? ' ↗' : ''}`}
+              </button>
+            }
           />
         </div>
 
