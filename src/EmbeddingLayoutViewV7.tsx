@@ -362,14 +362,14 @@ export default function EmbeddingLayoutViewV7() {
             onSpeedChange={setPlaybackRate}
             hideSegmentsMode
             onSubtitleLoad={handleSubtitleLoad}
-            label="Transcript"
+            label="Raw Transcript"
             prependTextareaButtons={
               <button
                 className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
                 disabled={isProd ? !currentVideoId : loadStatus === 'loading'}
               >
-                {!isProd && loadStatus === 'loading' ? 'Loading…' : `Load${isProd ? ' ↗' : ''}`}
+                {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch${isProd ? ' ↗' : ''}`}
               </button>
             }
           />

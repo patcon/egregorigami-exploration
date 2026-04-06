@@ -318,7 +318,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           />
           {prependTextareaButtons}
           <button type="button" className="flex-shrink-0 py-1.5 px-3 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-75"
-            onClick={() => fileInputRef.current?.click()}>Load file</button>
+            onClick={() => fileInputRef.current?.click()}>Load</button>
           <input ref={fileInputRef} type="file" accept=".vtt,.srt,text/vtt,text/plain"
             className="hidden" onChange={handleFileLoad} />
         </div>
