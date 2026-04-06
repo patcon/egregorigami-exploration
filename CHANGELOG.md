@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add v7: mobile-optimized copy of v5, now the default landing page. Single-column layout on mobile (≤768px). Removes "allow faster" checkbox — video embed hides automatically when speed exceeds 2×. Removes "segments" window mode (words-only). Share URL updated to `#v7`.
+
 - Fix all ESLint warnings and errors: move ref writes out of render into effects, type `progress_callback` params, fix recursive rAF `tick` pattern in `SegmentProjectorModal`, and suppress intentional rule violations with targeted disable comments
 
 - Migrate styling from hand-written CSS files to Tailwind CSS v4; all 8 component CSS files replaced with utility classes in JSX; animations, `color-mix()` rules, and pseudo-element styles retained in `index.css`

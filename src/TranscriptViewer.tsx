@@ -26,13 +26,17 @@ interface TranscriptViewerProps {
   onSpeedChange?: (speed: number) => void
   maxSpeed?: number
   onSubtitleLoad?: (result: SubtitleParseResult) => void
+  hideSegmentsMode?: boolean
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode }: TranscriptViewerProps = {}) {
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
+  useEffect(() => {
+    if (hideSegmentsMode && windowMode === 'segments') setWindowMode('words')
+  }, [hideSegmentsMode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [overlapInput, setOverlapInput] = useState(() => localStorage.getItem('transcript-overlap') ?? '80')
   const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
@@ -329,10 +333,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => { setWindowMode('words'); localStorage.setItem('transcript-window-mode', 'words') }} />
               words
             </label>
-            <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
-              <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
-              segments
-            </label>
+            {!hideSegmentsMode && (
+              <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
+                <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
+                segments
+              </label>
+            )}
             {windowMode === 'segments' && windowInputNum > 0 && words.length > 0 && (
               <span className="text-[13px] text-text opacity-60">({windowSize} words)</span>
             )}

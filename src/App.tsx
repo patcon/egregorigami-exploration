@@ -4,6 +4,7 @@ import YoutubeTranscriptViewer from './YoutubeTranscriptViewer'
 import YoutubeEmbeddingProjector from './YoutubeEmbeddingProjector'
 import EmbeddingLayoutView from './EmbeddingLayoutView'
 import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
+import EmbeddingLayoutViewV7 from './EmbeddingLayoutViewV7'
 import MicTranscriptViewer from './MicTranscriptViewer'
 
 function useHash() {
@@ -52,13 +53,19 @@ function IndexPage() {
           <li>
             <a href="#v5" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Embedding Layout (New Renderers)</strong>
-              <span className="text-sm text-text">Same as v4, with switchable renderers: original points, Cividis tube, and glow shader. (default)</span>
+              <span className="text-sm text-text">Same as v4, with switchable renderers: original points, Cividis tube, and glow shader.</span>
             </a>
           </li>
           <li>
             <a href="#v6" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Live Mic Transcript Visualizer</strong>
               <span className="text-sm text-text">Record speech via your microphone and watch the embedding window slide through the live transcript.</span>
+            </a>
+          </li>
+          <li>
+            <a href="#v7" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Embedding Layout (Mobile)</strong>
+              <span className="text-sm text-text">Mobile-optimized version of v5. (default)</span>
             </a>
           </li>
         </ul>
@@ -119,8 +126,9 @@ function App() {
   if (hash === '#v4') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutView /></>
   if (hash === '#v5') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV5 /></>
   if (hash === '#v6') return <><GitHubCorner /><IndexLink /><MicTranscriptViewer /></>
+  if (hash === '#v7') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV7 /></>
   if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
-  return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV5 /></>
+  return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV7 /></>
 }
 
 export default App
