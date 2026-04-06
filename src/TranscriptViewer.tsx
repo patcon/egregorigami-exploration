@@ -340,61 +340,51 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
 
   const windowedControls = (
     <>
-      <div className="flex items-center gap-2 md:gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5 text-xs md:text-sm text-text">
+      {/* Row 1: Window size + word count + overlap */}
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap text-xs md:text-sm text-text">
+        <label className="flex items-center gap-1.5">
           Window
           <input
             type="number"
             min={1}
-            className={`w-16 ${inputBase} ${windowInputNum <= 0 ? inputError : ''}`}
+            className={`w-14 ${inputBase} ${windowInputNum <= 0 ? inputError : ''}`}
             value={windowInput}
             onChange={e => { setWindowInput(e.target.value); localStorage.setItem('transcript-window', e.target.value) }}
             onBlur={onParamsBlur}
           />
-          <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer">
-            <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => { setWindowMode('words'); localStorage.setItem('transcript-window-mode', 'words') }} />
-            words
+        </label>
+        <span className="opacity-60">of {words.length} words{windowMode === 'segments' && windowInputNum > 0 && words.length > 0 ? ` (${windowSize}/seg)` : ''},</span>
+        {!hideSegmentsMode && (
+          <label className="flex items-center gap-[3px] cursor-pointer">
+            <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
+            segments
           </label>
-          {!hideSegmentsMode && (
-            <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer">
-              <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
-              segments
-            </label>
-          )}
-          {windowMode === 'segments' && windowInputNum > 0 && words.length > 0 && (
-            <span className="text-[13px] text-text opacity-60">({windowSize} words)</span>
-          )}
-        </div>
-        <label className="flex items-center gap-1.5 text-xs md:text-sm text-text">
+        )}
+        <label className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={0}
+            max={99}
+            className={`w-12 ${inputBase} ${parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? inputError : ''}`}
+            value={overlapInput}
+            onChange={e => { setOverlapInput(e.target.value); localStorage.setItem('transcript-overlap', e.target.value) }}
+            onBlur={onParamsBlur}
+          />
+          % overlap
+        </label>
+      </div>
+      {/* Row 2: Duration + speed + auto-scroll */}
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap text-xs md:text-sm text-text">
+        <label className="flex items-center gap-1.5">
           Duration
           <input
             type="text"
-            className={`w-[72px] ${inputBase} ${parseTimecode(durationInput) > 0 ? '' : inputError}`}
+            className={`w-[64px] ${inputBase} ${parseTimecode(durationInput) > 0 ? '' : inputError}`}
             value={durationInput}
             onChange={e => { setDurationInput(e.target.value); localStorage.setItem('transcript-duration', e.target.value) }}
             placeholder="30 or 4:28"
           />
         </label>
-        <label className="flex items-center gap-1.5 text-xs md:text-sm text-text">
-          Overlap
-          <input
-            type="number"
-            min={0}
-            max={99}
-            className={`w-[52px] ${inputBase} ${parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? inputError : ''}`}
-            value={overlapInput}
-            onChange={e => { setOverlapInput(e.target.value); localStorage.setItem('transcript-overlap', e.target.value) }}
-            onBlur={onParamsBlur}
-          />
-          %
-        </label>
-        <div className="flex items-center gap-1">
-          <button className="py-1 px-2 md:py-1.5 md:px-2.5 bg-code-bg text-text-h border border-border rounded-md text-xs md:text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(-1)} title="Step back">&#9664;</button>
-          <button className="py-1 px-3 md:py-1.5 md:px-4 bg-accent text-white border-0 rounded-md text-xs md:text-sm cursor-pointer font-medium transition-opacity duration-150 hover:opacity-85" onClick={handlePlayPause}>
-            {isPlaying ? '⏸ Pause' : position >= 1 ? '↺ Replay' : '▶ Play'}
-          </button>
-          <button className="py-1 px-2 md:py-1.5 md:px-2.5 bg-code-bg text-text-h border border-border rounded-md text-xs md:text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">&#9654;</button>
-        </div>
         <div className="flex gap-0.5">
           {[1, 2, 5, 10].map(s => (
             <button
@@ -409,7 +399,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             >{s}x</button>
           ))}
           {maxSpeed !== undefined && (
-            <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
+            <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer ml-1">
               <input
                 type="checkbox"
                 checked={allowFaster}
@@ -428,19 +418,26 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             </label>
           )}
         </div>
-        <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer ml-auto">
+        <label className="flex items-center gap-[3px] cursor-pointer ml-auto">
           <input type="checkbox" checked={autoScroll} onChange={e => { setAutoScroll(e.target.checked); localStorage.setItem('transcript-auto-scroll', String(e.target.checked)) }} />
           auto-scroll
         </label>
-        <span className="text-xs md:text-[13px] text-text">{words.length} words</span>
       </div>
-      <div
-        className="scrub-bar relative h-[4px] bg-border cursor-pointer mt-2 rounded-[2px] overflow-visible group"
-        onPointerDown={handleScrubPointerDown}
-        onPointerMove={handleScrubPointerMove}
-      >
-        <div className="scrub-progress absolute left-0 top-0 h-full bg-accent rounded-[2px] pointer-events-none" style={{ width: `${position * 100}%` }} />
-        <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100" style={{ left: `${position * 100}%` }} />
+      {/* Row 3: Step/play buttons + scrub bar */}
+      <div className="flex items-center gap-1">
+        <button className="py-1 px-1.5 bg-code-bg text-text-h border border-border rounded-md text-xs cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(-1)} title="Step back">⏮</button>
+        <button className="py-1 px-2 bg-accent text-white border-0 rounded-md text-xs cursor-pointer font-medium transition-opacity duration-150 hover:opacity-85" onClick={handlePlayPause}>
+          {isPlaying ? '⏸' : position >= 1 ? '↺' : '▶'}
+        </button>
+        <button className="py-1 px-1.5 bg-code-bg text-text-h border border-border rounded-md text-xs cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">⏭</button>
+        <div
+          className="scrub-bar flex-1 relative h-[4px] bg-border cursor-pointer rounded-[2px] overflow-visible group mx-1"
+          onPointerDown={handleScrubPointerDown}
+          onPointerMove={handleScrubPointerMove}
+        >
+          <div className="scrub-progress absolute left-0 top-0 h-full bg-accent rounded-[2px] pointer-events-none" style={{ width: `${position * 100}%` }} />
+          <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100" style={{ left: `${position * 100}%` }} />
+        </div>
       </div>
     </>
   )
