@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix 3D scatter not rendering in v7 after deferred-init fix — `extraTabContent` wrapper in TranscriptViewer was missing `flex flex-col`, causing `h-full` on the mount div to resolve to zero
+
 - Fix WebGL "zero size framebuffer" errors in ScatterPlot3D, ScatterPlot3DV5, and ScatterPlot3DV6 when component mounts inside a hidden tab — defer Three.js renderer init until container has non-zero dimensions, using a one-shot ResizeObserver
 
 - Add info button (ⓘ) to v7 URL bar that opens a modal; modal contains a "Version Index →" link, replacing the fixed bottom-left link on that view.
