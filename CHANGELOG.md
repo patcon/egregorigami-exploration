@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix WebGL "zero size framebuffer" errors in ScatterPlot3D, ScatterPlot3DV5, and ScatterPlot3DV6 when component mounts inside a hidden tab — defer Three.js renderer init until container has non-zero dimensions, using a one-shot ResizeObserver
+
 - Add info button (ⓘ) to v7 URL bar that opens a modal; modal contains a "Version Index →" link, replacing the fixed bottom-left link on that view.
 - Add v7: mobile-optimized copy of v5, now the default landing page. Single-column layout on mobile (≤768px). Removes "allow faster" checkbox — video embed hides automatically when speed exceeds 2×. Removes "segments" window mode (words-only). Share URL updated to `#v7`.
 - Warn in v7 (below video, above transcript) when transcript duration doesn't match the YouTube video duration (threshold: >10s or >5%). "Fetch Transcript" button moved into transcript section as "Load", alongside a "Transcript" section header.
