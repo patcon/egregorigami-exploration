@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add URL history autocomplete dropdown to YouTube URL inputs across all embedding views (v3–v7) — shows video title (fetched async via YouTube oEmbed) and URL; title appears above URL in the list but selecting an entry sets only the URL value; history persists in localStorage (`yt-url-history`, max 15 entries)
+
 - Cache 3D UMAP points in localStorage keyed by video ID (`yt-3d-points-<videoId>`) across all embedding views (v3–v7) — points are restored automatically on page reload, and overwritten when a new embedding is run for the same video
 
 - Fix v7 mobile: prevent pull-to-refresh and iOS bounce — lock `html` overflow on mount, add `overscroll-y-contain` to inner scrollable areas (word display, segments list) so their overscroll doesn't propagate, use `100dvh` for dynamic viewport height, and add `flex-shrink-0` to YouTube player wrapper

@@ -5,6 +5,8 @@ import SegmentProjectorModal from './SegmentProjectorModal'
 import { extractVideoId, computeChunks, computeExternalPosition } from './videoUtils'
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
+import { useUrlHistory } from './useUrlHistory'
+import UrlHistoryInput from './UrlHistoryInput'
 
 const isProd = import.meta.env.PROD
 
@@ -14,11 +16,14 @@ export default function YoutubeEmbeddingProjector() {
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
     return localStorage.getItem('yt-url') ?? ''
   })
+  const { history: urlHistory, addToHistory } = useUrlHistory()
   const {
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
     status, errorMessage, handleLoad, handleSubtitleLoad,
     setLoadedVideoId, setWordTimestamps,
-  } = useYoutubeTranscript(urlInput)
+  } = useYoutubeTranscript(urlInput, {
+    onLoaded: ({ videoId }) => { addToHistory(urlInput, videoId) },
+  })
   const [modalSegments, setModalSegments] = useState<string[] | null>(null)
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
@@ -77,12 +82,9 @@ export default function YoutubeEmbeddingProjector() {
     <div className="flex flex-col flex-1 min-h-0">
       <div className="sticky top-0 bg-bg z-[11] px-5 py-2.5 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2">
-          <input
-            type="url"
-            className="flex-1 py-1.5 px-2.5 border border-border rounded-md bg-code-bg text-text-h text-sm focus:outline-2 focus:outline-accent focus:outline-offset-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
+          <UrlHistoryInput
             value={urlInput}
-            onChange={e => {
-              const val = e.target.value
+            onChange={val => {
               setUrlInput(val)
               localStorage.setItem('yt-url', val)
               if (!extractVideoId(val)) {
@@ -93,6 +95,7 @@ export default function YoutubeEmbeddingProjector() {
             }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
+            history={urlHistory}
           />
           <button className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}

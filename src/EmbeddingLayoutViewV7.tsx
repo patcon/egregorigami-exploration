@@ -13,6 +13,8 @@ import { extractVideoId, computeChunks, computeExternalPosition } from './videoU
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
 import { usePointsCache } from './usePointsCache'
+import { useUrlHistory } from './useUrlHistory'
+import UrlHistoryInput from './UrlHistoryInput'
 
 const isProd = import.meta.env.PROD
 
@@ -52,6 +54,7 @@ export default function EmbeddingLayoutViewV7() {
   const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
   const hasSharePoints = !!(readShareParam()?.points)
   const { savePoints, restoreIfCached } = usePointsCache(currentVideoId, restorePoints, !hasSharePoints)
+  const { history: urlHistory, addToHistory } = useUrlHistory()
   useEffect(() => {
     if (embedPhase.status === 'done') savePoints(embedPhase.points)
   }, [embedPhase]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,8 +71,9 @@ export default function EmbeddingLayoutViewV7() {
     status, errorMessage: loadError, handleLoad, handleSubtitleLoad,
     setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,
   } = useYoutubeTranscript(urlInput, {
-    onLoaded: ({ text }) => {
+    onLoaded: ({ text, videoId }) => {
       if (!restoreIfCached()) resetEmbedPhase()
+      addToHistory(urlInput, videoId)
       setVideoDuration(null)
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
@@ -311,12 +315,9 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"
             aria-label="About"
           >i</button>
-          <input
-            type="url"
-            className="flex-1 py-1.5 px-2.5 border border-border rounded-md bg-code-bg text-text-h text-sm focus:outline-2 focus:outline-accent focus:outline-offset-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
+          <UrlHistoryInput
             value={urlInput}
-            onChange={e => {
-              const val = e.target.value
+            onChange={val => {
               setUrlInput(val)
               localStorage.setItem('yt-url', val)
               if (!extractVideoId(val)) {
@@ -327,6 +328,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
+            history={urlHistory}
           />
           <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShare}>
             {shareCopied ? 'Copied!' : 'Share'}

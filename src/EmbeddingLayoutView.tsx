@@ -11,6 +11,8 @@ import { extractVideoId, computeChunks, computeExternalPosition } from './videoU
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
 import { usePointsCache } from './usePointsCache'
+import { useUrlHistory } from './useUrlHistory'
+import UrlHistoryInput from './UrlHistoryInput'
 
 const isProd = import.meta.env.PROD
 
@@ -50,6 +52,7 @@ export default function EmbeddingLayoutView() {
   const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
   const hasSharePoints = !!(readShareParam()?.points)
   const { savePoints, restoreIfCached } = usePointsCache(currentVideoId, restorePoints, !hasSharePoints)
+  const { history: urlHistory, addToHistory } = useUrlHistory()
   useEffect(() => {
     if (embedPhase.status === 'done') savePoints(embedPhase.points)
   }, [embedPhase]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -62,8 +65,9 @@ export default function EmbeddingLayoutView() {
     status, errorMessage: loadError, handleLoad, handleSubtitleLoad,
     setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,
   } = useYoutubeTranscript(urlInput, {
-    onLoaded: ({ text }) => {
+    onLoaded: ({ text, videoId }) => {
       if (!restoreIfCached()) resetEmbedPhase()
+      addToHistory(urlInput, videoId)
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
       setHasTranscriptText(true)
@@ -267,12 +271,9 @@ export default function EmbeddingLayoutView() {
       {/* URL Bar */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
-          <input
-            type="url"
-            className="flex-1 py-1.5 px-2.5 border border-border rounded-md bg-code-bg text-text-h text-sm focus:outline-2 focus:outline-accent focus:outline-offset-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
+          <UrlHistoryInput
             value={urlInput}
-            onChange={e => {
-              const val = e.target.value
+            onChange={val => {
               setUrlInput(val)
               localStorage.setItem('yt-url', val)
               if (!extractVideoId(val)) {
@@ -283,6 +284,7 @@ export default function EmbeddingLayoutView() {
             }}
             onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
+            history={urlHistory}
           />
           <button className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
