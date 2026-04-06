@@ -126,9 +126,9 @@ function App() {
   if (hash === '#v4') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutView /></>
   if (hash === '#v5') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV5 /></>
   if (hash === '#v6') return <><GitHubCorner /><IndexLink /><MicTranscriptViewer /></>
-  if (hash === '#v7') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV7 /></>
+  if (hash === '#v7') return <><GitHubCorner /><EmbeddingLayoutViewV7 /></>
   if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
-  return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV7 /></>
+  return <><GitHubCorner /><EmbeddingLayoutViewV7 /></>
 }
 
 export default App

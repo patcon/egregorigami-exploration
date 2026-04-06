@@ -276,11 +276,40 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
     : 'https://www.youtube-transcript.io'
 
+  const [infoOpen, setInfoOpen] = useState(false)
+  const infoDialogRef = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const dialog = infoDialogRef.current
+    if (!dialog) return
+    if (infoOpen) dialog.showModal()
+    else dialog.close()
+  }, [infoOpen])
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      {/* Info modal */}
+      <dialog
+        ref={infoDialogRef}
+        onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
+        className="backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(360px,90vw)] shadow-lg"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold m-0">About</h2>
+          <button onClick={() => setInfoOpen(false)} className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none">×</button>
+        </div>
+        <a href="#index" onClick={() => setInfoOpen(false)} className="text-sm text-accent no-underline hover:underline">
+          Version Index →
+        </a>
+      </dialog>
+
       {/* URL Bar */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
+          <button
+            onClick={() => setInfoOpen(true)}
+            className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"
+            aria-label="About"
+          >i</button>
           <input
             type="url"
             className="flex-1 py-1.5 px-2.5 border border-border rounded-md bg-code-bg text-text-h text-sm focus:outline-2 focus:outline-accent focus:outline-offset-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
