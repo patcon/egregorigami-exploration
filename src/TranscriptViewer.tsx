@@ -29,9 +29,10 @@ interface TranscriptViewerProps {
   hideSegmentsMode?: boolean
   label?: string
   prependTextareaButtons?: React.ReactNode
+  hideFileLoad?: boolean
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad }: TranscriptViewerProps = {}) {
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
@@ -316,9 +317,13 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             placeholder="Paste transcript text or .vtt/.srt here…"
             rows={3}
           />
-          {prependTextareaButtons}
-          <button type="button" className="flex-shrink-0 py-1.5 px-3 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-75"
-            onClick={() => fileInputRef.current?.click()}>Load</button>
+          <div className="flex flex-col gap-1 flex-shrink-0">
+            {prependTextareaButtons}
+            {!hideFileLoad && (
+              <button type="button" className="py-1.5 px-3 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-75"
+                onClick={() => fileInputRef.current?.click()}>Load</button>
+            )}
+          </div>
           <input ref={fileInputRef} type="file" accept=".vtt,.srt,text/vtt,text/plain"
             className="hidden" onChange={handleFileLoad} />
         </div>

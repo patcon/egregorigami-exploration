@@ -363,6 +363,7 @@ export default function EmbeddingLayoutViewV7() {
             hideSegmentsMode
             onSubtitleLoad={handleSubtitleLoad}
             label="Raw Transcript"
+            hideFileLoad={!isProd}
             prependTextareaButtons={
               <button
                 className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
