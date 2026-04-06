@@ -234,6 +234,9 @@ export default function EmbeddingLayoutViewV7() {
   const durationMismatch = videoDuration !== null && totalSecs !== null
     && Math.abs(videoDuration - totalSecs) > Math.max(10, totalSecs * 0.05)
 
+  const [transcriptOpen, setTranscriptOpen] = useState(!hasTranscriptText)
+  useEffect(() => { if (durationMismatch) setTranscriptOpen(true) }, [durationMismatch])
+
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 
   const handleScrub = useCallback((pos: number) => {
@@ -364,6 +367,9 @@ export default function EmbeddingLayoutViewV7() {
             onSubtitleLoad={handleSubtitleLoad}
             label="Raw Transcript"
             hideFileLoad={!isProd}
+            collapsible
+            open={transcriptOpen}
+            onToggle={() => setTranscriptOpen(o => !o)}
             prependTextareaButtons={
               <button
                 className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -30,9 +30,13 @@ interface TranscriptViewerProps {
   label?: string
   prependTextareaButtons?: React.ReactNode
   hideFileLoad?: boolean
+  collapsible?: boolean
+  open?: boolean
+  onToggle?: () => void
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle }: TranscriptViewerProps = {}) {
+  const isCollapsed = collapsible && open === false
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
@@ -282,8 +286,14 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   return (
     <div className="flex flex-col flex-1 min-h-0 text-left">
       <div className="sticky top-0 bg-bg z-10 pt-3 px-5 border-b border-border flex flex-col gap-2">
-        {label && <p className="text-xs font-semibold uppercase tracking-wide text-text opacity-50 m-0">{label}</p>}
-        <div className="flex items-start gap-2">
+        {label && (
+          collapsible
+            ? <button type="button" className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-text opacity-50 cursor-pointer hover:opacity-75 bg-transparent border-0 p-0" onClick={onToggle}>
+                <span>{isCollapsed ? '▶' : '▼'}</span>{label}
+              </button>
+            : <p className="text-xs font-semibold uppercase tracking-wide text-text opacity-50 m-0">{label}</p>
+        )}
+        {!isCollapsed && <div className="flex items-start gap-2">
           <textarea
             className="w-full box-border resize-y font-mono text-[13px] py-2 px-2.5 border border-border rounded-md bg-code-bg text-text-h leading-[1.5] focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
             value={rawText}
@@ -326,8 +336,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           </div>
           <input ref={fileInputRef} type="file" accept=".vtt,.srt,text/vtt,text/plain"
             className="hidden" onChange={handleFileLoad} />
-        </div>
-        <div className="flex items-center gap-4 flex-wrap">
+        </div>}
+        {!isCollapsed && <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-1.5 text-sm text-text">
             Window
             <input
@@ -420,18 +430,18 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             auto-scroll
           </label>
           <span className="text-[13px] text-text">{words.length} words</span>
-        </div>
-        <div
+        </div>}
+        {!isCollapsed && <div
           className="scrub-bar relative h-[4px] bg-border cursor-pointer mt-2 rounded-[2px] overflow-visible group"
           onPointerDown={handleScrubPointerDown}
           onPointerMove={handleScrubPointerMove}
         >
           <div className="scrub-progress absolute left-0 top-0 h-full bg-accent rounded-[2px] pointer-events-none" style={{ width: `${position * 100}%` }} />
           <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100" style={{ left: `${position * 100}%` }} />
-        </div>
+        </div>}
       </div>
 
-      <div className="flex-1 overflow-y-auto py-6 px-5" ref={textAreaRef}>
+      {!isCollapsed && <div className="flex-1 overflow-y-auto py-6 px-5" ref={textAreaRef}>
         {words.length === 0 ? (
           <p className="text-text italic">Paste some text above to get started.</p>
         ) : (
@@ -455,7 +465,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             })}
           </p>
         )}
-      </div>
+      </div>}
     </div>
   )
 }
