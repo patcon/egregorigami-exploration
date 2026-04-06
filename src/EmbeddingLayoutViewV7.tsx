@@ -82,6 +82,7 @@ export default function EmbeddingLayoutViewV7() {
   const handleWindowChange = useCallback((params: { windowSize: number; overlapPct: number; text: string }) => {
     windowParamsRef.current = params
     setHasTranscriptText(!!params.text.trim())
+    if (params.text.trim()) setSegments(computeChunks(params.text, params.windowSize, params.overlapPct))
   }, [])
 
   const handleParamsBlur = useCallback(() => {
@@ -90,7 +91,6 @@ export default function EmbeddingLayoutViewV7() {
     setSegments(computeChunks(text, windowSize, overlapPct))
   }, [])
 
-  // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [clickSeekPosition, setClickSeekPosition] = useState<number | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
@@ -177,27 +177,16 @@ export default function EmbeddingLayoutViewV7() {
     if (words.length === 0) return
     const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
     const initialCursor = Math.min(windowSize - 1, words.length - 1)
-
-    // Compute end word index for each segment
     const endIndices = segs.map((_, i) => {
       const cursor = Math.min(words.length - 1, initialCursor + i * step)
       const windowStart = Math.max(0, cursor - windowSize + 1)
       return Math.min(words.length - 1, windowStart + windowSize - 1)
     })
-
-    // Interpolate: find the two adjacent segments whose ends bracket wordIndex
-    if (wordIndex <= endIndices[0]) {
-      setHighlightIndex(0)
-      return
-    }
-    if (wordIndex >= endIndices[endIndices.length - 1]) {
-      setHighlightIndex(segs.length - 1)
-      return
-    }
+    if (wordIndex <= endIndices[0]) { setHighlightIndex(0); return }
+    if (wordIndex >= endIndices[endIndices.length - 1]) { setHighlightIndex(segs.length - 1); return }
     for (let i = 0; i < endIndices.length - 1; i++) {
       if (wordIndex >= endIndices[i] && wordIndex < endIndices[i + 1]) {
-        const t = (wordIndex - endIndices[i]) / (endIndices[i + 1] - endIndices[i])
-        setHighlightIndex(i + t)
+        setHighlightIndex(i + (wordIndex - endIndices[i]) / (endIndices[i + 1] - endIndices[i]))
         return
       }
     }
@@ -211,10 +200,7 @@ export default function EmbeddingLayoutViewV7() {
     const step = Math.max(1, Math.round(windowSize * (1 - overlapPct / 100)))
     const initialCursor = Math.min(windowSize - 1, words.length - 1)
     const wordIndex = Math.min(words.length - 1, initialCursor + idx * step)
-    // Always set a direct word-index position so the transcript cursor jumps
-    // even when no video is loaded (externalPosition would otherwise be undefined)
     setClickSeekPosition(words.length > 1 ? wordIndex / (words.length - 1) : 0)
-    // Also seek the video if available
     const secs = totalSecsRef.current
     if (!secs) return
     const ts = wordTimestampsRef.current
@@ -225,7 +211,7 @@ export default function EmbeddingLayoutViewV7() {
     setSeekTarget(seekTime)
   }, [])
 
-  const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
+const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
   useEffect(() => { totalSecsRef.current = totalSecs })
 
   const [videoDuration, setVideoDuration] = useState<number | null>(null)
@@ -383,20 +369,40 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             tab={transcriptTab}
             onTabChange={setTranscriptTab}
             warning={durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined}
-            extraTabs={[{ id: 'segments', label: 'Segments' }]}
+            extraTabs={[
+              { id: 'segments', label: 'Segments' },
+              { id: '3d', label: '3D' },
+            ]}
             extraTabContent={
-              isDone && embedPhase.status === 'done' && segments ? (
-                <div className="flex-1 min-h-[400px] flex flex-col overflow-hidden">
-                  {/* eslint-disable react-hooks/refs */}
-                  {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                  {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                  {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                  {/* eslint-enable react-hooks/refs */}
-                </div>
+              transcriptTab === 'segments' ? (
+                segments && segments.length > 0 ? (
+                  <ul className="list-none p-0 m-0 overflow-y-auto flex-1">
+                    {segments.map((seg, i) => (
+                      <li key={i} className="flex gap-2 py-2 px-3.5 border-b border-border text-[13px] items-start">
+                        <span className="text-text opacity-50 min-w-[28px] flex-shrink-0 text-right tabular-nums pt-[1px]">{i + 1}</span>
+                        <span className="text-text-h leading-[1.45]">{seg}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+                    Load a transcript to see segments.
+                  </div>
+                )
               ) : (
-                <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
-                  {isEmbedding ? 'Embedding in progress…' : 'Run Visualize to see segments in 3D.'}
-                </div>
+                isDone && embedPhase.status === 'done' && segments ? (
+                  <div className="flex-1 min-h-[400px] flex flex-col overflow-hidden">
+                    {/* eslint-disable react-hooks/refs */}
+                    {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                    {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                    {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                    {/* eslint-enable react-hooks/refs */}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+                    {isEmbedding ? 'Embedding in progress…' : 'Run Visualize to see segments in 3D.'}
+                  </div>
+                )
               )
             }
             prependTextareaButtons={
