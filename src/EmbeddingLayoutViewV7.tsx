@@ -462,28 +462,37 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
           </div>
         )}
         <div className="flex gap-2 items-center flex-wrap">
-          <button
-            className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-semibold cursor-pointer whitespace-nowrap hover:opacity-[0.88] disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleRunEmbedding}
-            disabled={!hasTranscriptText || isEmbedding}
-          >
-            Visualize
-          </button>
-          <select
-            className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-            value={selectedModel}
-            onChange={e => {
-              const v = e.target.value as EmbeddingModelId
-              setSelectedModel(v)
-              localStorage.setItem('projector-model', v)
-            }}
-          >
-            {EMBEDDING_MODELS.map(m => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-          {isDone && (
+          {!isDone ? (
             <>
+              <select
+                className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
+                value={selectedModel}
+                onChange={e => {
+                  const v = e.target.value as EmbeddingModelId
+                  setSelectedModel(v)
+                  localStorage.setItem('projector-model', v)
+                }}
+              >
+                {EMBEDDING_MODELS.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+              <button
+                className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-semibold cursor-pointer whitespace-nowrap hover:opacity-[0.88] disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleRunEmbedding}
+                disabled={!hasTranscriptText || isEmbedding}
+              >
+                Visualize
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="py-1.5 px-3 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border"
+                onClick={resetEmbedPhase}
+              >
+                Reset Viz
+              </button>
               <select
                 className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
                 value={rendererType}
