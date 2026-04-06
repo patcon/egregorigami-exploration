@@ -234,8 +234,8 @@ export default function EmbeddingLayoutViewV7() {
   const durationMismatch = videoDuration !== null && totalSecs !== null
     && Math.abs(videoDuration - totalSecs) > Math.max(10, totalSecs * 0.05)
 
-  const [transcriptOpen, setTranscriptOpen] = useState(!hasTranscriptText)
-  useEffect(() => { if (durationMismatch) setTranscriptOpen(true) }, [durationMismatch])
+  const [transcriptTab, setTranscriptTab] = useState<'raw' | 'windowed'>(!hasTranscriptText ? 'raw' : 'windowed')
+  useEffect(() => { if (durationMismatch) setTranscriptTab('raw') }, [durationMismatch])
 
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
 
@@ -360,11 +360,9 @@ export default function EmbeddingLayoutViewV7() {
             onSpeedChange={setPlaybackRate}
             hideSegmentsMode
             onSubtitleLoad={handleSubtitleLoad}
-            label="Raw Transcript"
             hideFileLoad={!isProd}
-            collapsible
-            open={transcriptOpen}
-            onToggle={() => setTranscriptOpen(o => !o)}
+            tab={transcriptTab}
+            onTabChange={setTranscriptTab}
             warning={durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined}
             prependTextareaButtons={
               <button
