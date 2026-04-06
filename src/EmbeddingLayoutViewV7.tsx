@@ -245,6 +245,7 @@ const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
 
 const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status === 'embedding' || embedPhase.status === 'umap-running'
   const isDone = embedPhase.status === 'done'
+  useEffect(() => { if (isDone) setTranscriptTab('3d') }, [isDone])
 
   const handleDownload = () => {
     if (embedPhase.status !== 'done') return
