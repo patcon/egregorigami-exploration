@@ -34,11 +34,13 @@ interface TranscriptViewerProps {
   open?: boolean
   onToggle?: () => void
   warning?: string
-  tab?: 'raw' | 'windowed'
-  onTabChange?: (tab: 'raw' | 'windowed') => void
+  tab?: string
+  onTabChange?: (tab: string) => void
+  extraTabs?: Array<{ id: string; label: React.ReactNode }>
+  extraTabContent?: React.ReactNode
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
   const isCollapsed = collapsible && open === false
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
@@ -471,12 +473,14 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     </div>
   )
 
-  const tabBtnClass = (t: 'raw' | 'windowed') => [
+  const tabBtnClass = (t: string) => [
     'py-2 px-4 text-[13px] font-medium border-b-2 cursor-pointer bg-transparent transition-colors',
     tab === t
       ? 'border-accent text-accent'
       : 'border-transparent text-text opacity-60 hover:opacity-100',
   ].join(' ')
+
+  const isExtraTab = extraTabs?.some(t => t.id === tab)
 
   if (tab !== undefined) {
     return (
@@ -489,13 +493,21 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             <button type="button" className={tabBtnClass('windowed')} onClick={() => onTabChange?.('windowed')}>
               Windowed
             </button>
+            {extraTabs?.map(t => (
+              <button key={t.id} type="button" className={tabBtnClass(t.id)} onClick={() => onTabChange?.(t.id)}>
+                {t.label}
+              </button>
+            ))}
           </div>
-          <div className="pt-3 px-5 pb-3 flex flex-col gap-2">
-            {tab === 'raw' && rawContent}
-            {tab === 'windowed' && windowedControls}
-          </div>
+          {!isExtraTab && (
+            <div className="pt-3 px-5 pb-3 flex flex-col gap-2">
+              {tab === 'raw' && rawContent}
+              {tab === 'windowed' && windowedControls}
+            </div>
+          )}
         </div>
         {tab === 'windowed' && wordDisplay}
+        {isExtraTab && <div className="flex-1 min-h-0 overflow-hidden">{extraTabContent}</div>}
       </div>
     )
   }

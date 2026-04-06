@@ -5,7 +5,6 @@ import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
 import ScatterPlot3DV6 from './ScatterPlot3DV6'
 import type { CameraState } from './scatterTypes'
-import SegmentsListModal from './SegmentsListModal'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import { buildShareUrl, readShareParam } from './shareUrl'
@@ -51,7 +50,6 @@ export default function EmbeddingLayoutViewV7() {
   const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
   const [segments, setSegments] = useState<string[] | null>(null)
   const [shareCopied, setShareCopied] = useState(false)
-  const [showSegmentsModal, setShowSegmentsModal] = useState(false)
 
   type RendererType = 'original' | 'cividis-tube' | 'glow'
   const [rendererType, setRendererType] = useState<RendererType>(() =>
@@ -234,7 +232,7 @@ export default function EmbeddingLayoutViewV7() {
   const durationMismatch = videoDuration !== null && totalSecs !== null
     && Math.abs(videoDuration - totalSecs) > Math.max(10, totalSecs * 0.05)
 
-  const [transcriptTab, setTranscriptTab] = useState<'raw' | 'windowed'>(!hasTranscriptText ? 'raw' : 'windowed')
+  const [transcriptTab, setTranscriptTab] = useState(!hasTranscriptText ? 'raw' : 'windowed')
   useEffect(() => { if (durationMismatch) setTranscriptTab('raw') }, [durationMismatch])
 
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
@@ -259,14 +257,7 @@ export default function EmbeddingLayoutViewV7() {
     runEmbeddingOnChunks(chunks)
   }
 
-  const handleShowSegments = () => {
-    const { windowSize, overlapPct, text } = windowParamsRef.current
-    const chunks = computeChunks(text, windowSize, overlapPct)
-    setSegments(chunks)
-    setShowSegmentsModal(true)
-  }
-
-  const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status === 'embedding' || embedPhase.status === 'umap-running'
+const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status === 'embedding' || embedPhase.status === 'umap-running'
   const isDone = embedPhase.status === 'done'
 
   const handleDownload = () => {
@@ -314,10 +305,9 @@ export default function EmbeddingLayoutViewV7() {
         {loadStatus === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{loadError}</p>}
       </div>
 
-      {/* Main panels */}
-      <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
-        {/* Left: video + transcript */}
-        <div className="flex-1 min-w-0 flex flex-col border-b md:border-b-0 md:border-r border-border overflow-hidden">
+      {/* Main panel */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {currentVideoId ? (
             <div className="relative">
               <div style={{ visibility: videoHidden ? 'hidden' : 'visible' }}>
@@ -364,6 +354,22 @@ export default function EmbeddingLayoutViewV7() {
             tab={transcriptTab}
             onTabChange={setTranscriptTab}
             warning={durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined}
+            extraTabs={[{ id: 'segments', label: 'Segments' }]}
+            extraTabContent={
+              isDone && embedPhase.status === 'done' && segments ? (
+                <div className="flex-1 min-h-[400px] flex flex-col overflow-hidden">
+                  {/* eslint-disable react-hooks/refs */}
+                  {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                  {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                  {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                  {/* eslint-enable react-hooks/refs */}
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+                  {isEmbedding ? 'Embedding in progress…' : 'Run Visualize to see segments in 3D.'}
+                </div>
+              )
+            }
             prependTextareaButtons={
               <button
                 className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -376,160 +382,96 @@ export default function EmbeddingLayoutViewV7() {
           />
         </div>
 
-        {/* Right: embedding panel */}
-        <div className="w-full md:w-[420px] flex-shrink-0 flex flex-col overflow-hidden">
-          {/* No transcript yet */}
-          {!hasTranscriptText && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-6 text-text opacity-50 text-sm text-center">
-              <span>Load a YouTube video to enable embedding.</span>
-            </div>
-          )}
+      </div>
 
-          {/* Transcript available, not yet embedded */}
-          {hasTranscriptText && !isDone && !isEmbedding && (
+      {/* Bottom: embedding form */}
+      <div className="flex-shrink-0 border-t border-border px-4 py-2.5 flex flex-col gap-2">
+        {isEmbedding && (
+          <div className="flex flex-col gap-1.5 text-[13px] text-text">
+            {embedPhase.status === 'model-loading' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="spinner" />
+                  <span>{embedPhase.progress > 0 ? `Downloading model… ${embedPhase.progress}%` : 'Initializing model…'}</span>
+                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
+                </div>
+                <div className={`progress-bar ${embedPhase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
+                  <div className="progress-bar-fill" style={{ width: `${embedPhase.progress}%` }} />
+                </div>
+              </>
+            )}
+            {embedPhase.status === 'embedding' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="spinner" />
+                  <span>Embedding {embedPhase.loaded + 1} / {embedPhase.total}</span>
+                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: `${(embedPhase.loaded / embedPhase.total) * 100}%` }} />
+                </div>
+              </>
+            )}
+            {embedPhase.status === 'umap-running' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="spinner" />
+                  <span>Reducing to 3D…</span>
+                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
+                </div>
+                <div className="progress-bar progress-bar--indeterminate">
+                  <div className="progress-bar-fill" />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2 items-center flex-wrap">
+          <button
+            className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-semibold cursor-pointer whitespace-nowrap hover:opacity-[0.88] disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleRunEmbedding}
+            disabled={!hasTranscriptText || isEmbedding}
+          >
+            Visualize
+          </button>
+          <select
+            className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
+            value={selectedModel}
+            onChange={e => {
+              const v = e.target.value as EmbeddingModelId
+              setSelectedModel(v)
+              localStorage.setItem('projector-model', v)
+            }}
+          >
+            {EMBEDDING_MODELS.map(m => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+          {isDone && (
             <>
-              <div className="flex-shrink-0 p-4 border-b border-border flex flex-col gap-2.5">
-                <select
-                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-                  value={selectedModel}
-                  onChange={e => {
-                    const v = e.target.value as EmbeddingModelId
-                    setSelectedModel(v)
-                    localStorage.setItem('projector-model', v)
-                  }}
-                >
-                  {EMBEDDING_MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-                <div className="flex gap-2 items-center">
-                  <button
-                    className="py-2 px-[18px] rounded-md border-0 bg-accent text-white text-sm cursor-pointer font-semibold whitespace-nowrap hover:opacity-[0.88]"
-                    onClick={handleRunEmbedding}
-                  >
-                    Run Embedding
-                  </button>
-                  <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShowSegments}>
-                    Show Segments{segments ? ` (${segments.length})` : ''}
-                  </button>
-                </div>
-                {embedPhase.status === 'error' && (
-                  <p className="text-[#e53e3e] text-[13px] m-0 py-3 px-4">{embedPhase.message}</p>
-                )}
-              </div>
-              {!segments && (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-6 text-text opacity-50 text-sm text-center">
-                  <span>Run embedding to visualize segment relationships in 3D.</span>
-                </div>
-              )}
+              <select
+                className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
+                value={rendererType}
+                onChange={e => {
+                  const v = e.target.value as RendererType
+                  setRendererType(v)
+                  localStorage.setItem('scatter-renderer', v)
+                }}
+              >
+                <option value="original">Points + Line</option>
+                <option value="cividis-tube">Cividis Tube</option>
+                <option value="glow">Glow (Shader)</option>
+              </select>
+              <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">
+                ⬇ <span className="sr-only">Download 3D points as JSON</span>
+              </button>
             </>
           )}
-
-          {/* Embedding in progress */}
-          {isEmbedding && (
-            <div className="flex-1 flex flex-col items-center justify-center py-8 px-6 gap-4">
-              {embedPhase.status === 'model-loading' && (
-                <div className="flex flex-col gap-2 text-[13px] text-text w-full max-w-[300px]">
-                  <div className="flex items-center gap-2">
-                    <div className="spinner" />
-                    <span>{embedPhase.progress > 0 ? `Downloading model… ${embedPhase.progress}%` : 'Initializing model…'}</span>
-                    <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
-                  </div>
-                  <div className={`progress-bar ${embedPhase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
-                    <div className="progress-bar-fill" style={{ width: `${embedPhase.progress}%` }} />
-                  </div>
-                </div>
-              )}
-              {embedPhase.status === 'embedding' && (
-                <div className="flex flex-col gap-2 text-[13px] text-text w-full max-w-[300px]">
-                  <div className="flex items-center gap-2">
-                    <div className="spinner" />
-                    <span>Embedding {embedPhase.loaded + 1} / {embedPhase.total}</span>
-                    <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
-                  </div>
-                  <div className="progress-bar">
-                    <div className="progress-bar-fill" style={{ width: `${(embedPhase.loaded / embedPhase.total) * 100}%` }} />
-                  </div>
-                </div>
-              )}
-              {embedPhase.status === 'umap-running' && (
-                <div className="flex flex-col gap-2 text-[13px] text-text w-full max-w-[300px]">
-                  <div className="flex items-center gap-2">
-                    <div className="spinner" />
-                    <span>Reducing to 3D…</span>
-                    <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
-                  </div>
-                  <div className="progress-bar progress-bar--indeterminate">
-                    <div className="progress-bar-fill" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Embedding done */}
-          {isDone && embedPhase.status === 'done' && segments && (
-            <>
-              <div className="flex-shrink-0 p-4 border-b border-border flex flex-col gap-2.5">
-                <select
-                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-                  value={selectedModel}
-                  onChange={e => {
-                    const v = e.target.value as EmbeddingModelId
-                    setSelectedModel(v)
-                    localStorage.setItem('projector-model', v)
-                  }}
-                >
-                  {EMBEDDING_MODELS.map(m => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-                <select
-                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-                  value={rendererType}
-                  onChange={e => {
-                    const v = e.target.value as RendererType
-                    setRendererType(v)
-                    localStorage.setItem('scatter-renderer', v)
-                  }}
-                >
-                  <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Cividis Tube</option>
-                  <option value="glow">Glow (Shader)</option>
-                </select>
-                <div className="flex gap-2 items-center">
-                  <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShowSegments}>
-                    Show Segments ({segments.length})
-                  </button>
-                  <button
-                    className="py-2 px-[18px] rounded-md border-0 bg-accent text-white text-sm cursor-pointer font-semibold whitespace-nowrap hover:opacity-[0.88]"
-                    onClick={handleRunEmbedding}
-                  >
-                    Run Embedding
-                  </button>
-                  <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">
-                    ⬇ <span className="sr-only">Download 3D points as JSON</span>
-                  </button>
-                </div>
-              </div>
-              <div className="min-h-[400px] md:min-h-0 md:flex-1 flex flex-col overflow-hidden">
-                {/* eslint-disable react-hooks/refs */}
-                {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                {/* eslint-enable react-hooks/refs */}
-              </div>
-            </>
+          {embedPhase.status === 'error' && (
+            <p className="text-[#e53e3e] text-[13px] m-0 w-full">{embedPhase.message}</p>
           )}
         </div>
       </div>
-
-      {showSegmentsModal && segments && (
-        <SegmentsListModal
-          segments={segments}
-          onClose={() => setShowSegmentsModal(false)}
-        />
-      )}
     </div>
   )
 }
