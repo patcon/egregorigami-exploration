@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
+import { usePointsCache } from './usePointsCache'
 import ScatterPlot3D from './ScatterPlot3D'
 
 const PLAYBACK_DURATION = 10 // seconds to walk all segments
@@ -8,14 +9,19 @@ const PLAYBACK_DURATION = 10 // seconds to walk all segments
 interface Props {
   segments: string[]
   onClose: () => void
+  videoId?: string | null
 }
 
-export default function SegmentProjectorModal({ segments, onClose }: Props) {
+export default function SegmentProjectorModal({ segments, onClose, videoId = null }: Props) {
   const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(() => {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const { phase, runEmbedding, cancelEmbedding } = useEmbeddingWorker()
+  const { phase, runEmbedding, cancelEmbedding, restorePoints } = useEmbeddingWorker()
+  const { savePoints } = usePointsCache(videoId, restorePoints)
+  useEffect(() => {
+    if (phase.status === 'done') savePoints(phase.points)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [dotPosition, setDotPosition] = useState<number | null>(null) // float for smooth interpolation
   const [isPlaying, setIsPlaying] = useState(false)

@@ -12,6 +12,7 @@ import { detectAndParseSubtitle } from './subtitleParser'
 import { extractVideoId, computeChunks, computeExternalPosition } from './videoUtils'
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
+import { usePointsCache } from './usePointsCache'
 
 const isProd = import.meta.env.PROD
 
@@ -21,6 +22,7 @@ export default function EmbeddingLayoutViewV7() {
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
     return localStorage.getItem('yt-url') ?? ''
   })
+  const currentVideoId = extractVideoId(urlInput)
   useEffect(() => {
     const videoId = extractVideoId(urlInput)
     const url = new URL(window.location.href)
@@ -48,6 +50,11 @@ export default function EmbeddingLayoutViewV7() {
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
   const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
+  const hasSharePoints = !!(readShareParam()?.points)
+  const { savePoints } = usePointsCache(currentVideoId, restorePoints, !hasSharePoints)
+  useEffect(() => {
+    if (embedPhase.status === 'done') savePoints(embedPhase.points)
+  }, [embedPhase]) // eslint-disable-line react-hooks/exhaustive-deps
   const [segments, setSegments] = useState<string[] | null>(null)
   const [shareCopied, setShareCopied] = useState(false)
 
@@ -266,7 +273,6 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
     URL.revokeObjectURL(url)
   }
 
-  const currentVideoId = extractVideoId(urlInput)
   const transcriptToolUrl = currentVideoId
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
     : 'https://www.youtube-transcript.io'

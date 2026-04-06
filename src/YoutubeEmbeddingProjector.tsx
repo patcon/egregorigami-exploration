@@ -162,6 +162,7 @@ export default function YoutubeEmbeddingProjector() {
         <SegmentProjectorModal
           segments={modalSegments}
           onClose={() => setModalSegments(null)}
+          videoId={currentVideoId}
         />
       )}
     </div>
