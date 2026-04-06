@@ -78,6 +78,7 @@
 
 body {
   margin: 0;
+  overscroll-behavior: none;
 }
 
 h1,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix v7 mobile: prevent pull-to-refresh and iOS bounce — lock `html` overflow on mount, add `overscroll-y-contain` to inner scrollable areas (word display, segments list) so their overscroll doesn't propagate, use `100dvh` for dynamic viewport height, and add `flex-shrink-0` to YouTube player wrapper
+
 - Fix 3D scatter not rendering in v7 after deferred-init fix — `extraTabContent` wrapper in TranscriptViewer was missing `flex flex-col`, causing `h-full` on the mount div to resolve to zero
 
 - Fix WebGL "zero size framebuffer" errors in ScatterPlot3D, ScatterPlot3DV5, and ScatterPlot3DV6 when component mounts inside a hidden tab — defer Three.js renderer init until container has non-zero dimensions, using a one-shot ResizeObserver

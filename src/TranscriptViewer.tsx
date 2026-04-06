@@ -443,7 +443,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   )
 
   const wordDisplay = (
-    <div className="flex-1 overflow-y-auto py-3 px-3 md:py-6 md:px-5" ref={textAreaRef}>
+    <div className="flex-1 overflow-y-auto overscroll-y-contain py-3 px-3 md:py-6 md:px-5" ref={textAreaRef}>
       {words.length === 0 ? (
         <p className="text-text italic">Paste some text above to get started.</p>
       ) : (
