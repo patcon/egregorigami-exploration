@@ -507,7 +507,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           )}
         </div>
         {tab === 'windowed' && wordDisplay}
-        {isExtraTab && <div className="flex-1 min-h-0 overflow-hidden">{extraTabContent}</div>}
+        {isExtraTab && <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{extraTabContent}</div>}
       </div>
     )
   }

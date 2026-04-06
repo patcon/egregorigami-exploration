@@ -391,7 +391,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 )
               ) : (
                 isDone && embedPhase.status === 'done' && segments ? (
-                  <div className="flex-1 min-h-[400px] flex flex-col overflow-hidden">
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                     {/* eslint-disable react-hooks/refs */}
                     {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
                     {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
