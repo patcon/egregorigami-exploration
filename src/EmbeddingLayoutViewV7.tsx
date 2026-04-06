@@ -346,11 +346,6 @@ export default function EmbeddingLayoutViewV7() {
               </div>
             </div>
           )}
-          {durationMismatch && (
-            <p className="text-[13px] text-[#b7791f] m-0 px-4 py-2 border-b border-border">
-              ⚠ Transcript duration ({totalSecs}s) doesn't match video ({Math.round(videoDuration!)}s) — transcript may be out of date.
-            </p>
-          )}
           <TranscriptViewer
             key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
             initialText={loadedText ?? undefined}
@@ -370,6 +365,7 @@ export default function EmbeddingLayoutViewV7() {
             collapsible
             open={transcriptOpen}
             onToggle={() => setTranscriptOpen(o => !o)}
+            warning={durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined}
             prependTextareaButtons={
               <button
                 className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"

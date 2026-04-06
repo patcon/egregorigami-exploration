@@ -33,9 +33,10 @@ interface TranscriptViewerProps {
   collapsible?: boolean
   open?: boolean
   onToggle?: () => void
+  warning?: string
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning }: TranscriptViewerProps = {}) {
   const isCollapsed = collapsible && open === false
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
@@ -288,10 +289,15 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
       <div className="sticky top-0 bg-bg z-10 pt-3 px-5 border-b border-border flex flex-col gap-2">
         {label && (
           collapsible
-            ? <button type="button" className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-text opacity-50 cursor-pointer hover:opacity-75 bg-transparent border-0 p-0" onClick={onToggle}>
-                <span>{isCollapsed ? '▶' : '▼'}</span>{label}
+            ? <button type="button" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-text opacity-50 cursor-pointer hover:opacity-75 bg-transparent border-0 p-0" onClick={onToggle}>
+                <span>{isCollapsed ? '▶' : '▼'}</span>
+                {label}
+                {warning && isCollapsed && <span className="text-[#b7791f] opacity-100">⚠</span>}
               </button>
             : <p className="text-xs font-semibold uppercase tracking-wide text-text opacity-50 m-0">{label}</p>
+        )}
+        {warning && !isCollapsed && (
+          <p className="text-[13px] text-[#b7791f] m-0">{warning}</p>
         )}
         {!isCollapsed && <div className="flex items-start gap-2">
           <textarea
