@@ -77,187 +77,206 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
   // Build scene once
   useEffect(() => {
     const mount = mountRef.current!
-    const w = mount.clientWidth
-    const h = mount.clientHeight
+    let cleanup: (() => void) | undefined
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setSize(w, h)
-    renderer.setPixelRatio(window.devicePixelRatio)
-    const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117'
-    renderer.setClearColor(new THREE.Color(bgColor))
-    mount.appendChild(renderer.domElement)
+    const init = () => {
+      const w = mount.clientWidth
+      const h = mount.clientHeight
 
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 100)
-    camera.position.set(0, 0, 4)
+      const renderer = new THREE.WebGLRenderer({ antialias: true })
+      renderer.setSize(w, h)
+      renderer.setPixelRatio(window.devicePixelRatio)
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117'
+      renderer.setClearColor(new THREE.Color(bgColor))
+      mount.appendChild(renderer.domElement)
 
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.dampingFactor = 0.08
+      const scene = new THREE.Scene()
+      const camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 100)
+      camera.position.set(0, 0, 4)
 
-    if (initialCameraState) {
-      camera.position.set(...initialCameraState.position)
-      controls.target.set(...initialCameraState.target)
-    }
+      const controls = new OrbitControls(camera, renderer.domElement)
+      controls.enableDamping = true
+      controls.dampingFactor = 0.08
 
-    const onControlsChange = () => {
-      onCameraChange?.({
-        position: [camera.position.x, camera.position.y, camera.position.z],
-        target: [controls.target.x, controls.target.y, controls.target.z],
-        followMode: followModeRef.current,
-      })
-    }
-    controls.addEventListener('change', onControlsChange)
-
-    const normalized = normalize(points)
-    normalizedRef.current = normalized
-    const n = normalized.length
-
-    // Points for raycasting (hover/click)
-    const positions = new Float32Array(n * 3)
-    const colors = new Float32Array(n * 3)
-    for (let i = 0; i < n; i++) {
-      positions[i * 3] = normalized[i][0]
-      positions[i * 3 + 1] = normalized[i][1]
-      positions[i * 3 + 2] = normalized[i][2]
-      const c = cividis(i / (n - 1))
-      colors[i * 3] = c.r
-      colors[i * 3 + 1] = c.g
-      colors[i * 3 + 2] = c.b
-    }
-
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    const mat = new THREE.PointsMaterial({ size: 0.025, sizeAttenuation: true, vertexColors: true })
-    const pointsMesh = new THREE.Points(geo, mat)
-    scene.add(pointsMesh)
-
-    // Curved tube path (protein-folding aesthetic).
-    // Use centripetal parameterization so the curve never overshoots or loops
-    // when adjacent segments are far apart in 3D space — prevents the sphere
-    // from visually reversing direction as it follows the curve.
-    const curve = new THREE.CatmullRomCurve3(
-      normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
-      false,
-      'centripetal'
-    )
-
-    const TUBE_SEGMENTS = Math.max(64, normalized.length * 6)
-    const RADIAL_SEGMENTS = 10
-    const TUBE_RADIUS = 0.025
-
-    const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEGMENTS, TUBE_RADIUS, RADIAL_SEGMENTS, false)
-
-    const tubeColors = new Float32Array(tubeGeo.attributes.position.count * 3)
-    const vertsPerRing = RADIAL_SEGMENTS + 1
-    for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
-      const ring = Math.floor(v / vertsPerRing)
-      const t = ring / TUBE_SEGMENTS
-      const c = cividis(t)
-      // Alternate brightness between node-to-node segments to show spacing
-      const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
-      const bright = segIdx % 2 === 0 ? 1.2 : 0.7
-      tubeColors[v * 3] = Math.min(1, c.r * bright)
-      tubeColors[v * 3 + 1] = Math.min(1, c.g * bright)
-      tubeColors[v * 3 + 2] = Math.min(1, c.b * bright)
-    }
-    tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
-
-    const tubeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })
-    const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat)
-    scene.add(tubeMesh)
-
-    // Lighting for MeshStandardMaterial
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7))
-    scene.add(new THREE.DirectionalLight(0xffffff, 0.8))
-
-    // Highlight mesh (sphere)
-    const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
-    const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
-    const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
-    highlightMesh.visible = false
-    scene.add(highlightMesh)
-
-    const raycaster = new THREE.Raycaster()
-    raycaster.params.Points!.threshold = 0.05
-
-    let animId = 0
-    let firstFrame = true
-    const animate = () => {
-      animId = requestAnimationFrame(animate)
-      // Lerp the curve parameter so the sphere travels along the tube path.
-      // On the first visible frame, snap to target and seed prevFollowTargetRef.
-      if (sphereVisibleRef.current) {
-        if (firstFrame) {
-          currentSphereTRef.current = targetSphereTRef.current
-          const spherePos = curve.getPoint(currentSphereTRef.current)
-          highlightMesh.position.copy(spherePos)
-          prevFollowTargetRef.current.copy(spherePos)
-          firstFrame = false
-        } else {
-          currentSphereTRef.current += (targetSphereTRef.current - currentSphereTRef.current) * 0.2
-          highlightMesh.position.copy(curve.getPoint(currentSphereTRef.current))
-        }
-        highlightMesh.visible = true
-      } else {
-        firstFrame = false
-        highlightMesh.visible = false
+      if (initialCameraState) {
+        camera.position.set(...initialCameraState.position)
+        controls.target.set(...initialCameraState.target)
       }
-      const mode = followModeRef.current
-      if (mode === 'tracking' && highlightMesh.visible) {
-        controls.enabled = true
-        const newTarget = highlightMesh.position.clone()
-        const delta = newTarget.clone().sub(prevFollowTargetRef.current)
-        camera.position.add(delta)
-        controls.target.copy(newTarget)
-        prevFollowTargetRef.current.copy(newTarget)
-        controls.update()
-      } else if (mode === 'following' && highlightMesh.visible) {
-        controls.enabled = true
-        const newTarget = highlightMesh.position.clone()
-        const currTangent = curve.getTangent(Math.max(0.0001, Math.min(0.9999, currentSphereTRef.current)))
-        // Rotate camera's orbital offset to track path direction change
-        const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
-        const prevTangent = prevPathTangentRef.current
-        if (prevTangent.lengthSq() > 0) {
-          const dot = prevTangent.dot(currTangent)
-          if (dot < 0.9999 && dot > -0.9999) {
-            oldOffset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(prevTangent, currTangent))
+
+      const onControlsChange = () => {
+        onCameraChange?.({
+          position: [camera.position.x, camera.position.y, camera.position.z],
+          target: [controls.target.x, controls.target.y, controls.target.z],
+          followMode: followModeRef.current,
+        })
+      }
+      controls.addEventListener('change', onControlsChange)
+
+      const normalized = normalize(points)
+      normalizedRef.current = normalized
+      const n = normalized.length
+
+      // Points for raycasting (hover/click)
+      const positions = new Float32Array(n * 3)
+      const colors = new Float32Array(n * 3)
+      for (let i = 0; i < n; i++) {
+        positions[i * 3] = normalized[i][0]
+        positions[i * 3 + 1] = normalized[i][1]
+        positions[i * 3 + 2] = normalized[i][2]
+        const c = cividis(i / (n - 1))
+        colors[i * 3] = c.r
+        colors[i * 3 + 1] = c.g
+        colors[i * 3 + 2] = c.b
+      }
+
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+      const mat = new THREE.PointsMaterial({ size: 0.025, sizeAttenuation: true, vertexColors: true })
+      const pointsMesh = new THREE.Points(geo, mat)
+      scene.add(pointsMesh)
+
+      // Curved tube path (protein-folding aesthetic).
+      // Use centripetal parameterization so the curve never overshoots or loops
+      // when adjacent segments are far apart in 3D space — prevents the sphere
+      // from visually reversing direction as it follows the curve.
+      const curve = new THREE.CatmullRomCurve3(
+        normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+        false,
+        'centripetal'
+      )
+
+      const TUBE_SEGMENTS = Math.max(64, normalized.length * 6)
+      const RADIAL_SEGMENTS = 10
+      const TUBE_RADIUS = 0.025
+
+      const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEGMENTS, TUBE_RADIUS, RADIAL_SEGMENTS, false)
+
+      const tubeColors = new Float32Array(tubeGeo.attributes.position.count * 3)
+      const vertsPerRing = RADIAL_SEGMENTS + 1
+      for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
+        const ring = Math.floor(v / vertsPerRing)
+        const t = ring / TUBE_SEGMENTS
+        const c = cividis(t)
+        // Alternate brightness between node-to-node segments to show spacing
+        const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
+        const bright = segIdx % 2 === 0 ? 1.2 : 0.7
+        tubeColors[v * 3] = Math.min(1, c.r * bright)
+        tubeColors[v * 3 + 1] = Math.min(1, c.g * bright)
+        tubeColors[v * 3 + 2] = Math.min(1, c.b * bright)
+      }
+      tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
+
+      const tubeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })
+      const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat)
+      scene.add(tubeMesh)
+
+      // Lighting for MeshStandardMaterial
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+      scene.add(new THREE.DirectionalLight(0xffffff, 0.8))
+
+      // Highlight mesh (sphere)
+      const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
+      const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
+      const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
+      highlightMesh.visible = false
+      scene.add(highlightMesh)
+
+      const raycaster = new THREE.Raycaster()
+      raycaster.params.Points!.threshold = 0.05
+
+      let animId = 0
+      let firstFrame = true
+      const animate = () => {
+        animId = requestAnimationFrame(animate)
+        // Lerp the curve parameter so the sphere travels along the tube path.
+        // On the first visible frame, snap to target and seed prevFollowTargetRef.
+        if (sphereVisibleRef.current) {
+          if (firstFrame) {
+            currentSphereTRef.current = targetSphereTRef.current
+            const spherePos = curve.getPoint(currentSphereTRef.current)
+            highlightMesh.position.copy(spherePos)
+            prevFollowTargetRef.current.copy(spherePos)
+            firstFrame = false
+          } else {
+            currentSphereTRef.current += (targetSphereTRef.current - currentSphereTRef.current) * 0.2
+            highlightMesh.position.copy(curve.getPoint(currentSphereTRef.current))
           }
+          highlightMesh.visible = true
+        } else {
+          firstFrame = false
+          highlightMesh.visible = false
         }
-        camera.position.copy(newTarget).add(oldOffset)
-        controls.target.copy(newTarget)
-        prevFollowTargetRef.current.copy(newTarget)
-        prevPathTangentRef.current.copy(currTangent)
-        controls.update()
-      } else {
-        controls.enabled = true
-        controls.update()
+        const mode = followModeRef.current
+        if (mode === 'tracking' && highlightMesh.visible) {
+          controls.enabled = true
+          const newTarget = highlightMesh.position.clone()
+          const delta = newTarget.clone().sub(prevFollowTargetRef.current)
+          camera.position.add(delta)
+          controls.target.copy(newTarget)
+          prevFollowTargetRef.current.copy(newTarget)
+          controls.update()
+        } else if (mode === 'following' && highlightMesh.visible) {
+          controls.enabled = true
+          const newTarget = highlightMesh.position.clone()
+          const currTangent = curve.getTangent(Math.max(0.0001, Math.min(0.9999, currentSphereTRef.current)))
+          // Rotate camera's orbital offset to track path direction change
+          const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
+          const prevTangent = prevPathTangentRef.current
+          if (prevTangent.lengthSq() > 0) {
+            const dot = prevTangent.dot(currTangent)
+            if (dot < 0.9999 && dot > -0.9999) {
+              oldOffset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(prevTangent, currTangent))
+            }
+          }
+          camera.position.copy(newTarget).add(oldOffset)
+          controls.target.copy(newTarget)
+          prevFollowTargetRef.current.copy(newTarget)
+          prevPathTangentRef.current.copy(currTangent)
+          controls.update()
+        } else {
+          controls.enabled = true
+          controls.update()
+        }
+        renderer.render(scene, camera)
       }
-      renderer.render(scene, camera)
+      animate()
+
+      const ro = new ResizeObserver(() => {
+        const nw = mount.clientWidth
+        const nh = mount.clientHeight
+        renderer.setSize(nw, nh)
+        camera.aspect = nw / nh
+        camera.updateProjectionMatrix()
+      })
+      ro.observe(mount)
+
+      sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId, curve }
+
+      cleanup = () => {
+        cancelAnimationFrame(animId)
+        controls.removeEventListener('change', onControlsChange)
+        controls.dispose()
+        renderer.dispose()
+        ro.disconnect()
+        if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+      }
     }
-    animate()
 
-    const ro = new ResizeObserver(() => {
-      const nw = mount.clientWidth
-      const nh = mount.clientHeight
-      renderer.setSize(nw, nh)
-      camera.aspect = nw / nh
-      camera.updateProjectionMatrix()
-    })
-    ro.observe(mount)
-
-    sceneRef.current = { renderer, camera, controls, scene, pointsMesh, highlightMesh, raycaster, animId, curve }
-
-    return () => {
-      cancelAnimationFrame(animId)
-      controls.removeEventListener('change', onControlsChange)
-      controls.dispose()
-      renderer.dispose()
-      ro.disconnect()
-      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+    if (mount.clientWidth > 0 && mount.clientHeight > 0) {
+      init()
+    } else {
+      const ro = new ResizeObserver(() => {
+        if (mount.clientWidth > 0 && mount.clientHeight > 0) {
+          ro.disconnect()
+          init()
+        }
+      })
+      ro.observe(mount)
+      cleanup = () => ro.disconnect()
     }
+
+    return () => cleanup?.()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points])
 

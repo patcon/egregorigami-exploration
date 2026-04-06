@@ -26,13 +26,29 @@ interface TranscriptViewerProps {
   onSpeedChange?: (speed: number) => void
   maxSpeed?: number
   onSubtitleLoad?: (result: SubtitleParseResult) => void
+  hideSegmentsMode?: boolean
+  label?: string
+  prependTextareaButtons?: React.ReactNode
+  hideFileLoad?: boolean
+  collapsible?: boolean
+  open?: boolean
+  onToggle?: () => void
+  warning?: string
+  tab?: string
+  onTabChange?: (tab: string) => void
+  extraTabs?: Array<{ id: string; label: React.ReactNode }>
+  extraTabContent?: React.ReactNode
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
+  const isCollapsed = collapsible && open === false
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
+  useEffect(() => {
+    if (hideSegmentsMode && windowMode === 'segments') setWindowMode('words')
+  }, [hideSegmentsMode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [overlapInput, setOverlapInput] = useState(() => localStorage.getItem('transcript-overlap') ?? '80')
   const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
@@ -272,15 +288,31 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const inputBase = 'py-1 px-1.5 border border-border rounded bg-code-bg text-text-h text-sm text-center focus:outline-2 focus:outline-accent focus:outline-offset-[1px]'
   const inputError = 'border-[#e53e3e] outline-[#e53e3e]'
 
-  return (
-    <div className="flex flex-col flex-1 min-h-0 text-left">
-      <div className="sticky top-0 bg-bg z-10 pt-3 px-5 border-b border-border flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <textarea
-            className="w-full box-border resize-y font-mono text-[13px] py-2 px-2.5 border border-border rounded-md bg-code-bg text-text-h leading-[1.5] focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-            value={rawText}
-            onChange={e => {
-              const raw = e.target.value
+  const rawContent = (
+    <>
+      {warning && <p className="text-[13px] text-[#b7791f] m-0">{warning}</p>}
+      <div className="flex items-start gap-2">
+        <textarea
+          className="w-full box-border resize-y font-mono text-[13px] py-2 px-2.5 border border-border rounded-md bg-code-bg text-text-h leading-[1.5] focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
+          value={rawText}
+          onChange={e => {
+            const raw = e.target.value
+            const normalized = raw.replace(/\s+/g, ' ').trim()
+            setRawText(raw)
+            setText(normalized)
+            localStorage.setItem('transcript-raw-text', raw)
+            localStorage.setItem('transcript-text', normalized)
+            setPosition(0)
+            stopPlayback()
+          }}
+          onBlur={onParamsBlur}
+          onPaste={e => {
+            e.preventDefault()
+            const raw = e.clipboardData.getData('text')
+            const parsed = detectAndParseSubtitle(raw)
+            if (parsed) {
+              applySubtitleResult(raw, parsed)
+            } else {
               const normalized = raw.replace(/\s+/g, ' ').trim()
               setRawText(raw)
               setText(normalized)
@@ -288,126 +320,118 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               localStorage.setItem('transcript-text', normalized)
               setPosition(0)
               stopPlayback()
-            }}
+            }
+          }}
+          placeholder="Paste transcript text or .vtt/.srt here…"
+          rows={3}
+        />
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          {prependTextareaButtons}
+          {!hideFileLoad && (
+            <button type="button" className="py-1.5 px-3 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-75"
+              onClick={() => fileInputRef.current?.click()}>Load</button>
+          )}
+        </div>
+        <input ref={fileInputRef} type="file" accept=".vtt,.srt,text/vtt,text/plain"
+          className="hidden" onChange={handleFileLoad} />
+      </div>
+    </>
+  )
+
+  const windowedControls = (
+    <>
+      {/* Row 1: Window size + word count + overlap */}
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap text-xs md:text-sm text-text">
+        <label className="flex items-center gap-1.5">
+          Window
+          <input
+            type="number"
+            min={1}
+            className={`w-14 ${inputBase} ${windowInputNum <= 0 ? inputError : ''}`}
+            value={windowInput}
+            onChange={e => { setWindowInput(e.target.value); localStorage.setItem('transcript-window', e.target.value) }}
             onBlur={onParamsBlur}
-            onPaste={e => {
-              e.preventDefault()
-              const raw = e.clipboardData.getData('text')
-              const parsed = detectAndParseSubtitle(raw)
-              if (parsed) {
-                applySubtitleResult(raw, parsed)
-              } else {
-                const normalized = raw.replace(/\s+/g, ' ').trim()
-                setRawText(raw)
-                setText(normalized)
-                localStorage.setItem('transcript-raw-text', raw)
-                localStorage.setItem('transcript-text', normalized)
-                setPosition(0)
-                stopPlayback()
-              }
-            }}
-            placeholder="Paste transcript text or .vtt/.srt here…"
-            rows={3}
           />
-          <button type="button" className="flex-shrink-0 py-1.5 px-3 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-75"
-            onClick={() => fileInputRef.current?.click()}>Load file</button>
-          <input ref={fileInputRef} type="file" accept=".vtt,.srt,text/vtt,text/plain"
-            className="hidden" onChange={handleFileLoad} />
-        </div>
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-1.5 text-sm text-text">
-            Window
-            <input
-              type="number"
-              min={1}
-              className={`w-16 ${inputBase} ${windowInputNum <= 0 ? inputError : ''}`}
-              value={windowInput}
-              onChange={e => { setWindowInput(e.target.value); localStorage.setItem('transcript-window', e.target.value) }}
-              onBlur={onParamsBlur}
-            />
-            <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
-              <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => { setWindowMode('words'); localStorage.setItem('transcript-window-mode', 'words') }} />
-              words
+        </label>
+        <span className="opacity-60">of {words.length} words{windowMode === 'segments' && windowInputNum > 0 && words.length > 0 ? ` (${windowSize}/seg)` : ''},</span>
+        {!hideSegmentsMode && (
+          <label className="flex items-center gap-[3px] cursor-pointer">
+            <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
+            segments
+          </label>
+        )}
+        <label className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={0}
+            max={99}
+            className={`w-12 ${inputBase} ${parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? inputError : ''}`}
+            value={overlapInput}
+            onChange={e => { setOverlapInput(e.target.value); localStorage.setItem('transcript-overlap', e.target.value) }}
+            onBlur={onParamsBlur}
+          />
+          % overlap
+        </label>
+      </div>
+      {/* Row 2: Duration + speed + auto-scroll */}
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap text-xs md:text-sm text-text">
+        <label className="flex items-center gap-1.5">
+          Duration
+          <input
+            type="text"
+            className={`w-[64px] ${inputBase} ${parseTimecode(durationInput) > 0 ? '' : inputError}`}
+            value={durationInput}
+            onChange={e => { setDurationInput(e.target.value); localStorage.setItem('transcript-duration', e.target.value) }}
+            placeholder="30 or 4:28"
+          />
+        </label>
+        <div className="flex gap-0.5">
+          {[1, 2, 5, 10].map(s => (
+            <button
+              key={s}
+              className={[
+                'py-0.5 px-1.5 md:py-1 md:px-2 text-xs md:text-[13px] border border-border cursor-pointer rounded-none first:rounded-l last:rounded-r disabled:opacity-35 disabled:cursor-not-allowed',
+                speed === s ? 'bg-accent border-accent text-white' : 'bg-code-bg text-text',
+              ].join(' ')}
+              onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
+              disabled={!allowFaster && maxSpeed !== undefined && s > maxSpeed}
+              title={!allowFaster && maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
+            >{s}x</button>
+          ))}
+          {maxSpeed !== undefined && (
+            <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer ml-1">
+              <input
+                type="checkbox"
+                checked={allowFaster}
+                onChange={e => {
+                  const checked = e.target.checked
+                  setAllowFaster(checked)
+                  localStorage.setItem('transcript-allow-faster', String(checked))
+                  if (!checked && speed > maxSpeed) {
+                    setSpeed(maxSpeed)
+                    onSpeedChange?.(maxSpeed)
+                  }
+                  onAllowFasterChange?.(checked)
+                }}
+              />
+              allow faster
             </label>
-            <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
-              <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
-              segments
-            </label>
-            {windowMode === 'segments' && windowInputNum > 0 && words.length > 0 && (
-              <span className="text-[13px] text-text opacity-60">({windowSize} words)</span>
-            )}
-          </div>
-          <label className="flex items-center gap-1.5 text-sm text-text">
-            Duration
-            <input
-              type="text"
-              className={`w-[72px] ${inputBase} ${parseTimecode(durationInput) > 0 ? '' : inputError}`}
-              value={durationInput}
-              onChange={e => { setDurationInput(e.target.value); localStorage.setItem('transcript-duration', e.target.value) }}
-              placeholder="30 or 4:28"
-            />
-          </label>
-          <label className="flex items-center gap-1.5 text-sm text-text">
-            Overlap
-            <input
-              type="number"
-              min={0}
-              max={99}
-              className={`w-[52px] ${inputBase} ${parseFloat(overlapInput) < 0 || parseFloat(overlapInput) >= 100 ? inputError : ''}`}
-              value={overlapInput}
-              onChange={e => { setOverlapInput(e.target.value); localStorage.setItem('transcript-overlap', e.target.value) }}
-              onBlur={onParamsBlur}
-            />
-            %
-          </label>
-          <div className="flex items-center gap-1">
-            <button className="py-1.5 px-2.5 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(-1)} title="Step back">&#9664;</button>
-            <button className="py-1.5 px-4 bg-accent text-white border-0 rounded-md text-sm cursor-pointer font-medium transition-opacity duration-150 hover:opacity-85" onClick={handlePlayPause}>
-              {isPlaying ? '⏸ Pause' : position >= 1 ? '↺ Replay' : '▶ Play'}
-            </button>
-            <button className="py-1.5 px-2.5 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">&#9654;</button>
-          </div>
-          <div className="flex gap-0.5">
-            {[1, 2, 5, 10].map(s => (
-              <button
-                key={s}
-                className={[
-                  'py-1 px-2 text-[13px] border border-border cursor-pointer rounded-none first:rounded-l last:rounded-r disabled:opacity-35 disabled:cursor-not-allowed',
-                  speed === s ? 'bg-accent border-accent text-white' : 'bg-code-bg text-text',
-                ].join(' ')}
-                onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
-                disabled={!allowFaster && maxSpeed !== undefined && s > maxSpeed}
-                title={!allowFaster && maxSpeed !== undefined && s > maxSpeed ? `YouTube player is capped at ${maxSpeed}x` : undefined}
-              >{s}x</button>
-            ))}
-            {maxSpeed !== undefined && (
-              <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allowFaster}
-                  onChange={e => {
-                    const checked = e.target.checked
-                    setAllowFaster(checked)
-                    localStorage.setItem('transcript-allow-faster', String(checked))
-                    if (!checked && speed > maxSpeed) {
-                      setSpeed(maxSpeed)
-                      onSpeedChange?.(maxSpeed)
-                    }
-                    onAllowFasterChange?.(checked)
-                  }}
-                />
-                allow faster
-              </label>
-            )}
-          </div>
-          <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer ml-auto">
-            <input type="checkbox" checked={autoScroll} onChange={e => { setAutoScroll(e.target.checked); localStorage.setItem('transcript-auto-scroll', String(e.target.checked)) }} />
-            auto-scroll
-          </label>
-          <span className="text-[13px] text-text">{words.length} words</span>
+          )}
         </div>
+        <label className="flex items-center gap-[3px] cursor-pointer ml-auto">
+          <input type="checkbox" checked={autoScroll} onChange={e => { setAutoScroll(e.target.checked); localStorage.setItem('transcript-auto-scroll', String(e.target.checked)) }} />
+          auto-scroll
+        </label>
+      </div>
+      {/* Row 3: Step/play buttons + scrub bar */}
+      <div className="flex items-center gap-1">
+        <button className="py-1 px-1.5 bg-code-bg text-text-h border border-border rounded-md text-xs cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(-1)} title="Step back">⏮</button>
+        <button className="py-1 px-2 bg-accent text-white border-0 rounded-md text-xs cursor-pointer font-medium transition-opacity duration-150 hover:opacity-85" onClick={handlePlayPause}>
+          {isPlaying ? '⏸' : position >= 1 ? '↺' : '▶'}
+        </button>
+        <button className="py-1 px-1.5 bg-code-bg text-text-h border border-border rounded-md text-xs cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">⏭</button>
         <div
-          className="scrub-bar relative h-[4px] bg-border cursor-pointer mt-2 rounded-[2px] overflow-visible group"
+          className="scrub-bar flex-1 relative h-[4px] bg-border cursor-pointer rounded-[2px] overflow-visible group mx-1"
           onPointerDown={handleScrubPointerDown}
           onPointerMove={handleScrubPointerMove}
         >
@@ -415,32 +439,92 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100" style={{ left: `${position * 100}%` }} />
         </div>
       </div>
+    </>
+  )
 
-      <div className="flex-1 overflow-y-auto py-6 px-5" ref={textAreaRef}>
-        {words.length === 0 ? (
-          <p className="text-text italic">Paste some text above to get started.</p>
-        ) : (
-          <p className="text-lg leading-[1.8] text-text">
-            {words.map((word, i) => {
-              const inWindow = i >= windowStart && i < windowStart + windowSize
-              const isCursor = i === cursorIndex
-              const cls = ['word', inWindow ? 'in-window' : '', isCursor ? 'cursor' : ''].filter(Boolean).join(' ')
-              return (
-                <span
-                  key={i}
-                  ref={el => {
-                    if (el) wordRefsMap.current.set(i, el)
-                    else wordRefsMap.current.delete(i)
-                  }}
-                  className={cls}
-                >
-                  {word}{' '}
-                </span>
-              )
-            })}
-          </p>
-        )}
+  const wordDisplay = (
+    <div className="flex-1 overflow-y-auto py-3 px-3 md:py-6 md:px-5" ref={textAreaRef}>
+      {words.length === 0 ? (
+        <p className="text-text italic">Paste some text above to get started.</p>
+      ) : (
+        <p className="text-base md:text-lg leading-[1.65] md:leading-[1.8] text-text">
+          {words.map((word, i) => {
+            const inWindow = i >= windowStart && i < windowStart + windowSize
+            const isCursor = i === cursorIndex
+            const cls = ['word', inWindow ? 'in-window' : '', isCursor ? 'cursor' : ''].filter(Boolean).join(' ')
+            return (
+              <span
+                key={i}
+                ref={el => {
+                  if (el) wordRefsMap.current.set(i, el)
+                  else wordRefsMap.current.delete(i)
+                }}
+                className={cls}
+              >
+                {word}{' '}
+              </span>
+            )
+          })}
+        </p>
+      )}
+    </div>
+  )
+
+  const tabBtnClass = (t: string) => [
+    'py-1.5 px-2.5 md:py-2 md:px-4 text-xs md:text-[13px] font-medium border-b-2 cursor-pointer bg-transparent transition-colors',
+    tab === t
+      ? 'border-accent text-accent'
+      : 'border-transparent text-text opacity-60 hover:opacity-100',
+  ].join(' ')
+
+  const isExtraTab = extraTabs?.some(t => t.id === tab)
+
+  if (tab !== undefined) {
+    return (
+      <div className="flex flex-col flex-1 min-h-0 text-left">
+        <div className="sticky top-0 bg-bg z-10 border-b border-border flex flex-col">
+          <div className="flex border-b border-border px-2">
+            <button type="button" className={tabBtnClass('raw')} onClick={() => onTabChange?.('raw')}>
+              Raw{warning && tab !== 'raw' ? ' ⚠' : ''}
+            </button>
+            <button type="button" className={tabBtnClass('windowed')} onClick={() => onTabChange?.('windowed')}>
+              Windowed
+            </button>
+            {extraTabs?.map(t => (
+              <button key={t.id} type="button" className={tabBtnClass(t.id)} onClick={() => onTabChange?.(t.id)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {!isExtraTab && (
+            <div className="pt-2 px-3 pb-2 md:pt-3 md:px-5 md:pb-3 flex flex-col gap-2">
+              {tab === 'raw' && rawContent}
+              {tab === 'windowed' && windowedControls}
+            </div>
+          )}
+        </div>
+        {tab === 'windowed' && wordDisplay}
+        {isExtraTab && <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{extraTabContent}</div>}
       </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 text-left">
+      <div className="sticky top-0 bg-bg z-10 pt-3 px-5 border-b border-border flex flex-col gap-2">
+        {label && (
+          collapsible
+            ? <button type="button" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-text opacity-50 cursor-pointer hover:opacity-75 bg-transparent border-0 p-0" onClick={onToggle}>
+                <span>{isCollapsed ? '▶' : '▼'}</span>
+                {label}
+                {warning && isCollapsed && <span className="text-[#b7791f] opacity-100">⚠</span>}
+              </button>
+            : <p className="text-xs font-semibold uppercase tracking-wide text-text opacity-50 m-0">{label}</p>
+        )}
+        {!isCollapsed && rawContent}
+        {!isCollapsed && windowedControls}
+      </div>
+      {!isCollapsed && wordDisplay}
     </div>
   )
 }
