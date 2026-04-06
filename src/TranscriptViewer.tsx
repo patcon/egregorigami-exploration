@@ -340,8 +340,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
 
   const windowedControls = (
     <>
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5 text-sm text-text">
+      <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs md:text-sm text-text">
           Window
           <input
             type="number"
@@ -351,12 +351,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             onChange={e => { setWindowInput(e.target.value); localStorage.setItem('transcript-window', e.target.value) }}
             onBlur={onParamsBlur}
           />
-          <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
+          <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer">
             <input type="radio" name="windowMode" value="words" checked={windowMode === 'words'} onChange={() => { setWindowMode('words'); localStorage.setItem('transcript-window-mode', 'words') }} />
             words
           </label>
           {!hideSegmentsMode && (
-            <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer">
+            <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer">
               <input type="radio" name="windowMode" value="segments" checked={windowMode === 'segments'} onChange={() => { setWindowMode('segments'); localStorage.setItem('transcript-window-mode', 'segments') }} />
               segments
             </label>
@@ -365,7 +365,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             <span className="text-[13px] text-text opacity-60">({windowSize} words)</span>
           )}
         </div>
-        <label className="flex items-center gap-1.5 text-sm text-text">
+        <label className="flex items-center gap-1.5 text-xs md:text-sm text-text">
           Duration
           <input
             type="text"
@@ -375,7 +375,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             placeholder="30 or 4:28"
           />
         </label>
-        <label className="flex items-center gap-1.5 text-sm text-text">
+        <label className="flex items-center gap-1.5 text-xs md:text-sm text-text">
           Overlap
           <input
             type="number"
@@ -389,18 +389,18 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           %
         </label>
         <div className="flex items-center gap-1">
-          <button className="py-1.5 px-2.5 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(-1)} title="Step back">&#9664;</button>
-          <button className="py-1.5 px-4 bg-accent text-white border-0 rounded-md text-sm cursor-pointer font-medium transition-opacity duration-150 hover:opacity-85" onClick={handlePlayPause}>
+          <button className="py-1 px-2 md:py-1.5 md:px-2.5 bg-code-bg text-text-h border border-border rounded-md text-xs md:text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(-1)} title="Step back">&#9664;</button>
+          <button className="py-1 px-3 md:py-1.5 md:px-4 bg-accent text-white border-0 rounded-md text-xs md:text-sm cursor-pointer font-medium transition-opacity duration-150 hover:opacity-85" onClick={handlePlayPause}>
             {isPlaying ? '⏸ Pause' : position >= 1 ? '↺ Replay' : '▶ Play'}
           </button>
-          <button className="py-1.5 px-2.5 bg-code-bg text-text-h border border-border rounded-md text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">&#9654;</button>
+          <button className="py-1 px-2 md:py-1.5 md:px-2.5 bg-code-bg text-text-h border border-border rounded-md text-xs md:text-[13px] cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">&#9654;</button>
         </div>
         <div className="flex gap-0.5">
           {[1, 2, 5, 10].map(s => (
             <button
               key={s}
               className={[
-                'py-1 px-2 text-[13px] border border-border cursor-pointer rounded-none first:rounded-l last:rounded-r disabled:opacity-35 disabled:cursor-not-allowed',
+                'py-0.5 px-1.5 md:py-1 md:px-2 text-xs md:text-[13px] border border-border cursor-pointer rounded-none first:rounded-l last:rounded-r disabled:opacity-35 disabled:cursor-not-allowed',
                 speed === s ? 'bg-accent border-accent text-white' : 'bg-code-bg text-text',
               ].join(' ')}
               onClick={() => { setSpeed(s); onSpeedChange?.(s) }}
@@ -428,11 +428,11 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             </label>
           )}
         </div>
-        <label className="flex items-center gap-[3px] text-sm text-text cursor-pointer ml-auto">
+        <label className="flex items-center gap-[3px] text-xs md:text-sm text-text cursor-pointer ml-auto">
           <input type="checkbox" checked={autoScroll} onChange={e => { setAutoScroll(e.target.checked); localStorage.setItem('transcript-auto-scroll', String(e.target.checked)) }} />
           auto-scroll
         </label>
-        <span className="text-[13px] text-text">{words.length} words</span>
+        <span className="text-xs md:text-[13px] text-text">{words.length} words</span>
       </div>
       <div
         className="scrub-bar relative h-[4px] bg-border cursor-pointer mt-2 rounded-[2px] overflow-visible group"
@@ -446,11 +446,11 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   )
 
   const wordDisplay = (
-    <div className="flex-1 overflow-y-auto py-6 px-5" ref={textAreaRef}>
+    <div className="flex-1 overflow-y-auto py-3 px-3 md:py-6 md:px-5" ref={textAreaRef}>
       {words.length === 0 ? (
         <p className="text-text italic">Paste some text above to get started.</p>
       ) : (
-        <p className="text-lg leading-[1.8] text-text">
+        <p className="text-base md:text-lg leading-[1.65] md:leading-[1.8] text-text">
           {words.map((word, i) => {
             const inWindow = i >= windowStart && i < windowStart + windowSize
             const isCursor = i === cursorIndex
@@ -474,7 +474,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   )
 
   const tabBtnClass = (t: string) => [
-    'py-2 px-4 text-[13px] font-medium border-b-2 cursor-pointer bg-transparent transition-colors',
+    'py-1.5 px-2.5 md:py-2 md:px-4 text-xs md:text-[13px] font-medium border-b-2 cursor-pointer bg-transparent transition-colors',
     tab === t
       ? 'border-accent text-accent'
       : 'border-transparent text-text opacity-60 hover:opacity-100',
@@ -500,7 +500,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             ))}
           </div>
           {!isExtraTab && (
-            <div className="pt-3 px-5 pb-3 flex flex-col gap-2">
+            <div className="pt-2 px-3 pb-2 md:pt-3 md:px-5 md:pb-3 flex flex-col gap-2">
               {tab === 'raw' && rawContent}
               {tab === 'windowed' && windowedControls}
             </div>
