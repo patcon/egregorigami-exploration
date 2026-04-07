@@ -29,15 +29,15 @@ export function useUrlHistory(url: string, videoId: string | null) {
   useEffect(() => {
     if (!videoId) return
     setHistory(prev => {
-      const existing = prev.find(e => e.url === url)
+      const existing = prev.find(e => e.videoId === videoId)
       const entry: UrlHistoryEntry = { url, videoId, title: existing?.title }
-      const next = [entry, ...prev.filter(e => e.url !== url)].slice(0, MAX_HISTORY)
+      const next = [entry, ...prev.filter(e => e.videoId !== videoId)].slice(0, MAX_HISTORY)
       persistHistory(next)
       if (!existing?.title) {
         fetchOembedTitle(url).then(title => {
           if (!title) return
           setHistory(h => {
-            const updated = h.map(e => e.url === url ? { ...e, title } : e)
+            const updated = h.map(e => e.videoId === videoId ? { ...e, title } : e)
             persistHistory(updated)
             return updated
           })
