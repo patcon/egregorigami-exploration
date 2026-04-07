@@ -16,14 +16,13 @@ export default function YoutubeEmbeddingProjector() {
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
     return localStorage.getItem('yt-url') ?? ''
   })
-  const { history: urlHistory, addToHistory } = useUrlHistory()
+  const currentVideoId = extractVideoId(urlInput)
+  const { history: urlHistory } = useUrlHistory(urlInput, currentVideoId)
   const {
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
     status, errorMessage, handleLoad, handleSubtitleLoad,
     setLoadedVideoId, setWordTimestamps,
-  } = useYoutubeTranscript(urlInput, {
-    onLoaded: ({ videoId }) => { addToHistory(urlInput, videoId) },
-  })
+  } = useYoutubeTranscript(urlInput)
   const [modalSegments, setModalSegments] = useState<string[] | null>(null)
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
@@ -67,7 +66,6 @@ export default function YoutubeEmbeddingProjector() {
     setSeekTarget(t)
   }, [totalSecs])
 
-  const currentVideoId = extractVideoId(urlInput)
   const transcriptToolUrl = currentVideoId
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
     : 'https://www.youtube-transcript.io'

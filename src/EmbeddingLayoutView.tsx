@@ -52,7 +52,7 @@ export default function EmbeddingLayoutView() {
   const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
   const hasSharePoints = !!(readShareParam()?.points)
   const { savePoints, restoreIfCached } = usePointsCache(currentVideoId, restorePoints, !hasSharePoints)
-  const { history: urlHistory, addToHistory } = useUrlHistory()
+  const { history: urlHistory } = useUrlHistory(urlInput, currentVideoId)
   useEffect(() => {
     if (embedPhase.status === 'done') savePoints(embedPhase.points)
   }, [embedPhase]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -65,9 +65,8 @@ export default function EmbeddingLayoutView() {
     status, errorMessage: loadError, handleLoad, handleSubtitleLoad,
     setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,
   } = useYoutubeTranscript(urlInput, {
-    onLoaded: ({ text, videoId }) => {
+    onLoaded: ({ text }) => {
       if (!restoreIfCached()) resetEmbedPhase()
-      addToHistory(urlInput, videoId)
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
       setHasTranscriptText(true)

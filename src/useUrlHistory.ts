@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export type UrlHistoryEntry = { url: string; videoId: string; title?: string }
 
@@ -23,18 +23,16 @@ async function fetchOembedTitle(url: string): Promise<string | null> {
   } catch { return null }
 }
 
-export function useUrlHistory() {
+export function useUrlHistory(url: string, videoId: string | null) {
   const [history, setHistory] = useState<UrlHistoryEntry[]>(loadHistory)
 
-  function addToHistory(url: string, videoId: string) {
+  useEffect(() => {
+    if (!videoId) return
     setHistory(prev => {
-      const filtered = prev.filter(e => e.url !== url)
-      // Preserve existing title if this URL was already in history
       const existing = prev.find(e => e.url === url)
       const entry: UrlHistoryEntry = { url, videoId, title: existing?.title }
-      const next = [entry, ...filtered].slice(0, MAX_HISTORY)
+      const next = [entry, ...prev.filter(e => e.url !== url)].slice(0, MAX_HISTORY)
       persistHistory(next)
-      // Fetch title async if not already known
       if (!existing?.title) {
         fetchOembedTitle(url).then(title => {
           if (!title) return
@@ -47,7 +45,7 @@ export function useUrlHistory() {
       }
       return next
     })
-  }
+  }, [videoId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { history, addToHistory }
+  return { history }
 }
