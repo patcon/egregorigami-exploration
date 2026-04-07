@@ -4,7 +4,10 @@ export function extractVideoId(url: string): string | null {
   try {
     const u = new URL(url.trim())
     if (u.hostname === 'youtu.be') return valid(u.pathname.slice(1))
-    if (u.hostname.includes('youtube.com')) return valid(u.searchParams.get('v'))
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/live/')) return valid(u.pathname.slice(6))
+      return valid(u.searchParams.get('v'))
+    }
     return null
   } catch {
     return /^[a-zA-Z0-9_-]{11}$/.test(url.trim()) ? url.trim() : null
