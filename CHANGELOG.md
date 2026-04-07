@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Store embedding model ID and segment count alongside cached 3D points in localStorage — displayed as a small info overlay in the bottom-right corner of the scatter plot
+- Rename "Reset Viz" to "Rerun Viz" in v7 — clicking it shows the model selector and Visualize button with an ✕ to return to the visualization without re-embedding; the prior scatter plot remains visible throughout
+- Keep prior scatter plot visible while a new embedding runs or is cancelled — cancelling mid-progress restores the previous visualization
+
 - Add URL history autocomplete dropdown to YouTube URL inputs across all embedding views (v3–v7) — shows video title (fetched async via YouTube oEmbed) and URL; title appears above URL in the list but selecting an entry sets only the URL value; history persists in localStorage (`yt-url-history`, max 15 entries)
 
 - Cache 3D UMAP points in localStorage keyed by video ID (`yt-3d-points-<videoId>`) across all embedding views (v3–v7) — points are restored automatically on page reload, and overwritten when a new embedding is run for the same video

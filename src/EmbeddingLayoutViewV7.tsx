@@ -12,7 +12,7 @@ import { detectAndParseSubtitle } from './subtitleParser'
 import { extractVideoId, computeChunks, computeExternalPosition } from './videoUtils'
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
-import { usePointsCache } from './usePointsCache'
+import { loadCached, saveCached } from './usePointsCache'
 import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
 
@@ -51,13 +51,41 @@ export default function EmbeddingLayoutViewV7() {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const { phase: embedPhase, runEmbedding, cancelEmbedding, resetPhase: resetEmbedPhase, restorePoints } = useEmbeddingWorker()
+  const { phase: embedPhase, runEmbedding, cancelEmbedding } = useEmbeddingWorker()
   const hasSharePoints = !!(readShareParam()?.points)
-  const { savePoints, restoreIfCached } = usePointsCache(currentVideoId, restorePoints, !hasSharePoints)
   const { history: urlHistory } = useUrlHistory(urlInput, currentVideoId)
+
+  const [displayPoints, setDisplayPoints] = useState<[number,number,number][] | null>(null)
+  const [displayMeta, setDisplayMeta] = useState<{ modelId: string; segmentCount: number } | null>(null)
+  const [isRerunMode, setIsRerunMode] = useState(false)
+  const pendingMetaRef = useRef<{ modelId: string; segmentCount: number } | null>(null)
+
+  // Load cached embedding when video changes (skip if share URL already provides points)
   useEffect(() => {
-    if (embedPhase.status === 'done') savePoints(embedPhase.points)
-  }, [embedPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (hasSharePoints) return
+    if (!currentVideoId) { setDisplayPoints(null); setDisplayMeta(null); return }
+    const cached = loadCached(currentVideoId)
+    if (cached) {
+      setDisplayPoints(cached.points)
+      setDisplayMeta({ modelId: cached.modelId, segmentCount: cached.segmentCount })
+    } else {
+      setDisplayPoints(null)
+      setDisplayMeta(null)
+    }
+    setIsRerunMode(false)
+  }, [currentVideoId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // On successful embedding, update display and save to cache
+  useEffect(() => {
+    if (embedPhase.status === 'done' && currentVideoId && pendingMetaRef.current) {
+      const meta = pendingMetaRef.current
+      setDisplayPoints(embedPhase.points)
+      setDisplayMeta(meta)
+      setIsRerunMode(false)
+      saveCached(currentVideoId, { points: embedPhase.points, ...meta })
+      pendingMetaRef.current = null
+    }
+  }, [embedPhase.status]) // eslint-disable-line react-hooks/exhaustive-deps
   const [segments, setSegments] = useState<string[] | null>(null)
   const [shareCopied, setShareCopied] = useState(false)
 
@@ -72,14 +100,12 @@ export default function EmbeddingLayoutViewV7() {
     setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,
   } = useYoutubeTranscript(urlInput, {
     onLoaded: ({ text }) => {
-      if (!restoreIfCached()) resetEmbedPhase()
       setVideoDuration(null)
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
       setHasTranscriptText(true)
     },
     onSubtitleLoaded: ({ text }) => {
-      if (!restoreIfCached()) resetEmbedPhase()
       const { windowSize, overlapPct } = windowParamsRef.current
       setSegments(computeChunks(text, windowSize, overlapPct))
       setHasTranscriptText(true)
@@ -144,7 +170,10 @@ export default function EmbeddingLayoutViewV7() {
       setHasTranscriptText(true)
       const chunks = computeChunks(processedText, shared.windowSize, shared.overlapPct)
       setSegments(chunks)
-      if (shared.points) restorePoints(shared.points)
+      if (shared.points) {
+        setDisplayPoints(shared.points)
+        setDisplayMeta(null) // share URLs don't carry embedding metadata
+      }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -156,7 +185,7 @@ export default function EmbeddingLayoutViewV7() {
       modelId: selectedModel,
       rendererType,
       ...(localStorage.getItem('transcript-raw-text') ? { rawText: localStorage.getItem('transcript-raw-text')! } : {}),
-      ...(embedPhase.status === 'done' ? { points: embedPhase.points } : {}),
+      ...(displayPoints ? { points: displayPoints } : {}),
     }
     const url = buildShareUrl(payload, '#v7')
     navigator.clipboard.writeText(url).then(() => {
@@ -236,7 +265,10 @@ const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
   const durationMismatch = videoDuration !== null && totalSecs !== null
     && Math.abs(videoDuration - totalSecs) > Math.max(10, totalSecs * 0.05)
 
-  const [transcriptTab, setTranscriptTab] = useState(!hasTranscriptText ? 'raw' : 'windowed')
+  const [transcriptTab, setTranscriptTab] = useState(() => {
+    if (hasSharePoints) return '3d'
+    return !hasTranscriptText ? 'raw' : 'windowed'
+  })
   useEffect(() => { if (durationMismatch) setTranscriptTab('raw') }, [durationMismatch])
 
   const externalPosition = computeExternalPosition(videoTime, wordTimestamps, totalSecs)
@@ -257,17 +289,17 @@ const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
     const { windowSize, overlapPct, text } = windowParamsRef.current
     const chunks = computeChunks(text, windowSize, overlapPct)
     setSegments(chunks)
+    pendingMetaRef.current = { modelId: selectedModel, segmentCount: chunks.length }
     cameraStateRef.current = null
     runEmbeddingOnChunks(chunks)
   }
 
 const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status === 'embedding' || embedPhase.status === 'umap-running'
-  const isDone = embedPhase.status === 'done'
-  useEffect(() => { if (isDone) setTranscriptTab('3d') }, [isDone])
+  useEffect(() => { if (embedPhase.status === 'done') setTranscriptTab('3d') }, [embedPhase.status])
 
   const handleDownload = () => {
-    if (embedPhase.status !== 'done') return
-    const blob = new Blob([JSON.stringify(embedPhase.points)], { type: 'application/json' })
+    if (!displayPoints) return
+    const blob = new Blob([JSON.stringify(displayPoints)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -406,13 +438,19 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   </div>
                 )
               ) : (
-                isDone && embedPhase.status === 'done' && segments ? (
-                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                displayPoints !== null ? (
+                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
                     {/* eslint-disable react-hooks/refs */}
-                    {rendererType === 'original' && <ScatterPlot3D points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                    {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                    {rendererType === 'glow' && <ScatterPlot3DV6 points={embedPhase.points} labels={segments} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                    {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                    {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+                    {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
                     {/* eslint-enable react-hooks/refs */}
+                    {displayMeta && (
+                      <div className="absolute bottom-2 right-2 text-[11px] text-text opacity-40 text-right pointer-events-none leading-tight select-none">
+                        <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>
+                        <div>{displayMeta.segmentCount} segments</div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
@@ -444,7 +482,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 <div className="flex items-center gap-2">
                   <div className="spinner" />
                   <span>{embedPhase.progress > 0 ? `Downloading model… ${embedPhase.progress}%` : 'Initializing model…'}</span>
-                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
+                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={() => { cancelEmbedding(); setIsRerunMode(false) }}>Cancel</button>
                 </div>
                 <div className={`progress-bar ${embedPhase.progress === 0 ? 'progress-bar--indeterminate' : ''}`}>
                   <div className="progress-bar-fill" style={{ width: `${embedPhase.progress}%` }} />
@@ -456,7 +494,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 <div className="flex items-center gap-2">
                   <div className="spinner" />
                   <span>Embedding {embedPhase.loaded + 1} / {embedPhase.total}</span>
-                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
+                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={() => { cancelEmbedding(); setIsRerunMode(false) }}>Cancel</button>
                 </div>
                 <div className="progress-bar">
                   <div className="progress-bar-fill" style={{ width: `${(embedPhase.loaded / embedPhase.total) * 100}%` }} />
@@ -468,7 +506,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 <div className="flex items-center gap-2">
                   <div className="spinner" />
                   <span>Reducing to 3D…</span>
-                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={cancelEmbedding}>Cancel</button>
+                  <button className="ml-auto py-[3px] px-2.5 rounded border border-border bg-transparent text-text text-xs cursor-pointer opacity-70 hover:opacity-100" onClick={() => { cancelEmbedding(); setIsRerunMode(false) }}>Cancel</button>
                 </div>
                 <div className="progress-bar progress-bar--indeterminate">
                   <div className="progress-bar-fill" />
@@ -477,60 +515,71 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             )}
           </div>
         )}
-        <div className="flex gap-2 items-center flex-wrap">
-          {!isDone ? (
-            <>
-              <select
-                className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-                value={selectedModel}
-                onChange={e => {
-                  const v = e.target.value as EmbeddingModelId
-                  setSelectedModel(v)
-                  localStorage.setItem('projector-model', v)
-                }}
-              >
-                {EMBEDDING_MODELS.map(m => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </select>
-              <button
-                className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-semibold cursor-pointer whitespace-nowrap hover:opacity-[0.88] disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={handleRunEmbedding}
-                disabled={!hasTranscriptText || isEmbedding}
-              >
-                Visualize
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                className="py-1.5 px-3 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border"
-                onClick={resetEmbedPhase}
-              >
-                Reset Viz
-              </button>
-              <select
-                className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-                value={rendererType}
-                onChange={e => {
-                  const v = e.target.value as RendererType
-                  setRendererType(v)
-                  localStorage.setItem('scatter-renderer', v)
-                }}
-              >
-                <option value="original">Points + Line</option>
-                <option value="cividis-tube">Cividis Tube</option>
-                <option value="glow">Glow (Shader)</option>
-              </select>
-              <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">
-                ⬇ <span className="sr-only">Download 3D points as JSON</span>
-              </button>
-            </>
-          )}
-          {embedPhase.status === 'error' && (
-            <p className="text-[#e53e3e] text-[13px] m-0 w-full">{embedPhase.message}</p>
-          )}
-        </div>
+        {!isEmbedding && (
+          <div className="flex gap-2 items-center flex-wrap">
+            {displayPoints && !isRerunMode ? (
+              <>
+                <button
+                  className="py-1.5 px-3 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border"
+                  onClick={() => setIsRerunMode(true)}
+                >
+                  Rerun Viz
+                </button>
+                <select
+                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
+                  value={rendererType}
+                  onChange={e => {
+                    const v = e.target.value as RendererType
+                    setRendererType(v)
+                    localStorage.setItem('scatter-renderer', v)
+                  }}
+                >
+                  <option value="original">Points + Line</option>
+                  <option value="cividis-tube">Cividis Tube</option>
+                  <option value="glow">Glow (Shader)</option>
+                </select>
+                <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">
+                  ⬇ <span className="sr-only">Download 3D points as JSON</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {isRerunMode && (
+                  <button
+                    className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border"
+                    onClick={() => setIsRerunMode(false)}
+                    title="Cancel rerun"
+                  >
+                    ✕
+                  </button>
+                )}
+                <select
+                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
+                  value={selectedModel}
+                  onChange={e => {
+                    const v = e.target.value as EmbeddingModelId
+                    setSelectedModel(v)
+                    localStorage.setItem('projector-model', v)
+                  }}
+                >
+                  {EMBEDDING_MODELS.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+                <button
+                  className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-semibold cursor-pointer whitespace-nowrap hover:opacity-[0.88] disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleRunEmbedding}
+                  disabled={!hasTranscriptText}
+                >
+                  Visualize
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {embedPhase.status === 'error' && (
+          <p className="text-[#e53e3e] text-[13px] m-0 w-full">{embedPhase.message}</p>
+        )}
       </div>
     </div>
   )
