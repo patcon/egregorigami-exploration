@@ -481,8 +481,12 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 <div className="w-1/2 flex-shrink-0 overflow-hidden">
                   {videoBlock}
                 </div>
-                <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden border-l border-border">
-                  {threeDContent}
+                <div className="w-1/2 flex-shrink-0 overflow-hidden border-l border-border">
+                  <div className="relative w-full aspect-video">
+                    <div className="absolute inset-0 flex flex-col">
+                      {threeDContent}
+                    </div>
+                  </div>
                 </div>
               </div>
               {/* Desktop: bottom row — transcript tabs (Raw/Windowed/Segments) */}
