@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- v7 landscape layout: at 640px+ screen width (mobile landscape), the main panel splits into two columns — video on the left, full tab section (Raw, Windowed, Segments, 3D) on the right
+
 - Store embedding model ID and segment count alongside cached 3D points in localStorage — displayed as a small info overlay in the bottom-right corner of the scatter plot
 - Rename "Reset Viz" to "Rerun Viz" in v7 — clicking it shows the model selector and Visualize button with an ✕ to return to the visualization without re-embedding; the prior scatter plot remains visible throughout
 - Keep prior scatter plot visible while a new embedding runs or is cancelled — cancelling mid-progress restores the previous visualization

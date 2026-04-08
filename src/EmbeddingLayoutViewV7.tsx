@@ -370,7 +370,8 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
       {/* Main panel */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col sm:flex-row overflow-hidden">
+          <div className="flex-shrink-0 sm:w-1/2 sm:overflow-hidden">
           {currentVideoId ? (
             <div className="relative flex-shrink-0">
               <div style={{ visibility: videoHidden ? 'hidden' : 'visible' }}>
@@ -399,6 +400,8 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
               </div>
             </div>
           )}
+          </div>
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
           <TranscriptViewer
             key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
             initialText={loadedText ?? undefined}
@@ -469,6 +472,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
               </button>
             }
           />
+          </div>
         </div>
 
       </div>
