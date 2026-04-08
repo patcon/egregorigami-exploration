@@ -476,8 +476,8 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
         if (isDesktop) {
           return (
             <>
-              {/* Desktop: top row — video left, 3D right */}
-              <div className="flex flex-1 min-h-0 overflow-hidden">
+              {/* Desktop: top row — video left, 3D right; height driven by aspect-video content */}
+              <div className="flex flex-shrink-0 overflow-hidden">
                 <div className="w-1/2 flex-shrink-0 overflow-hidden">
                   {videoBlock}
                 </div>
@@ -490,7 +490,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 </div>
               </div>
               {/* Desktop: bottom row — transcript tabs (Raw/Windowed/Segments) */}
-              <div className="flex-shrink-0 h-[38vh] border-t border-border flex flex-col overflow-hidden">
+              <div className="flex-1 min-h-0 border-t border-border flex flex-col overflow-hidden">
                 <TranscriptViewer
                   key={transcriptKey}
                   {...transcriptViewerProps}
