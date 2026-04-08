@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- v7 desktop layout: at 1024px+ width, the layout splits into a top row (video | 3D plot) and a bottom panel (Raw/Windowed/Segments transcript tabs); landscape mobile (640px–1023px) keeps the existing two-column layout with all tabs on the right
+
 - Store embedding model ID and segment count alongside cached 3D points in localStorage — displayed as a small info overlay in the bottom-right corner of the scatter plot
 - Rename "Reset Viz" to "Rerun Viz" in v7 — clicking it shows the model selector and Visualize button with an ✕ to return to the visualization without re-embedding; the prior scatter plot remains visible throughout
 - Keep prior scatter plot visible while a new embedding runs or is cancelled — cancelling mid-progress restores the previous visualization

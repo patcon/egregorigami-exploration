@@ -321,6 +321,18 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
     else dialog.close()
   }, [infoOpen])
 
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  // When switching to desktop, the '3d' tab doesn't exist in the bottom TranscriptViewer
+  useEffect(() => {
+    if (isDesktop && transcriptTab === '3d') setTranscriptTab('windowed')
+  }, [isDesktop]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden overscroll-none">
       {/* Info modal */}
@@ -368,110 +380,152 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
         {loadStatus === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{loadError}</p>}
       </div>
 
-      {/* Main panel */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          {currentVideoId ? (
-            <div className="relative flex-shrink-0">
-              <div style={{ visibility: videoHidden ? 'hidden' : 'visible' }}>
-                <YoutubePlayerEmbed
-                  videoId={currentVideoId}
-                  onTimeUpdate={setVideoTime}
-                  seekTo={videoHidden ? undefined : seekTarget}
-                  playing={videoHidden ? false : transcriptPlaying}
-                  onPlayStateChange={videoHidden ? undefined : setYtPlaying}
-                  playbackRate={playbackRate}
-                  onVideoDuration={setVideoDuration}
-                />
+      {/* Shared content blocks */}
+      {(() => {
+        const videoBlock = currentVideoId ? (
+          <div className="relative flex-shrink-0">
+            <div style={{ visibility: videoHidden ? 'hidden' : 'visible' }}>
+              <YoutubePlayerEmbed
+                videoId={currentVideoId}
+                onTimeUpdate={setVideoTime}
+                seekTo={videoHidden ? undefined : seekTarget}
+                playing={videoHidden ? false : transcriptPlaying}
+                onPlayStateChange={videoHidden ? undefined : setYtPlaying}
+                playbackRate={playbackRate}
+                onVideoDuration={setVideoDuration}
+                noBottomMargin={isDesktop}
+              />
+            </div>
+            {videoHidden && (
+              <div className="absolute inset-0 w-full max-w-[640px] mx-auto">
+                <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
+                  <span className="text-text opacity-40 text-[13px]">YouTube paused — playing faster than 2×</span>
+                </div>
               </div>
-              {videoHidden && (
-                <div className="absolute inset-0 w-full max-w-[640px] mx-auto">
-                  <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
-                    <span className="text-text opacity-40 text-[13px]">YouTube paused — playing faster than 2×</span>
+            )}
+          </div>
+        ) : (
+          <div className="w-full max-w-[640px] mx-auto flex-shrink-0">
+            <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
+              <span className="text-text opacity-40 text-[13px]">Paste a YouTube URL above to load the player</span>
+            </div>
+          </div>
+        )
+
+        const segmentsContent = segments && segments.length > 0 ? (
+          <ul className="list-none p-0 m-0 overflow-y-auto overscroll-y-contain flex-1">
+            {segments.map((seg, i) => (
+              <li key={i} className="flex gap-2 py-2 px-3.5 border-b border-border text-[13px] items-start">
+                <span className="text-text opacity-50 min-w-[28px] flex-shrink-0 text-right tabular-nums pt-[1px]">{i + 1}</span>
+                <span className="text-text-h leading-[1.45]">{seg}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+            Load a transcript to see segments.
+          </div>
+        )
+
+        const threeDContent = displayPoints !== null ? (
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+            {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {displayMeta && (
+              <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
+                <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>
+                <div>{displayMeta.segmentCount} segments</div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+            {isEmbedding ? 'Embedding in progress…' : 'Run Visualize to see segments in 3D.'}
+          </div>
+        )
+
+        const transcriptKey = `${loadedVideoId ?? 'empty'}-${loadCount}`
+        const transcriptViewerProps = {
+          initialText: loadedText ?? undefined,
+          initialDuration: loadedDuration ?? undefined,
+          onWindowChange: handleWindowChange,
+          onParamsBlur: handleParamsBlur,
+          onCursorChange: handleCursorChange,
+          externalPosition: (videoHidden ? undefined : externalPosition) ?? clickSeekPosition,
+          externalPlaying: videoHidden ? undefined : ytPlaying,
+          onScrub: handleScrub,
+          onPlayingChange: setTranscriptPlaying,
+          onSpeedChange: setPlaybackRate,
+          hideSegmentsMode: true,
+          onSubtitleLoad: handleSubtitleLoad,
+          hideFileLoad: !isProd,
+          tab: transcriptTab,
+          onTabChange: setTranscriptTab,
+          warning: durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined,
+          prependTextareaButtons: (
+            <button
+              className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+              disabled={isProd ? !currentVideoId : loadStatus === 'loading'}
+            >
+              {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch${isProd ? ' ↗' : ''}`}
+            </button>
+          ),
+        }
+
+        if (isDesktop) {
+          return (
+            <>
+              {/* Desktop: top row — video left, 3D right; height driven by aspect-video content */}
+              <div className="flex flex-shrink-0 overflow-hidden">
+                <div className="w-1/2 flex-shrink-0 overflow-hidden">
+                  {videoBlock}
+                </div>
+                <div className="w-1/2 flex-shrink-0 overflow-hidden border-l border-border">
+                  <div className="relative w-full aspect-video">
+                    <div className="absolute inset-0 flex flex-col">
+                      {threeDContent}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="w-full max-w-[640px] mx-auto flex-shrink-0">
-              <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
-                <span className="text-text opacity-40 text-[13px]">Paste a YouTube URL above to load the player</span>
+              </div>
+              {/* Desktop: bottom row — transcript tabs (Raw/Windowed/Segments) */}
+              <div className="flex-1 min-h-0 border-t border-border flex flex-col overflow-hidden">
+                <TranscriptViewer
+                  key={transcriptKey}
+                  {...transcriptViewerProps}
+                  tab={transcriptTab === '3d' ? 'windowed' : transcriptTab}
+                  extraTabs={[{ id: 'segments', label: 'Segments' }]}
+                  extraTabContent={segmentsContent}
+                />
+              </div>
+            </>
+          )
+        }
+
+        return (
+          /* Mobile/landscape: single flex column, splits to two columns at sm: */
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col sm:flex-row overflow-hidden">
+              <div className="flex-shrink-0 sm:w-1/2 sm:overflow-hidden">
+                {videoBlock}
+              </div>
+              <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
+                <TranscriptViewer
+                  key={transcriptKey}
+                  {...transcriptViewerProps}
+                  extraTabs={[
+                    { id: 'segments', label: 'Segments' },
+                    { id: '3d', label: '3D' },
+                  ]}
+                  extraTabContent={transcriptTab === 'segments' ? segmentsContent : threeDContent}
+                />
               </div>
             </div>
-          )}
-          <TranscriptViewer
-            key={`${loadedVideoId ?? 'empty'}-${loadCount}`}
-            initialText={loadedText ?? undefined}
-            initialDuration={loadedDuration ?? undefined}
-            onWindowChange={handleWindowChange}
-            onParamsBlur={handleParamsBlur}
-            onCursorChange={handleCursorChange}
-            externalPosition={(videoHidden ? undefined : externalPosition) ?? clickSeekPosition}
-            externalPlaying={videoHidden ? undefined : ytPlaying}
-            onScrub={handleScrub}
-            onPlayingChange={setTranscriptPlaying}
-            onSpeedChange={setPlaybackRate}
-            hideSegmentsMode
-            onSubtitleLoad={handleSubtitleLoad}
-            hideFileLoad={!isProd}
-            tab={transcriptTab}
-            onTabChange={setTranscriptTab}
-            warning={durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined}
-            extraTabs={[
-              { id: 'segments', label: 'Segments' },
-              { id: '3d', label: '3D' },
-            ]}
-            extraTabContent={
-              transcriptTab === 'segments' ? (
-                segments && segments.length > 0 ? (
-                  <ul className="list-none p-0 m-0 overflow-y-auto overscroll-y-contain flex-1">
-                    {segments.map((seg, i) => (
-                      <li key={i} className="flex gap-2 py-2 px-3.5 border-b border-border text-[13px] items-start">
-                        <span className="text-text opacity-50 min-w-[28px] flex-shrink-0 text-right tabular-nums pt-[1px]">{i + 1}</span>
-                        <span className="text-text-h leading-[1.45]">{seg}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
-                    Load a transcript to see segments.
-                  </div>
-                )
-              ) : (
-                displayPoints !== null ? (
-                  <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-                    {/* eslint-disable react-hooks/refs */}
-                    {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                    {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                    {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-                    {/* eslint-enable react-hooks/refs */}
-                    {displayMeta && (
-                      <div className="absolute bottom-2 right-2 text-[11px] text-text opacity-40 text-right pointer-events-none leading-tight select-none">
-                        <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>
-                        <div>{displayMeta.segmentCount} segments</div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
-                    {isEmbedding ? 'Embedding in progress…' : 'Run Visualize to see segments in 3D.'}
-                  </div>
-                )
-              )
-            }
-            prependTextareaButtons={
-              <button
-                className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
-                disabled={isProd ? !currentVideoId : loadStatus === 'loading'}
-              >
-                {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch${isProd ? ' ↗' : ''}`}
-              </button>
-            }
-          />
-        </div>
-
-      </div>
+          </div>
+        )
+      })()}
 
       {/* Bottom: embedding form */}
       <div className="flex-shrink-0 border-t border-border px-4 py-2.5 flex flex-col gap-2">
