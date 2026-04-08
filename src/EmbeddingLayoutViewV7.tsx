@@ -433,7 +433,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
             {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
             {displayMeta && (
-              <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none" style={{ color: '#ccc', textShadow: '0 0 6px rgba(0,0,0,1), 0 0 6px rgba(0,0,0,1)' }}>
+              <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
                 <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>
                 <div>{displayMeta.segmentCount} segments</div>
               </div>
