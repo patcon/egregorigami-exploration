@@ -15,9 +15,10 @@ interface YoutubePlayerEmbedProps {
   onPlayStateChange?: (playing: boolean) => void
   playbackRate?: number
   onVideoDuration?: (secs: number) => void
+  noBottomMargin?: boolean
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration, noBottomMargin }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -153,7 +154,7 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
   }, [playbackRate])
 
   return (
-    <div className="w-full max-w-[640px] mx-auto mb-4">
+    <div className={`w-full max-w-[640px] mx-auto${noBottomMargin ? '' : ' mb-4'}`}>
       <div className="yt-player-aspect relative w-full aspect-video">
         <div ref={containerRef} />
       </div>

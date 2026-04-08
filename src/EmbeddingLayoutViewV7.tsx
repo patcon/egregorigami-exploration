@@ -393,6 +393,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 onPlayStateChange={videoHidden ? undefined : setYtPlaying}
                 playbackRate={playbackRate}
                 onVideoDuration={setVideoDuration}
+                noBottomMargin={isDesktop}
               />
             </div>
             {videoHidden && (
