@@ -8,6 +8,8 @@ export interface SharePayload {
   rendererType?: string
   rawText?: string
   points?: [number, number, number][]
+  manualText?: string
+  autoEmbed?: boolean
 }
 
 export function encodeSharePayload(payload: SharePayload): string {

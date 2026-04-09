@@ -2,8 +2,8 @@
 type AnyPipeline = any
 
 export const EMBEDDING_MODELS = [
-  { id: 'Xenova/all-MiniLM-L6-v2',                      label: 'MiniLM-L6 (fast, ~22 MB)',         default: true },
-  { id: 'Xenova/all-MiniLM-L12-v2',                     label: 'MiniLM-L12 (balanced, ~33 MB)',    default: false },
+  { id: 'Xenova/all-MiniLM-L6-v2',                      label: 'MiniLM-L6 (fast, ~22 MB)',         default: false },
+  { id: 'Xenova/all-MiniLM-L12-v2',                     label: 'MiniLM-L12 (balanced, ~33 MB)',    default: true },
   { id: 'Xenova/all-mpnet-base-v2',                      label: 'MPNet-base (quality, ~420 MB)',    default: false },
   { id: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2', label: 'Multilingual MiniLM (~125 MB)',    default: false },
 ] as const
