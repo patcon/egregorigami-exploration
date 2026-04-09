@@ -150,12 +150,17 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
           }
 
           if (indices.length < 2) continue
+          // For non-root branches the first vertex is the prepended parent node.
+          // Use the branch's own color for that vertex so the first edge is solid
+          // (no gradient). The parent dot in the points mesh still shows its own color.
+          const branchColorSrc = bid > 0 ? branchOnly[0] : -1
           const lPos = new Float32Array(indices.length * 3)
           const lCol = new Float32Array(indices.length * 3)
           for (let j = 0; j < indices.length; j++) {
             const idx = indices[j]
+            const colorIdx = (bid > 0 && j === 0) ? branchColorSrc : idx
             lPos[j * 3] = normalized[idx][0]; lPos[j * 3 + 1] = normalized[idx][1]; lPos[j * 3 + 2] = normalized[idx][2]
-            lCol[j * 3] = colors[idx * 3]; lCol[j * 3 + 1] = colors[idx * 3 + 1]; lCol[j * 3 + 2] = colors[idx * 3 + 2]
+            lCol[j * 3] = colors[colorIdx * 3]; lCol[j * 3 + 1] = colors[colorIdx * 3 + 1]; lCol[j * 3 + 2] = colors[colorIdx * 3 + 2]
           }
           const lg = new THREE.BufferGeometry()
           lg.setAttribute('position', new THREE.BufferAttribute(lPos, 3))
