@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 
+const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
+
 interface Props {
   points: [number, number, number][]
   labels: string[]
@@ -10,6 +12,7 @@ interface Props {
   onPointClick: (index: number) => void
   initialCameraState?: CameraState
   onCameraChange?: (state: CameraState) => void
+  branchIds?: number[]
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -50,7 +53,7 @@ function cividis(t: number): THREE.Color {
   return new THREE.Color(r, g, b)
 }
 
-export default function ScatterPlot3DV5({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange }: Props) {
+export default function ScatterPlot3DV5({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, branchIds }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -123,7 +126,13 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
         positions[i * 3] = normalized[i][0]
         positions[i * 3 + 1] = normalized[i][1]
         positions[i * 3 + 2] = normalized[i][2]
-        const c = cividis(i / (n - 1))
+        let c: THREE.Color
+        if (branchIds) {
+          const hueIndex = branchIds[i] <= 1 ? 0 : branchIds[i] - 1
+          c = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.55)
+        } else {
+          c = cividis(i / (n - 1))
+        }
         colors[i * 3] = c.r
         colors[i * 3 + 1] = c.g
         colors[i * 3 + 2] = c.b
@@ -136,40 +145,85 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       const pointsMesh = new THREE.Points(geo, mat)
       scene.add(pointsMesh)
 
-      // Curved tube path (protein-folding aesthetic).
-      // Use centripetal parameterization so the curve never overshoots or loops
-      // when adjacent segments are far apart in 3D space — prevents the sphere
-      // from visually reversing direction as it follows the curve.
-      const curve = new THREE.CatmullRomCurve3(
-        normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
-        false,
-        'centripetal'
-      )
-
-      const TUBE_SEGMENTS = Math.max(64, normalized.length * 6)
       const RADIAL_SEGMENTS = 10
       const TUBE_RADIUS = 0.025
-
-      const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEGMENTS, TUBE_RADIUS, RADIAL_SEGMENTS, false)
-
-      const tubeColors = new Float32Array(tubeGeo.attributes.position.count * 3)
       const vertsPerRing = RADIAL_SEGMENTS + 1
-      for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
-        const ring = Math.floor(v / vertsPerRing)
-        const t = ring / TUBE_SEGMENTS
-        const c = cividis(t)
-        // Alternate brightness between node-to-node segments to show spacing
-        const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
-        const bright = segIdx % 2 === 0 ? 1.2 : 0.7
-        tubeColors[v * 3] = Math.min(1, c.r * bright)
-        tubeColors[v * 3 + 1] = Math.min(1, c.g * bright)
-        tubeColors[v * 3 + 2] = Math.min(1, c.b * bright)
-      }
-      tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
+      // curve is referenced by sceneRef for highlight sphere follow modes
+      let curve: THREE.CatmullRomCurve3
 
-      const tubeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })
-      const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat)
-      scene.add(tubeMesh)
+      if (branchIds) {
+        // One tube per branch; non-root branches prepend their parent node so the
+        // tube visually starts from the branching point with no gap.
+        const numBranches = Math.max(...branchIds) + 1
+        let rootCurve: THREE.CatmullRomCurve3 | null = null
+        for (let bid = 0; bid < numBranches; bid++) {
+          const branchOnly: number[] = []
+          for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
+          let indices: number[]
+          if (bid === 0) {
+            indices = branchOnly
+          } else {
+            const firstBranchIdx = branchOnly[0]
+            let parentIdx = -1
+            for (let i = firstBranchIdx - 1; i >= 0; i--) {
+              if (branchIds[i] === 0) { parentIdx = i; break }
+            }
+            indices = parentIdx >= 0 ? [parentIdx, ...branchOnly] : branchOnly
+          }
+          if (indices.length < 2) continue
+          const hueIndex = bid <= 1 ? 0 : bid - 1
+          const baseColor = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.55)
+          const branchCurve = new THREE.CatmullRomCurve3(
+            indices.map(idx => new THREE.Vector3(...normalized[idx])),
+            false, 'centripetal'
+          )
+          if (bid === 0) rootCurve = branchCurve
+          const branchTubeSegs = Math.max(64, indices.length * 6)
+          const tubeGeo = new THREE.TubeGeometry(branchCurve, branchTubeSegs, TUBE_RADIUS, RADIAL_SEGMENTS, false)
+          const tubeColors = new Float32Array(tubeGeo.attributes.position.count * 3)
+          for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
+            const ring = Math.floor(v / vertsPerRing)
+            const t = ring / branchTubeSegs
+            const segIdx = Math.floor(Math.min(t * (indices.length - 1), indices.length - 2))
+            const bright = segIdx % 2 === 0 ? 1.2 : 0.7
+            tubeColors[v * 3] = Math.min(1, baseColor.r * bright)
+            tubeColors[v * 3 + 1] = Math.min(1, baseColor.g * bright)
+            tubeColors[v * 3 + 2] = Math.min(1, baseColor.b * bright)
+          }
+          tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
+          scene.add(new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })))
+        }
+        // Provide a valid curve for sceneRef (only accessed when highlight sphere is visible)
+        curve = rootCurve ?? new THREE.CatmullRomCurve3(
+          [new THREE.Vector3(...normalized[0]), new THREE.Vector3(...normalized[0])],
+          false, 'centripetal'
+        )
+      } else {
+        // Curved tube path (protein-folding aesthetic).
+        // Use centripetal parameterization so the curve never overshoots or loops
+        // when adjacent segments are far apart in 3D space — prevents the sphere
+        // from visually reversing direction as it follows the curve.
+        curve = new THREE.CatmullRomCurve3(
+          normalized.map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+          false, 'centripetal'
+        )
+        const TUBE_SEGMENTS = Math.max(64, normalized.length * 6)
+        const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEGMENTS, TUBE_RADIUS, RADIAL_SEGMENTS, false)
+        const tubeColors = new Float32Array(tubeGeo.attributes.position.count * 3)
+        for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
+          const ring = Math.floor(v / vertsPerRing)
+          const t = ring / TUBE_SEGMENTS
+          const c = cividis(t)
+          // Alternate brightness between node-to-node segments to show spacing
+          const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
+          const bright = segIdx % 2 === 0 ? 1.2 : 0.7
+          tubeColors[v * 3] = Math.min(1, c.r * bright)
+          tubeColors[v * 3 + 1] = Math.min(1, c.g * bright)
+          tubeColors[v * 3 + 2] = Math.min(1, c.b * bright)
+        }
+        tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
+        scene.add(new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })))
+      }
 
       // Lighting for MeshStandardMaterial
       scene.add(new THREE.AmbientLight(0xffffff, 0.7))
@@ -278,7 +332,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
 
     return () => cleanup?.()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points])
+  }, [points, branchIds])
 
   // Highlight updates — set target position on curve; RAF lerps sphere towards it each frame
   useEffect(() => {

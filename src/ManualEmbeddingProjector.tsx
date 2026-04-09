@@ -179,6 +179,7 @@ export default function ManualEmbeddingProjector() {
             <ScatterPlot3DV5
               points={phase.points}
               labels={labels}
+              branchIds={branchIds ?? undefined}
               highlightPosition={null}
               onPointClick={() => {}}
             />
@@ -187,6 +188,7 @@ export default function ManualEmbeddingProjector() {
             <ScatterPlot3DV6
               points={phase.points}
               labels={labels}
+              branchIds={branchIds ?? undefined}
               highlightPosition={null}
               onPointClick={() => {}}
             />

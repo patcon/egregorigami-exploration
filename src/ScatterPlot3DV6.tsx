@@ -7,6 +7,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 
+const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
+
 interface Props {
   points: [number, number, number][]
   labels: string[]
@@ -17,6 +19,7 @@ interface Props {
   fillBrightness?: number // brightness multiplier for fill particles (default 1)
   initialCameraState?: CameraState
   onCameraChange?: (state: CameraState) => void
+  branchIds?: number[]
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -101,7 +104,7 @@ void main() {
 }
 `
 
-export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 12, fillJitter = 0.03, fillBrightness = 1.8, initialCameraState, onCameraChange }: Props) {
+export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 12, fillJitter = 0.03, fillBrightness = 1.8, initialCameraState, onCameraChange, branchIds }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -176,7 +179,13 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         positions[i * 3] = normalized[i][0]
         positions[i * 3 + 1] = normalized[i][1]
         positions[i * 3 + 2] = normalized[i][2]
-        const c = glowPalette(i / (n - 1))
+        let c: THREE.Color
+        if (branchIds) {
+          const hueIndex = branchIds[i] <= 1 ? 0 : branchIds[i] - 1
+          c = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.7)
+        } else {
+          c = glowPalette(i / (n - 1))
+        }
         aColors[i * 3] = c.r
         aColors[i * 3 + 1] = c.g
         aColors[i * 3 + 2] = c.b
@@ -200,19 +209,49 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       const pointsMesh = new THREE.Points(geo, mat)
       scene.add(pointsMesh)
 
-      // Fill particles — interpolated between adjacent nodes with optional jitter
-      const fillCount = (n - 1) * fillPerSeg
+      // Fill particles — interpolated between adjacent nodes with optional jitter.
+      // With branchIds, only fill within each branch's own segments so particles
+      // don't cross branch boundaries.
+      type FillSegment = { from: number; to: number; color: THREE.Color | null }
+      const fillSegments: FillSegment[] = []
+      if (branchIds) {
+        const numBranches = Math.max(...branchIds) + 1
+        for (let bid = 0; bid < numBranches; bid++) {
+          const branchOnly: number[] = []
+          for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
+          let indices: number[]
+          if (bid === 0) {
+            indices = branchOnly
+          } else {
+            const firstBranchIdx = branchOnly[0]
+            let parentIdx = -1
+            for (let i = firstBranchIdx - 1; i >= 0; i--) {
+              if (branchIds[i] === 0) { parentIdx = i; break }
+            }
+            indices = parentIdx >= 0 ? [parentIdx, ...branchOnly] : branchOnly
+          }
+          const hueIndex = bid <= 1 ? 0 : bid - 1
+          const branchColor = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.7)
+          for (let j = 0; j < indices.length - 1; j++) {
+            fillSegments.push({ from: indices[j], to: indices[j + 1], color: branchColor })
+          }
+        }
+      } else {
+        for (let i = 0; i < n - 1; i++) fillSegments.push({ from: i, to: i + 1, color: null })
+      }
+      const fillCount = fillSegments.length * fillPerSeg
       const fillPositions = new Float32Array(fillCount * 3)
       const fillColors = new Float32Array(fillCount * 3)
       const fillSeeds = new Float32Array(fillCount)
-      for (let i = 0; i < n - 1; i++) {
+      for (let si = 0; si < fillSegments.length; si++) {
+        const { from, to, color } = fillSegments[si]
         for (let j = 0; j < fillPerSeg; j++) {
           const f = (j + 1) / (fillPerSeg + 1)
-          const idx = i * fillPerSeg + j
-          fillPositions[idx * 3]     = normalized[i][0] + (normalized[i + 1][0] - normalized[i][0]) * f + (Math.random() - 0.5) * 2 * fillJitter
-          fillPositions[idx * 3 + 1] = normalized[i][1] + (normalized[i + 1][1] - normalized[i][1]) * f + (Math.random() - 0.5) * 2 * fillJitter
-          fillPositions[idx * 3 + 2] = normalized[i][2] + (normalized[i + 1][2] - normalized[i][2]) * f + (Math.random() - 0.5) * 2 * fillJitter
-          const c = glowPalette((i + f) / (n - 1))
+          const idx = si * fillPerSeg + j
+          fillPositions[idx * 3]     = normalized[from][0] + (normalized[to][0] - normalized[from][0]) * f + (Math.random() - 0.5) * 2 * fillJitter
+          fillPositions[idx * 3 + 1] = normalized[from][1] + (normalized[to][1] - normalized[from][1]) * f + (Math.random() - 0.5) * 2 * fillJitter
+          fillPositions[idx * 3 + 2] = normalized[from][2] + (normalized[to][2] - normalized[from][2]) * f + (Math.random() - 0.5) * 2 * fillJitter
+          const c = color ?? glowPalette((from + f) / (n - 1))
           fillColors[idx * 3] = c.r; fillColors[idx * 3 + 1] = c.g; fillColors[idx * 3 + 2] = c.b
           fillSeeds[idx] = Math.random()
         }
@@ -366,7 +405,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
 
     return () => cleanup?.()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, fillPerSeg, fillJitter, fillBrightness])
+  }, [points, fillPerSeg, fillJitter, fillBrightness, branchIds])
 
   // Highlight updates — set target segment index; RAF lerps along the path each frame
   useEffect(() => {
