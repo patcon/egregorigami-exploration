@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `#manual` view: type lines of text into a textarea — each line becomes one embedding node; prefix with `- ` to start a new branch, indent to continue it; branches appear as distinct colored paths in the 3D scatter plot with connector lines back to the last root node
+
 - v7 desktop layout: at 1024px+ width, the layout splits into a top row (video | 3D plot) and a bottom panel (Raw/Windowed/Segments transcript tabs); landscape mobile (640px–1023px) keeps the existing two-column layout with all tabs on the right
 
 - Store embedding model ID and segment count alongside cached 3D points in localStorage — displayed as a small info overlay in the bottom-right corner of the scatter plot

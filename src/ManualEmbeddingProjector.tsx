@@ -1,0 +1,169 @@
+import { useState, useMemo } from 'react'
+import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
+import { useEmbeddingWorker } from './useEmbeddingWorker'
+import ScatterPlot3D from './ScatterPlot3D'
+
+const EXAMPLE_INPUT = `Why
+Why does
+Why does a moon
+Why does a moon rock
+Why does a moon rock taste
+Why does a moon rock taste better
+Why does a moon rock taste better than
+Why does a moon rock taste better than an Earth
+Why does a moon rock taste better than an Earth rock?
+Why does a moon rock taste better than an Earth rock? It's
+Why does a moon rock taste better than an Earth rock? It's a little
+- Why does a moon rock taste better than an Earth rock? It's a little meteor.
+  Why does a moon rock taste better than an Earth rock? It's a little meteor. (punchline)
+- Why does a moon rock taste better than an Earth rock? It's a little meatier.`
+
+interface ParsedSegment {
+  text: string
+  branchId: number
+}
+
+function parseInput(raw: string): ParsedSegment[] {
+  const lines = raw.split('\n')
+  const segments: ParsedSegment[] = []
+  let currentBranchId = 0
+  let nextBranchId = 1
+
+  for (const line of lines) {
+    if (!line.trim()) continue
+
+    if (line.startsWith('- ')) {
+      currentBranchId = nextBranchId++
+      segments.push({ text: line.slice(2).trim(), branchId: currentBranchId })
+    } else if (/^\s/.test(line) && currentBranchId !== 0) {
+      segments.push({ text: line.trim(), branchId: currentBranchId })
+    } else {
+      currentBranchId = 0
+      segments.push({ text: line.trim(), branchId: 0 })
+    }
+  }
+
+  return segments
+}
+
+export default function ManualEmbeddingProjector() {
+  const [inputText, setInputText] = useState(EXAMPLE_INPUT)
+  const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(
+    EMBEDDING_MODELS.find(m => m.default)!.id
+  )
+  const [submitted, setSubmitted] = useState<ParsedSegment[] | null>(null)
+  const { phase, runEmbedding, cancelEmbedding, resetPhase } = useEmbeddingWorker()
+
+  const handleEmbed = () => {
+    const segments = parseInput(inputText)
+    if (segments.length < 2) return
+    setSubmitted(segments)
+    resetPhase()
+    runEmbedding(segments.map(s => s.text), selectedModel)
+  }
+
+  const handleReset = () => {
+    cancelEmbedding()
+    setSubmitted(null)
+  }
+
+  const branchIds = useMemo(
+    () => submitted?.map(s => s.branchId) ?? null,
+    [submitted]
+  )
+
+  const labels = useMemo(
+    () => submitted?.map(s => s.text) ?? [],
+    [submitted]
+  )
+
+  const isRunning = phase.status === 'model-loading' || phase.status === 'embedding' || phase.status === 'umap-running'
+  const isDone = phase.status === 'done'
+
+  return (
+    <div className="flex flex-col h-screen bg-[var(--bg)] text-[var(--text)] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] shrink-0">
+        <h2 className="text-sm font-semibold m-0 grow">Manual Branching Projector</h2>
+        {isDone && (
+          <button
+            className="text-xs px-2 py-1 rounded border border-[var(--border)] opacity-60 hover:opacity-100 transition-opacity"
+            onClick={handleReset}
+          >
+            ← Edit input
+          </button>
+        )}
+      </div>
+
+      {!isDone ? (
+        /* Input panel */
+        <div className="flex flex-col gap-3 p-4 max-w-2xl w-full mx-auto mt-4">
+          <p className="text-xs opacity-60 m-0">
+            Each line = one embedding node. Use <code className="bg-[rgba(255,255,255,0.08)] px-1 rounded">- </code> to start a new branch; indent with spaces to continue it.
+          </p>
+          <textarea
+            className="w-full font-mono text-sm rounded border border-[var(--border)] bg-[rgba(255,255,255,0.04)] p-3 resize-y min-h-[220px] focus:outline-none focus:border-[var(--accent-border)]"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            spellCheck={false}
+            disabled={isRunning}
+          />
+
+          <div className="flex items-center gap-3">
+            <select
+              className="text-xs rounded border border-[var(--border)] bg-[rgba(255,255,255,0.06)] px-2 py-1 grow focus:outline-none"
+              value={selectedModel}
+              onChange={e => setSelectedModel(e.target.value as EmbeddingModelId)}
+              disabled={isRunning}
+            >
+              {EMBEDDING_MODELS.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+
+            {!isRunning ? (
+              <button
+                className="text-xs px-3 py-1.5 rounded border border-[var(--accent-border)] bg-[rgba(80,140,255,0.15)] hover:bg-[rgba(80,140,255,0.3)] transition-colors shrink-0"
+                onClick={handleEmbed}
+              >
+                Embed
+              </button>
+            ) : (
+              <button
+                className="text-xs px-3 py-1.5 rounded border border-[var(--border)] opacity-70 hover:opacity-100 transition-opacity shrink-0"
+                onClick={handleReset}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          {/* Progress */}
+          {phase.status === 'model-loading' && (
+            <p className="text-xs opacity-60 m-0">Loading model… {phase.progress}%</p>
+          )}
+          {phase.status === 'embedding' && (
+            <p className="text-xs opacity-60 m-0">Embedding {phase.loaded}/{phase.total}…</p>
+          )}
+          {phase.status === 'umap-running' && (
+            <p className="text-xs opacity-60 m-0">Running UMAP…</p>
+          )}
+          {phase.status === 'error' && (
+            <p className="text-xs text-red-400 m-0">Error: {phase.message}</p>
+          )}
+        </div>
+      ) : (
+        /* 3D scatter */
+        <div className="flex-1 min-h-0">
+          <ScatterPlot3D
+            points={phase.points}
+            labels={labels}
+            branchIds={branchIds ?? undefined}
+            highlightPosition={null}
+            onPointClick={() => {}}
+          />
+        </div>
+      )}
+    </div>
+  )
+}

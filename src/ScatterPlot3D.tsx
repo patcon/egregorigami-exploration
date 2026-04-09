@@ -3,6 +3,9 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 
+// Distinct hues per branch: blue, orange, green, purple, yellow, cyan, pink, teal
+const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
+
 interface Props {
   points: [number, number, number][]
   labels: string[]
@@ -10,6 +13,8 @@ interface Props {
   onPointClick: (index: number) => void
   initialCameraState?: CameraState
   onCameraChange?: (state: CameraState) => void
+  /** When provided, colors points by branch and draws separate lines per branch */
+  branchIds?: number[]
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -29,7 +34,7 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange }: Props) {
+export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, branchIds }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -100,7 +105,12 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
         positions[i * 3] = normalized[i][0]
         positions[i * 3 + 1] = normalized[i][1]
         positions[i * 3 + 2] = normalized[i][2]
-        const hue = (1 - i / (n - 1)) * 240 // blue→red
+        let hue: number
+        if (branchIds) {
+          hue = BRANCH_HUES[branchIds[i] % BRANCH_HUES.length]
+        } else {
+          hue = (1 - i / (n - 1)) * 240 // blue→red
+        }
         const color = new THREE.Color().setHSL(hue / 360, 1, 0.55)
         colors[i * 3] = color.r
         colors[i * 3 + 1] = color.g
@@ -114,13 +124,49 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const pointsMesh = new THREE.Points(geo, mat)
       scene.add(pointsMesh)
 
-      // Path line through points in transcript order
-      const lineGeo = new THREE.BufferGeometry()
-      lineGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
-      lineGeo.setAttribute('color', new THREE.BufferAttribute(colors.slice(), 3))
-      const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.35, transparent: true })
-      const lineMesh = new THREE.Line(lineGeo, lineMat)
-      scene.add(lineMesh)
+      if (branchIds) {
+        // Draw a separate line per branch
+        const numBranches = Math.max(...branchIds) + 1
+        for (let bid = 0; bid < numBranches; bid++) {
+          const indices: number[] = []
+          for (let i = 0; i < n; i++) if (branchIds[i] === bid) indices.push(i)
+          if (indices.length < 2) continue
+          const lPos = new Float32Array(indices.length * 3)
+          const lCol = new Float32Array(indices.length * 3)
+          for (let j = 0; j < indices.length; j++) {
+            const idx = indices[j]
+            lPos[j * 3] = normalized[idx][0]; lPos[j * 3 + 1] = normalized[idx][1]; lPos[j * 3 + 2] = normalized[idx][2]
+            lCol[j * 3] = colors[idx * 3]; lCol[j * 3 + 1] = colors[idx * 3 + 1]; lCol[j * 3 + 2] = colors[idx * 3 + 2]
+          }
+          const lg = new THREE.BufferGeometry()
+          lg.setAttribute('position', new THREE.BufferAttribute(lPos, 3))
+          lg.setAttribute('color', new THREE.BufferAttribute(lCol, 3))
+          scene.add(new THREE.Line(lg, new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.5, transparent: true })))
+        }
+        // Connector lines from each branch's first point → last root point
+        const lastRootIdx = branchIds.lastIndexOf(0)
+        if (lastRootIdx >= 0) {
+          for (let bid = 1; bid < numBranches; bid++) {
+            const firstIdx = branchIds.indexOf(bid)
+            if (firstIdx < 0) continue
+            const cPos = new Float32Array([
+              normalized[lastRootIdx][0], normalized[lastRootIdx][1], normalized[lastRootIdx][2],
+              normalized[firstIdx][0],    normalized[firstIdx][1],    normalized[firstIdx][2],
+            ])
+            const cg = new THREE.BufferGeometry()
+            cg.setAttribute('position', new THREE.BufferAttribute(cPos, 3))
+            scene.add(new THREE.Line(cg, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true })))
+          }
+        }
+      } else {
+        // Path line through points in transcript order
+        const lineGeo = new THREE.BufferGeometry()
+        lineGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
+        lineGeo.setAttribute('color', new THREE.BufferAttribute(colors.slice(), 3))
+        const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.35, transparent: true })
+        const lineMesh = new THREE.Line(lineGeo, lineMat)
+        scene.add(lineMesh)
+      }
 
       // Highlight mesh (sphere so it stays visible at any zoom level)
       const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
@@ -243,7 +289,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
 
     return () => cleanup?.()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points])
+  }, [points, branchIds])
 
   // Highlight updates — set target segment index; RAF lerps along the path each frame
   useEffect(() => {
