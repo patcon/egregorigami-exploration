@@ -79,6 +79,16 @@ export default function ManualEmbeddingProjector() {
     setSubmitted(null)
   }
 
+  const nonEmptyLines = inputText.split('\n').filter(l => l.trim())
+  const isMultiline = nonEmptyLines.length > 1
+
+  const handleExpand = () => {
+    if (isMultiline) return
+    const words = inputText.trim().split(/\s+/)
+    if (!words[0]) return
+    setInputText(words.map((_, i) => words.slice(0, i + 1).join(' ')).join('\n'))
+  }
+
   const branchIds = useMemo(
     () => submitted?.map(s => s.branchId) ?? null,
     [submitted]
@@ -113,13 +123,23 @@ export default function ManualEmbeddingProjector() {
           <p className="text-xs opacity-60 m-0">
             Each line = one embedding node. Use <code className="bg-[rgba(255,255,255,0.08)] px-1 rounded">- </code> to start a new branch; indent with spaces to continue it.
           </p>
-          <textarea
-            className="w-full font-mono text-sm rounded border border-[var(--border)] bg-[rgba(255,255,255,0.04)] p-3 resize-y min-h-[220px] focus:outline-none focus:border-[var(--accent-border)]"
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            spellCheck={false}
-            disabled={isRunning}
-          />
+          <div className="relative">
+            <textarea
+              className="w-full font-mono text-sm rounded border border-[var(--border)] bg-[rgba(255,255,255,0.04)] p-3 resize-y min-h-[220px] focus:outline-none focus:border-[var(--accent-border)]"
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              spellCheck={false}
+              disabled={isRunning}
+            />
+            <button
+              className="absolute bottom-2 right-2 text-[11px] px-2 py-[3px] rounded border transition-[background,color,opacity] duration-150 disabled:opacity-30 disabled:cursor-not-allowed border-[var(--border)] bg-black/40 text-white/60 hover:enabled:bg-black/70 hover:enabled:text-white"
+              onClick={handleExpand}
+              disabled={isMultiline || isRunning}
+              title={isMultiline ? 'Already multiline — clear to a single sentence first' : 'Expand sentence word-by-word'}
+            >
+              Expand ↓
+            </button>
+          </div>
 
           <div className="flex items-center gap-3">
             <select
