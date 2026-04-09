@@ -9,6 +9,7 @@ export interface SharePayload {
   rawText?: string
   points?: [number, number, number][]
   manualText?: string
+  autoEmbed?: boolean
 }
 
 export function encodeSharePayload(payload: SharePayload): string {

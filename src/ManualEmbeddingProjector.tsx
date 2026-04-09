@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import ScatterPlot3D from './ScatterPlot3D'
@@ -63,13 +63,15 @@ function parseInput(raw: string): ParsedSegment[] {
 }
 
 export default function ManualEmbeddingProjector() {
-  const [inputText, setInputText] = useState(() => readShareParam()?.manualText ?? EXAMPLE_INPUT)
+  const shareParam = readShareParam()
+  const [inputText, setInputText] = useState(() => shareParam?.manualText ?? EXAMPLE_INPUT)
   const [copyLabel, setCopyLabel] = useState<'Share' | 'Copied!'>('Share')
+  const [shareAutoEmbed, setShareAutoEmbed] = useState(false)
   const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(
     EMBEDDING_MODELS.find(m => m.default)!.id
   )
   const [submitted, setSubmitted] = useState<ParsedSegment[] | null>(null)
-  const [rendererType, setRendererType] = useState<RendererType>('original')
+  const [rendererType, setRendererType] = useState<RendererType>('glow')
   const cameraStateRef = useRef<CameraState | undefined>(undefined)
   const { phase, runEmbedding, cancelEmbedding, resetPhase } = useEmbeddingWorker()
 
@@ -81,13 +83,21 @@ export default function ManualEmbeddingProjector() {
     runEmbedding(segments.map(s => s.text), selectedModel)
   }
 
+  // Auto-embed on load when share URL includes autoEmbed flag
+  useEffect(() => {
+    if (shareParam?.autoEmbed && shareParam.manualText) {
+      handleEmbed()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleReset = () => {
     cancelEmbedding()
     setSubmitted(null)
   }
 
   const handleShare = () => {
-    const url = buildShareUrl({ windowSize: 0, overlapPct: 0, manualText: inputText }, '#manual')
+    const url = buildShareUrl({ windowSize: 0, overlapPct: 0, manualText: inputText, autoEmbed: shareAutoEmbed }, '#manual')
     navigator.clipboard.writeText(url).then(() => {
       setCopyLabel('Copied!')
       setTimeout(() => setCopyLabel('Share'), 2000)
@@ -122,6 +132,15 @@ export default function ManualEmbeddingProjector() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] shrink-0">
         <h2 className="text-sm font-semibold m-0 grow">Manual Branching Projector</h2>
+        <label className="flex items-center gap-1.5 text-xs opacity-60 hover:opacity-100 transition-opacity cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={shareAutoEmbed}
+            onChange={e => setShareAutoEmbed(e.target.checked)}
+            className="accent-[var(--accent-border)]"
+          />
+          auto-embed
+        </label>
         <button
           className="text-xs px-2 py-1 rounded border border-[var(--border)] opacity-60 hover:opacity-100 transition-opacity"
           onClick={handleShare}

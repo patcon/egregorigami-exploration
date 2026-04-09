@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Default renderer in `#manual` changed to Glow; default embedding model changed to MiniLM-L12 (balanced)
+- Share button in `#manual` gains an "auto-embed" checkbox — when checked, the shared URL triggers embedding automatically on load
+
 - Add Share button to `#manual` view — compresses textarea text with pako into a `?share=` query param and copies the URL to clipboard; loading a share URL restores the text automatically
 
 - Preserve camera position when switching renderers in `#manual` view — camera state is stored in a ref and passed as `initialCameraState` to each renderer on mount
