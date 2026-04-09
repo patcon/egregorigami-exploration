@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Share button to `#manual` view — compresses textarea text with pako into a `?share=` query param and copies the URL to clipboard; loading a share URL restores the text automatically
+
 - Preserve camera position when switching renderers in `#manual` view — camera state is stored in a ref and passed as `initialCameraState` to each renderer on mount
 
 - Make Glow renderer adaptive to canvas size and zoom: particle sizes scale with canvas height (`uScale` uniform), fill density increased (12→20 particles per segment), and bloom strength/radius update each frame based on camera distance so the glow stays visible when zoomed out or viewing full-screen

@@ -5,6 +5,7 @@ import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
 import ScatterPlot3DV6 from './ScatterPlot3DV6'
 import type { CameraState } from './scatterTypes'
+import { buildShareUrl, readShareParam } from './shareUrl'
 
 type RendererType = 'original' | 'cividis-tube' | 'glow'
 
@@ -62,7 +63,8 @@ function parseInput(raw: string): ParsedSegment[] {
 }
 
 export default function ManualEmbeddingProjector() {
-  const [inputText, setInputText] = useState(EXAMPLE_INPUT)
+  const [inputText, setInputText] = useState(() => readShareParam()?.manualText ?? EXAMPLE_INPUT)
+  const [copyLabel, setCopyLabel] = useState<'Share' | 'Copied!'>('Share')
   const [selectedModel, setSelectedModel] = useState<EmbeddingModelId>(
     EMBEDDING_MODELS.find(m => m.default)!.id
   )
@@ -82,6 +84,14 @@ export default function ManualEmbeddingProjector() {
   const handleReset = () => {
     cancelEmbedding()
     setSubmitted(null)
+  }
+
+  const handleShare = () => {
+    const url = buildShareUrl({ windowSize: 0, overlapPct: 0, manualText: inputText }, '#manual')
+    navigator.clipboard.writeText(url).then(() => {
+      setCopyLabel('Copied!')
+      setTimeout(() => setCopyLabel('Share'), 2000)
+    })
   }
 
   const nonEmptyLines = inputText.split('\n').filter(l => l.trim())
@@ -112,6 +122,12 @@ export default function ManualEmbeddingProjector() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] shrink-0">
         <h2 className="text-sm font-semibold m-0 grow">Manual Branching Projector</h2>
+        <button
+          className="text-xs px-2 py-1 rounded border border-[var(--border)] opacity-60 hover:opacity-100 transition-opacity"
+          onClick={handleShare}
+        >
+          {copyLabel}
+        </button>
         {isDone && (
           <button
             className="text-xs px-2 py-1 rounded border border-[var(--border)] opacity-60 hover:opacity-100 transition-opacity"
