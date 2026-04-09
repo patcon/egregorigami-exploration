@@ -14,19 +14,24 @@ const RENDERER_LABELS: Record<RendererType, string> = {
   'glow':        'Glow',
 }
 
-const EXAMPLE_INPUT = `Why
-Why does
-Why does a moon
-Why does a moon rock
-Why does a moon rock taste
-Why does a moon rock taste better
-Why does a moon rock taste better than
-Why does a moon rock taste better than an Earth
-Why does a moon rock taste better than an Earth rock?
-Why does a moon rock taste better than an Earth rock? It's
-Why does a moon rock taste better than an Earth rock? It's a little
-- Why does a moon rock taste better than an Earth rock? It's a little meteor. [space]
-- Why does a moon rock taste better than an Earth rock? It's a little meatier. [taste]`
+const EXAMPLE_INPUT = `What's
+What's the
+What's the best
+What's the best thing
+What's the best thing about
+- What's the best thing about Switzerland [country]?
+  What's the best thing about Switzerland [country]? The
+  What's the best thing about Switzerland [country]? The flag
+  What's the best thing about Switzerland [country]? The flag is
+  What's the best thing about Switzerland [country]? The flag is a
+  What's the best thing about Switzerland [country]? The flag is a big
+  What's the best thing about Switzerland [country]? The flag is a big plus.
+- What's the best thing about Switzerland [country with a cross on its flag]?
+  What's the best thing about Switzerland [country with a cross on its flag]? The flag
+  What's the best thing about Switzerland [country with a cross on its flag]? The flag is
+  What's the best thing about Switzerland [country with a cross on its flag]? The flag is a
+  What's the best thing about Switzerland [country with a cross on its flag]? The flag is a big
+  What's the best thing about Switzerland [country with a cross on its flag]? The flag is a big plus.`
 
 interface ParsedSegment {
   text: string
