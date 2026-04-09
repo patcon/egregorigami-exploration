@@ -107,7 +107,10 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
         positions[i * 3 + 2] = normalized[i][2]
         let hue: number
         if (branchIds) {
-          hue = BRANCH_HUES[branchIds[i] % BRANCH_HUES.length]
+          // branchId 0 and 1 share the same hue (first branch continues the parent color);
+          // branchId 2+ each get the next distinct hue.
+          const hueIndex = branchIds[i] <= 1 ? 0 : branchIds[i] - 1
+          hue = BRANCH_HUES[hueIndex % BRANCH_HUES.length]
         } else {
           hue = (1 - i / (n - 1)) * 240 // blue→red
         }
