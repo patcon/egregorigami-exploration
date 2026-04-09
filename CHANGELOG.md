@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add `#manual` view: type lines of text into a textarea — each line becomes one embedding node; prefix with `- ` to start a new branch, indent to continue it; branches appear as distinct colored paths in the 3D scatter plot with connector lines back to the last root node
+- Add `#manual` view: type lines of text into a textarea — each line becomes one embedding node; prefix with `- ` to start a new branch, indent to continue it; branches appear as distinct colored paths in the 3D scatter plot, each visually continuing from the branching point; renderer toggle (Points / Tube / Glow) matches the styles available in other embedding views
 
 - v7 desktop layout: at 1024px+ width, the layout splits into a top row (video | 3D plot) and a bottom panel (Raw/Windowed/Segments transcript tabs); landscape mobile (640px–1023px) keeps the existing two-column layout with all tabs on the right
 

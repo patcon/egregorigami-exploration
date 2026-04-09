@@ -125,11 +125,27 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       scene.add(pointsMesh)
 
       if (branchIds) {
-        // Draw a separate line per branch
+        // Draw a separate line per branch.
+        // For non-root branches, prepend the last root node before the branch so
+        // the line visually continues from the branching point.
         const numBranches = Math.max(...branchIds) + 1
         for (let bid = 0; bid < numBranches; bid++) {
-          const indices: number[] = []
-          for (let i = 0; i < n; i++) if (branchIds[i] === bid) indices.push(i)
+          const branchOnly: number[] = []
+          for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
+
+          let indices: number[]
+          if (bid === 0) {
+            indices = branchOnly
+          } else {
+            // Find the last root node that appears before this branch's first node
+            const firstBranchIdx = branchOnly[0]
+            let parentIdx = -1
+            for (let i = firstBranchIdx - 1; i >= 0; i--) {
+              if (branchIds[i] === 0) { parentIdx = i; break }
+            }
+            indices = parentIdx >= 0 ? [parentIdx, ...branchOnly] : branchOnly
+          }
+
           if (indices.length < 2) continue
           const lPos = new Float32Array(indices.length * 3)
           const lCol = new Float32Array(indices.length * 3)
@@ -142,21 +158,6 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
           lg.setAttribute('position', new THREE.BufferAttribute(lPos, 3))
           lg.setAttribute('color', new THREE.BufferAttribute(lCol, 3))
           scene.add(new THREE.Line(lg, new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.5, transparent: true })))
-        }
-        // Connector lines from each branch's first point → last root point
-        const lastRootIdx = branchIds.lastIndexOf(0)
-        if (lastRootIdx >= 0) {
-          for (let bid = 1; bid < numBranches; bid++) {
-            const firstIdx = branchIds.indexOf(bid)
-            if (firstIdx < 0) continue
-            const cPos = new Float32Array([
-              normalized[lastRootIdx][0], normalized[lastRootIdx][1], normalized[lastRootIdx][2],
-              normalized[firstIdx][0],    normalized[firstIdx][1],    normalized[firstIdx][2],
-            ])
-            const cg = new THREE.BufferGeometry()
-            cg.setAttribute('position', new THREE.BufferAttribute(cPos, 3))
-            scene.add(new THREE.Line(cg, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true })))
-          }
         }
       } else {
         // Path line through points in transcript order

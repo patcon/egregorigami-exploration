@@ -2,6 +2,16 @@ import { useState, useMemo } from 'react'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import ScatterPlot3D from './ScatterPlot3D'
+import ScatterPlot3DV5 from './ScatterPlot3DV5'
+import ScatterPlot3DV6 from './ScatterPlot3DV6'
+
+type RendererType = 'original' | 'cividis-tube' | 'glow'
+
+const RENDERER_LABELS: Record<RendererType, string> = {
+  'original':    'Points',
+  'cividis-tube': 'Tube',
+  'glow':        'Glow',
+}
 
 const EXAMPLE_INPUT = `Why
 Why does
@@ -52,6 +62,7 @@ export default function ManualEmbeddingProjector() {
     EMBEDDING_MODELS.find(m => m.default)!.id
   )
   const [submitted, setSubmitted] = useState<ParsedSegment[] | null>(null)
+  const [rendererType, setRendererType] = useState<RendererType>('original')
   const { phase, runEmbedding, cancelEmbedding, resetPhase } = useEmbeddingWorker()
 
   const handleEmbed = () => {
@@ -154,14 +165,50 @@ export default function ManualEmbeddingProjector() {
         </div>
       ) : (
         /* 3D scatter */
-        <div className="flex-1 min-h-0">
-          <ScatterPlot3D
-            points={phase.points}
-            labels={labels}
-            branchIds={branchIds ?? undefined}
-            highlightPosition={null}
-            onPointClick={() => {}}
-          />
+        <div className="flex-1 min-h-0 relative">
+          {rendererType === 'original' && (
+            <ScatterPlot3D
+              points={phase.points}
+              labels={labels}
+              branchIds={branchIds ?? undefined}
+              highlightPosition={null}
+              onPointClick={() => {}}
+            />
+          )}
+          {rendererType === 'cividis-tube' && (
+            <ScatterPlot3DV5
+              points={phase.points}
+              labels={labels}
+              highlightPosition={null}
+              onPointClick={() => {}}
+            />
+          )}
+          {rendererType === 'glow' && (
+            <ScatterPlot3DV6
+              points={phase.points}
+              labels={labels}
+              highlightPosition={null}
+              onPointClick={() => {}}
+            />
+          )}
+
+          {/* Renderer toggle */}
+          <div className="absolute top-2 right-2 flex gap-1 z-10 pointer-events-auto">
+            {(Object.keys(RENDERER_LABELS) as RendererType[]).map(r => (
+              <button
+                key={r}
+                className={[
+                  'text-[11px] py-[3px] px-2 rounded border cursor-pointer transition-[background,color,border-color] duration-150',
+                  r === rendererType
+                    ? 'bg-[rgba(40,100,200,0.35)] border-[rgba(80,140,255,0.6)] text-white'
+                    : 'bg-black/55 text-white/65 border-white/[0.18] hover:bg-black/75 hover:text-white',
+                ].join(' ')}
+                onClick={() => setRendererType(r)}
+              >
+                {RENDERER_LABELS[r]}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
