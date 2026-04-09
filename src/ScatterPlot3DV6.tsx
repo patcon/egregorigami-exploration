@@ -58,6 +58,7 @@ function glowPalette(t: number): THREE.Color {
 const vertexShader = /* glsl */`
 attribute vec3 aColor;
 attribute float aSeed;
+uniform float uScale;
 varying vec3 vColor;
 varying float vSeed;
 
@@ -65,8 +66,8 @@ void main() {
   vColor = aColor;
   vSeed = aSeed;
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  // Size scales with camera distance; random seed adds per-point variation
-  gl_PointSize = (1.5 + 2.5 / -mvPosition.z) * (0.6 + 0.8 * aSeed);
+  // Size scales with camera distance, canvas size (uScale), and random seed variation
+  gl_PointSize = (2.5 + 5.0 / -mvPosition.z) * (0.6 + 0.8 * aSeed) * uScale;
   gl_Position = projectionMatrix * mvPosition;
 }
 `
@@ -75,6 +76,7 @@ void main() {
 const fillVertexShader = /* glsl */`
 attribute vec3 aColor;
 attribute float aSeed;
+uniform float uScale;
 varying vec3 vColor;
 varying float vSeed;
 
@@ -82,7 +84,7 @@ void main() {
   vColor = aColor;
   vSeed = aSeed;
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = (0.7 + 1.2 / -mvPosition.z) * (0.4 + 0.6 * aSeed);
+  gl_PointSize = (1.2 + 2.5 / -mvPosition.z) * (0.4 + 0.6 * aSeed) * uScale;
   gl_Position = projectionMatrix * mvPosition;
 }
 `
@@ -104,7 +106,7 @@ void main() {
 }
 `
 
-export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 12, fillJitter = 0.03, fillBrightness = 1.8, initialCameraState, onCameraChange, branchIds }: Props) {
+export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 20, fillJitter = 0.03, fillBrightness = 1.8, initialCameraState, onCameraChange, branchIds }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -197,7 +199,8 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       geo.setAttribute('aColor', new THREE.BufferAttribute(aColors, 3))
       geo.setAttribute('aSeed', new THREE.BufferAttribute(aSeeds, 1))
 
-      const uniforms = { uTime: { value: 0 }, uBrightness: { value: 1.0 } }
+      const canvasScale = Math.max(1.0, h / 500.0)
+      const uniforms = { uTime: { value: 0 }, uBrightness: { value: 1.0 }, uScale: { value: canvasScale } }
       const mat = new THREE.ShaderMaterial({
         uniforms,
         vertexShader,
@@ -260,9 +263,9 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       fillGeo.setAttribute('position', new THREE.BufferAttribute(fillPositions, 3))
       fillGeo.setAttribute('aColor',   new THREE.BufferAttribute(fillColors, 3))
       fillGeo.setAttribute('aSeed',    new THREE.BufferAttribute(fillSeeds, 1))
-      // Share uTime with node material; use fillBrightness for fill-specific brightness
+      // Share uTime and uScale with node material; use fillBrightness for fill-specific brightness
       const fillMat = new THREE.ShaderMaterial({
-        uniforms: { uTime: uniforms.uTime, uBrightness: { value: fillBrightness } },
+        uniforms: { uTime: uniforms.uTime, uBrightness: { value: fillBrightness }, uScale: uniforms.uScale },
         vertexShader: fillVertexShader,
         fragmentShader,
         transparent: true,
@@ -278,10 +281,10 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       highlightMesh.visible = false
       scene.add(highlightMesh)
 
-      // Post-processing: bloom
+      // Post-processing: bloom — strength and radius adapt to camera distance in animate loop
       const composer = new EffectComposer(renderer)
       composer.addPass(new RenderPass(scene, camera))
-      const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 1.2, 0.5, 0.15)
+      const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 1.5, 0.6, 0.10)
       composer.addPass(bloomPass)
       composer.addPass(new OutputPass())
 
@@ -293,6 +296,11 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       const animate = () => {
         animId = requestAnimationFrame(animate)
         uniforms.uTime.value += 0.016
+        // Adapt bloom strength to camera distance — farther away = weaker glow per pixel,
+        // so compensate by boosting strength as zoom increases.
+        const camDist = camera.position.distanceTo(controls.target)
+        bloomPass.strength = Math.max(1.0, 1.5 * (camDist / 4.0))
+        bloomPass.radius = Math.min(1.0, 0.5 + 0.08 * (camDist / 4.0))
         // Lerp the segment index so the sphere travels along the piecewise-linear path.
         // On the first visible frame, snap to target and seed prevFollowTargetRef.
         if (sphereVisibleRef.current) {
@@ -371,6 +379,8 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         composer.setSize(nw, nh)
         camera.aspect = nw / nh
         camera.updateProjectionMatrix()
+        // Scale particle sizes with canvas height so they stay visually consistent
+        uniforms.uScale.value = Math.max(1.0, nh / 500.0)
       })
       ro.observe(mount)
 

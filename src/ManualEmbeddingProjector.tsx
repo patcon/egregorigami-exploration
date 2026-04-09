@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
 import { useEmbeddingWorker } from './useEmbeddingWorker'
 import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
 import ScatterPlot3DV6 from './ScatterPlot3DV6'
+import type { CameraState } from './scatterTypes'
 
 type RendererType = 'original' | 'cividis-tube' | 'glow'
 
@@ -24,9 +25,8 @@ Why does a moon rock taste better than an Earth
 Why does a moon rock taste better than an Earth rock?
 Why does a moon rock taste better than an Earth rock? It's
 Why does a moon rock taste better than an Earth rock? It's a little
-- Why does a moon rock taste better than an Earth rock? It's a little meteor.
-  Why does a moon rock taste better than an Earth rock? It's a little meteor. (punchline)
-- Why does a moon rock taste better than an Earth rock? It's a little meatier.`
+- Why does a moon rock taste better than an Earth rock? It's a little meteor. [space]
+- Why does a moon rock taste better than an Earth rock? It's a little meatier. [taste]`
 
 interface ParsedSegment {
   text: string
@@ -63,6 +63,7 @@ export default function ManualEmbeddingProjector() {
   )
   const [submitted, setSubmitted] = useState<ParsedSegment[] | null>(null)
   const [rendererType, setRendererType] = useState<RendererType>('original')
+  const cameraStateRef = useRef<CameraState | undefined>(undefined)
   const { phase, runEmbedding, cancelEmbedding, resetPhase } = useEmbeddingWorker()
 
   const handleEmbed = () => {
@@ -173,6 +174,8 @@ export default function ManualEmbeddingProjector() {
               branchIds={branchIds ?? undefined}
               highlightPosition={null}
               onPointClick={() => {}}
+              initialCameraState={cameraStateRef.current}
+              onCameraChange={s => { cameraStateRef.current = s }}
             />
           )}
           {rendererType === 'cividis-tube' && (
@@ -182,6 +185,8 @@ export default function ManualEmbeddingProjector() {
               branchIds={branchIds ?? undefined}
               highlightPosition={null}
               onPointClick={() => {}}
+              initialCameraState={cameraStateRef.current}
+              onCameraChange={s => { cameraStateRef.current = s }}
             />
           )}
           {rendererType === 'glow' && (
@@ -191,6 +196,8 @@ export default function ManualEmbeddingProjector() {
               branchIds={branchIds ?? undefined}
               highlightPosition={null}
               onPointClick={() => {}}
+              initialCameraState={cameraStateRef.current}
+              onCameraChange={s => { cameraStateRef.current = s }}
             />
           )}
 
