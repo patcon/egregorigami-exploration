@@ -23,7 +23,6 @@ self.onmessage = async (e: MessageEvent<TranscriptionCommand>) => {
       const pipe = pipelineCache.get(cmd.modelId)!
       self.postMessage({ type: 'progress:transcribing' } satisfies TranscriptionEvent)
       const result = await pipe(cmd.audioData, {
-        language: 'english',
         chunk_length_s: 30,
         stride_length_s: 5,
       })
