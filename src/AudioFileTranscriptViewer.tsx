@@ -88,6 +88,9 @@ export default function AudioFileTranscriptViewer() {
         } else if (msg.type === 'progress:transcribing') {
           setPhase('transcribing')
         } else if (msg.type === 'done') {
+          // Clear localStorage so TranscriptViewer's initialText takes priority over stale cache
+          localStorage.removeItem('transcript-raw-text')
+          localStorage.removeItem('transcript-text')
           setTranscript(msg.text.trim())
           setPhase('ready')
         } else if (msg.type === 'error') {

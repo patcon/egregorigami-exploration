@@ -26,7 +26,15 @@ self.onmessage = async (e: MessageEvent<TranscriptionCommand>) => {
         chunk_length_s: 30,
         stride_length_s: 5,
       })
-      const text = typeof result === 'string' ? result : (result as { text: string }).text
+      // transformers.js v3 may return a single object or an array of chunks
+      let text: string
+      if (typeof result === 'string') {
+        text = result
+      } else if (Array.isArray(result)) {
+        text = (result as Array<{ text: string }>).map(r => r.text).join(' ')
+      } else {
+        text = (result as { text: string }).text
+      }
       self.postMessage({ type: 'done', text } satisfies TranscriptionEvent)
     } catch (err) {
       self.postMessage({ type: 'error', message: String(err) } satisfies TranscriptionEvent)
