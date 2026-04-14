@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import TranscriptionWorker from './transcriptionWorker?worker'
-import type { TranscriptionEvent } from './transcriptionWorker.types'
+import type { TranscriptionChunk, TranscriptionEvent } from './transcriptionWorker.types'
 
 const MODELS = [
   { id: 'Xenova/whisper-tiny.en', label: 'tiny.en (~150MB)' },
@@ -11,12 +11,51 @@ const MODELS = [
 
 type Phase = 'idle' | 'loading-audio' | 'model-loading' | 'transcribing' | 'ready' | 'error'
 
+function formatVttTime(secs: number): string {
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = secs % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s.toFixed(3).padStart(6, '0')}`
+}
+
+function chunksToVtt(chunks: TranscriptionChunk[], totalDuration: number): string {
+  const lines = ['WEBVTT', '']
+  chunks.forEach((chunk, i) => {
+    const start = chunk.timestamp[0]
+    const end = chunk.timestamp[1] ?? chunks[i + 1]?.timestamp[0] ?? totalDuration
+    lines.push(`${formatVttTime(start)} --> ${formatVttTime(end)}`)
+    lines.push(chunk.text.trim())
+    lines.push('')
+  })
+  return lines.join('\n')
+}
+
+/** For each word in the full transcript, compute an approximate start time
+ *  by linearly interpolating within each chunk. */
+function buildWordTimestamps(transcript: string, chunks: TranscriptionChunk[]): number[] {
+  const words = transcript.trim().split(/\s+/)
+  const timestamps = new Array<number>(words.length).fill(0)
+  let wordIdx = 0
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci]
+    const chunkWords = chunk.text.trim().split(/\s+/).filter(Boolean)
+    if (chunkWords.length === 0) continue
+    const start = chunk.timestamp[0]
+    const end = chunk.timestamp[1] ?? (ci + 1 < chunks.length ? chunks[ci + 1].timestamp[0] : start + 5)
+    for (let wi = 0; wi < chunkWords.length && wordIdx < words.length; wi++) {
+      timestamps[wordIdx++] = start + (wi / Math.max(1, chunkWords.length - 1)) * (end - start)
+    }
+  }
+  return timestamps
+}
+
 export default function AudioFileTranscriptViewer() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [modelId, setModelId] = useState(MODELS[0].id)
   const [modelProgress, setModelProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
   const [transcript, setTranscript] = useState('')
+  const [vttText, setVttText] = useState('')
   const [audioDuration, setAudioDuration] = useState('')
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [externalPosition, setExternalPosition] = useState<number | undefined>(undefined)
@@ -27,8 +66,8 @@ export default function AudioFileTranscriptViewer() {
   const workerRef = useRef<Worker | null>(null)
   const rafRef = useRef<number | null>(null)
   const prevUrlRef = useRef<string | null>(null)
+  const wordTimestampsRef = useRef<number[]>([])
 
-  // Cleanup object URL on unmount or when it changes
   useEffect(() => {
     return () => {
       if (prevUrlRef.current) URL.revokeObjectURL(prevUrlRef.current)
@@ -41,7 +80,6 @@ export default function AudioFileTranscriptViewer() {
     if (!file) return
     e.target.value = ''
 
-    // Revoke previous object URL
     if (prevUrlRef.current) {
       URL.revokeObjectURL(prevUrlRef.current)
       prevUrlRef.current = null
@@ -53,17 +91,17 @@ export default function AudioFileTranscriptViewer() {
 
     setPhase('loading-audio')
     setTranscript('')
+    setVttText('')
+    wordTimestampsRef.current = []
     setExternalPosition(undefined)
     setExternalPlaying(undefined)
 
     try {
-      // Decode audio
       const arrayBuffer = await file.arrayBuffer()
       const audioCtx = new AudioContext()
       const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
       await audioCtx.close()
 
-      // Resample to 16kHz mono for Whisper
       const targetSampleRate = 16000
       const length = Math.ceil(audioBuffer.duration * targetSampleRate)
       const offlineCtx = new OfflineAudioContext(1, length, targetSampleRate)
@@ -74,20 +112,12 @@ export default function AudioFileTranscriptViewer() {
       const resampled = await offlineCtx.startRendering()
       const float32 = resampled.getChannelData(0)
 
-      // Diagnostics: check what audio data we're sending to Whisper
-      const rmsFirst = Math.sqrt(float32.slice(0, 16000).reduce((s, v) => s + v * v, 0) / 16000)
-      const rmsLast = Math.sqrt(float32.slice(-16000).reduce((s, v) => s + v * v, 0) / 16000)
-      console.log('[audio] decoded duration:', audioBuffer.duration.toFixed(2), 's, channels:', audioBuffer.numberOfChannels)
-      console.log('[audio] resampled samples:', float32.length, '(expected ~', Math.round(audioBuffer.duration * 16000), ')')
-      console.log('[audio] RMS first 1s:', rmsFirst.toFixed(4), '| RMS last 1s:', rmsLast.toFixed(4))
-
-      // Create playback URL
       const url = URL.createObjectURL(file)
       prevUrlRef.current = url
       setAudioUrl(url)
-      setAudioDuration(String(Math.round(audioBuffer.duration)))
+      const durationSecs = audioBuffer.duration
+      setAudioDuration(String(Math.round(durationSecs)))
 
-      // Start worker
       if (workerRef.current) workerRef.current.terminate()
       const worker = new TranscriptionWorker()
       workerRef.current = worker
@@ -100,10 +130,20 @@ export default function AudioFileTranscriptViewer() {
         } else if (msg.type === 'progress:transcribing') {
           setPhase('transcribing')
         } else if (msg.type === 'done') {
-          // Clear localStorage so TranscriptViewer's initialText takes priority over stale cache
           localStorage.removeItem('transcript-raw-text')
           localStorage.removeItem('transcript-text')
-          setTranscript(msg.text.trim())
+          const text = msg.text.trim()
+          const chunks = msg.chunks
+          if (chunks.length > 0) {
+            wordTimestampsRef.current = buildWordTimestamps(text, chunks)
+            setVttText(chunksToVtt(chunks, durationSecs))
+          } else {
+            // No chunk timestamps available — synthesize evenly-spaced word timestamps
+            const words = text.split(/\s+/)
+            wordTimestampsRef.current = words.map((_, i) => (i / Math.max(1, words.length - 1)) * durationSecs)
+            setVttText('')
+          }
+          setTranscript(text)
           setPhase('ready')
         } else if (msg.type === 'error') {
           setErrorMsg(msg.message)
@@ -117,13 +157,28 @@ export default function AudioFileTranscriptViewer() {
       setErrorMsg(String(err))
       setPhase('error')
     }
-  }, [])
+  }, [modelId])
 
-  // Drive externalPosition via rAF while audio is playing
+  // Drive externalPosition via rAF using word-level timestamps when available
   const syncPosition = useCallback(() => {
     const audio = audioRef.current
     if (!audio || audio.paused || !isFinite(audio.duration) || audio.duration === 0) return
-    setExternalPosition(audio.currentTime / audio.duration)
+
+    const wts = wordTimestampsRef.current
+    let pos: number
+    if (wts.length > 1) {
+      const t = audio.currentTime
+      let lo = 0
+      for (let i = 1; i < wts.length; i++) {
+        if (wts[i] <= t) lo = i
+        else break
+      }
+      pos = lo / (wts.length - 1)
+    } else {
+      pos = audio.currentTime / audio.duration
+    }
+
+    setExternalPosition(pos)
     rafRef.current = requestAnimationFrame(syncPosition)
   }, [])
 
@@ -140,7 +195,18 @@ export default function AudioFileTranscriptViewer() {
     }
     const audio = audioRef.current
     if (audio && isFinite(audio.duration) && audio.duration > 0) {
-      setExternalPosition(audio.currentTime / audio.duration)
+      const wts = wordTimestampsRef.current
+      if (wts.length > 1) {
+        const t = audio.currentTime
+        let lo = 0
+        for (let i = 1; i < wts.length; i++) {
+          if (wts[i] <= t) lo = i
+          else break
+        }
+        setExternalPosition(lo / (wts.length - 1))
+      } else {
+        setExternalPosition(audio.currentTime / audio.duration)
+      }
     }
   }, [])
 
@@ -153,29 +219,30 @@ export default function AudioFileTranscriptViewer() {
     setExternalPosition(1)
   }, [])
 
-  // TranscriptViewer scrub bar → seek audio
   const handleScrub = useCallback((pos: number) => {
     const audio = audioRef.current
     if (audio && isFinite(audio.duration)) {
-      audio.currentTime = pos * audio.duration
+      // Map word position back to a timestamp for seeking
+      const wts = wordTimestampsRef.current
+      if (wts.length > 1) {
+        const wordIdx = Math.round(pos * (wts.length - 1))
+        audio.currentTime = wts[Math.min(wordIdx, wts.length - 1)]
+      } else {
+        audio.currentTime = pos * audio.duration
+      }
     }
     setExternalPosition(pos)
   }, [])
 
-  // TranscriptViewer play/pause button → control audio
   const handlePlayingChange = useCallback((playing: boolean) => {
     const audio = audioRef.current
     if (!audio) return
-    if (playing) {
-      audio.play().catch(() => {})
-    } else {
-      audio.pause()
-    }
+    if (playing) audio.play().catch(() => {})
+    else audio.pause()
   }, [])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
-      {/* Toolbar */}
       <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem', background: '#111', flexShrink: 0, flexWrap: 'wrap' }}>
         <select
           value={modelId}
@@ -193,18 +260,10 @@ export default function AudioFileTranscriptViewer() {
         </button>
         <input ref={fileInputRef} type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleFileChange} />
 
-        {phase === 'loading-audio' && (
-          <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Decoding audio…</span>
-        )}
-        {phase === 'model-loading' && (
-          <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Downloading Whisper model… {modelProgress}%</span>
-        )}
-        {phase === 'transcribing' && (
-          <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Transcribing…</span>
-        )}
-        {phase === 'error' && (
-          <span style={{ color: '#e74c3c', fontSize: '0.85rem' }}>Error: {errorMsg}</span>
-        )}
+        {phase === 'loading-audio' && <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Decoding audio…</span>}
+        {phase === 'model-loading' && <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Downloading Whisper model… {modelProgress}%</span>}
+        {phase === 'transcribing' && <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Transcribing…</span>}
+        {phase === 'error' && <span style={{ color: '#e74c3c', fontSize: '0.85rem' }}>Error: {errorMsg}</span>}
         {phase === 'ready' && audioUrl && (
           <audio
             ref={audioRef}
@@ -218,12 +277,12 @@ export default function AudioFileTranscriptViewer() {
         )}
       </div>
 
-      {/* Transcript viewer */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {phase === 'ready' ? (
           <TranscriptViewer
             key={transcript}
             initialText={transcript}
+            initialRawText={vttText || undefined}
             initialDuration={audioDuration}
             externalPosition={externalPosition}
             externalPlaying={externalPlaying}

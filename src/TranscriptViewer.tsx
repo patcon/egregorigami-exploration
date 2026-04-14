@@ -13,6 +13,7 @@ function parseTimecode(s: string): number {
 
 interface TranscriptViewerProps {
   initialText?: string
+  initialRawText?: string
   initialDuration?: string
   onWindowChange?: (params: { windowSize: number; overlapPct: number; text: string }) => void
   onParamsBlur?: () => void
@@ -40,9 +41,9 @@ interface TranscriptViewerProps {
   extraTabContent?: React.ReactNode
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialRawText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
   const isCollapsed = collapsible && open === false
-  const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
+  const [rawText, setRawText] = useState(() => initialRawText ?? localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
   const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
