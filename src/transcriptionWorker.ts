@@ -23,8 +23,9 @@ self.onmessage = async (e: MessageEvent<TranscriptionCommand>) => {
       const pipe = pipelineCache.get(cmd.modelId)!
       self.postMessage({ type: 'progress:transcribing' } satisfies TranscriptionEvent)
       const result = await pipe(cmd.audioData, {
-        chunk_length_s: 30,
-        stride_length_s: 5,
+        chunk_length_s: 20,
+        stride_length_s: 3,
+        sampling_rate: 16000,
       })
       // Log raw result shape to help debug missing text
       console.log('[transcriptionWorker] result type:', typeof result, Array.isArray(result) ? 'array' : '')

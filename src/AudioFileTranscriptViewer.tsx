@@ -74,6 +74,13 @@ export default function AudioFileTranscriptViewer() {
       const resampled = await offlineCtx.startRendering()
       const float32 = resampled.getChannelData(0)
 
+      // Diagnostics: check what audio data we're sending to Whisper
+      const rmsFirst = Math.sqrt(float32.slice(0, 16000).reduce((s, v) => s + v * v, 0) / 16000)
+      const rmsLast = Math.sqrt(float32.slice(-16000).reduce((s, v) => s + v * v, 0) / 16000)
+      console.log('[audio] decoded duration:', audioBuffer.duration.toFixed(2), 's, channels:', audioBuffer.numberOfChannels)
+      console.log('[audio] resampled samples:', float32.length, '(expected ~', Math.round(audioBuffer.duration * 16000), ')')
+      console.log('[audio] RMS first 1s:', rmsFirst.toFixed(4), '| RMS last 1s:', rmsLast.toFixed(4))
+
       // Create playback URL
       const url = URL.createObjectURL(file)
       prevUrlRef.current = url
