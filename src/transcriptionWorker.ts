@@ -26,6 +26,10 @@ self.onmessage = async (e: MessageEvent<TranscriptionCommand>) => {
         chunk_length_s: 30,
         stride_length_s: 5,
       })
+      // Log raw result shape to help debug missing text
+      console.log('[transcriptionWorker] result type:', typeof result, Array.isArray(result) ? 'array' : '')
+      console.log('[transcriptionWorker] result:', JSON.stringify(result).slice(0, 500))
+
       // transformers.js v3 may return a single object or an array of chunks
       let text: string
       if (typeof result === 'string') {
@@ -35,6 +39,7 @@ self.onmessage = async (e: MessageEvent<TranscriptionCommand>) => {
       } else {
         text = (result as { text: string }).text
       }
+      console.log('[transcriptionWorker] extracted text length:', text?.length, 'preview:', text?.slice(0, 100))
       self.postMessage({ type: 'done', text } satisfies TranscriptionEvent)
     } catch (err) {
       self.postMessage({ type: 'error', message: String(err) } satisfies TranscriptionEvent)

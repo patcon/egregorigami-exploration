@@ -3,12 +3,17 @@ import TranscriptViewer from './TranscriptViewer'
 import TranscriptionWorker from './transcriptionWorker?worker'
 import type { TranscriptionEvent } from './transcriptionWorker.types'
 
-const MODEL_ID = 'Xenova/whisper-tiny.en'
+const MODELS = [
+  { id: 'Xenova/whisper-tiny.en', label: 'tiny.en (~150MB)' },
+  { id: 'Xenova/whisper-base.en', label: 'base.en (~290MB)' },
+  { id: 'Xenova/whisper-small.en', label: 'small.en (~970MB)' },
+]
 
 type Phase = 'idle' | 'loading-audio' | 'model-loading' | 'transcribing' | 'ready' | 'error'
 
 export default function AudioFileTranscriptViewer() {
   const [phase, setPhase] = useState<Phase>('idle')
+  const [modelId, setModelId] = useState(MODELS[0].id)
   const [modelProgress, setModelProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
   const [transcript, setTranscript] = useState('')
@@ -99,7 +104,7 @@ export default function AudioFileTranscriptViewer() {
         }
       }
 
-      worker.postMessage({ type: 'transcribe', audioData: float32, modelId: MODEL_ID }, [float32.buffer])
+      worker.postMessage({ type: 'transcribe', audioData: float32, modelId }, [float32.buffer])
       setPhase('model-loading')
     } catch (err) {
       setErrorMsg(String(err))
@@ -165,6 +170,14 @@ export default function AudioFileTranscriptViewer() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}>
       {/* Toolbar */}
       <div style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem', background: '#111', flexShrink: 0, flexWrap: 'wrap' }}>
+        <select
+          value={modelId}
+          onChange={e => setModelId(e.target.value)}
+          disabled={phase !== 'idle' && phase !== 'ready' && phase !== 'error'}
+          style={{ background: '#222', color: '#ccc', border: '1px solid #444', borderRadius: 4, padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
+        >
+          {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
         <button
           onClick={() => fileInputRef.current?.click()}
           style={{ padding: '0.35rem 0.9rem', background: '#2980b9', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
