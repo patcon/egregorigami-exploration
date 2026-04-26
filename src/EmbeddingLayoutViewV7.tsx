@@ -93,6 +93,9 @@ export default function EmbeddingLayoutViewV7() {
   const [rendererType, setRendererType] = useState<RendererType>(() =>
     (localStorage.getItem('scatter-renderer') as RendererType) ?? 'cividis-tube'
   )
+  const [glowStrength, setGlowStrength] = useState(() =>
+    parseFloat(localStorage.getItem('glow-strength') ?? '1')
+  )
 
   const {
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
@@ -427,11 +430,36 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
           </div>
         )
 
+        const configContent = (
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[13px] text-text-h font-medium">Glow Strength</label>
+                <span className="text-[13px] text-text opacity-60 tabular-nums">{glowStrength.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={2}
+                step={0.05}
+                value={glowStrength}
+                onChange={e => {
+                  const v = parseFloat(e.target.value)
+                  setGlowStrength(v)
+                  localStorage.setItem('glow-strength', String(v))
+                }}
+                className="w-full accent-accent"
+              />
+              <p className="text-[12px] text-text opacity-40 m-0">Reduces bloom when many paths overlap. Only affects Glow (Shader) renderer.</p>
+            </div>
+          </div>
+        )
+
         const threeDContent = displayPoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
             {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
             {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} glowStrength={glowStrength} />}
             {displayMeta && (
               <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
                 <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>
@@ -496,8 +524,8 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   key={transcriptKey}
                   {...transcriptViewerProps}
                   tab={transcriptTab === '3d' ? 'windowed' : transcriptTab}
-                  extraTabs={[{ id: 'segments', label: 'Segments' }]}
-                  extraTabContent={segmentsContent}
+                  extraTabs={[{ id: 'segments', label: 'Segments' }, { id: 'config', label: 'Config' }]}
+                  extraTabContent={transcriptTab === 'config' ? configContent : segmentsContent}
                 />
               </div>
             </>
@@ -518,8 +546,9 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   extraTabs={[
                     { id: 'segments', label: 'Segments' },
                     { id: '3d', label: '3D' },
+                    { id: 'config', label: 'Config' },
                   ]}
-                  extraTabContent={transcriptTab === 'segments' ? segmentsContent : threeDContent}
+                  extraTabContent={transcriptTab === 'segments' ? segmentsContent : transcriptTab === 'config' ? configContent : threeDContent}
                 />
               </div>
             </div>

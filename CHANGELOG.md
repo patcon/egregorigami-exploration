@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add "Config" tab with a Glow Strength slider (range 0–2, default 1.0) that adjusts bloom intensity live without re-embedding; persisted to localStorage; available in both desktop and mobile layouts; only affects the Glow (Shader) renderer
+
 - Default renderer in `#manual` changed to Glow; default embedding model changed to MiniLM-L12 (balanced)
 - Share button in `#manual` gains an "auto-embed" checkbox — when checked, the shared URL triggers embedding automatically on load
 
