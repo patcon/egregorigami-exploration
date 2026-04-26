@@ -17,6 +17,7 @@ interface Props {
   fillPerSeg?: number     // interpolated fill points per segment (default 12)
   fillJitter?: number     // random scatter radius around the line (default 0)
   fillBrightness?: number // brightness multiplier for fill particles (default 1)
+  glowStrength?: number  // bloom intensity multiplier (default 1)
   initialCameraState?: CameraState
   onCameraChange?: (state: CameraState) => void
   branchIds?: number[]
@@ -106,7 +107,7 @@ void main() {
 }
 `
 
-export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 20, fillJitter = 0.03, fillBrightness = 1.8, initialCameraState, onCameraChange, branchIds }: Props) {
+export default function ScatterPlot3DV6({ points, labels, highlightPosition, onPointClick, fillPerSeg = 20, fillJitter = 0.03, fillBrightness = 1.8, glowStrength = 1, initialCameraState, onCameraChange, branchIds }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -130,6 +131,8 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
   const currentSphereTRef = useRef(0)  // animated segment index (lerps toward target)
   const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
+  const glowStrengthRef = useRef(glowStrength)
+  useEffect(() => { glowStrengthRef.current = glowStrength }, [glowStrength])
 
   useEffect(() => {
     const mount = mountRef.current!
@@ -299,8 +302,9 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         // Adapt bloom strength to camera distance — farther away = weaker glow per pixel,
         // so compensate by boosting strength as zoom increases.
         const camDist = camera.position.distanceTo(controls.target)
-        bloomPass.strength = Math.max(1.0, 1.5 * (camDist / 4.0))
-        bloomPass.radius = Math.min(1.0, 0.5 + 0.08 * (camDist / 4.0))
+        const gs = glowStrengthRef.current
+        bloomPass.strength = Math.max(1.0, 1.5 * (camDist / 4.0)) * gs
+        bloomPass.radius = Math.min(1.0, 0.5 + 0.08 * (camDist / 4.0)) * gs
         // Lerp the segment index so the sphere travels along the piecewise-linear path.
         // On the first visible frame, snap to target and seed prevFollowTargetRef.
         if (sphereVisibleRef.current) {
