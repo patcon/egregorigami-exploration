@@ -1,45 +1,35 @@
 # Changelog
 
+Entries are in chronological order (oldest first).
+
 ## Unreleased
 
-- Add "Config" tab with a Glow Strength slider (range 0–2, default 1.0) that adjusts bloom intensity live without re-embedding; persisted to localStorage; available in both desktop and mobile layouts; only affects the Glow (Shader) renderer
-- Default renderer in `#manual` changed to Glow; default embedding model changed to MiniLM-L12 (balanced)
-- Share button in `#manual` gains an "auto-embed" checkbox — when checked, the shared URL triggers embedding automatically on load
-- Add Share button to `#manual` view — compresses textarea text with pako into a `?share=` query param and copies the URL to clipboard; loading a share URL restores the text automatically
-- Preserve camera position when switching renderers in `#manual` view — camera state is stored in a ref and passed as `initialCameraState` to each renderer on mount
-- Make Glow renderer adaptive to canvas size and zoom: particle sizes scale with canvas height (`uScale` uniform), fill density increased (12→20 particles per segment), and bloom strength/radius update each frame based on camera distance so the glow stays visible when zoomed out or viewing full-screen
-- Add `#manual` view: type lines of text into a textarea — each line becomes one embedding node; prefix with `- ` to start a new branch, indent to continue it; branches appear as distinct colored paths in the 3D scatter plot, each visually continuing from the branching point; renderer toggle (Points / Tube / Glow) matches the styles available in other embedding views
-- Smooth branch divergence in Tube renderer: branch tubes now prepend several root nodes so both curves share the same CatmullRom tangent at the junction; colors blend from root to branch over the overlap region so branches appear to peel off naturally rather than snap into view
-
-- v7 desktop layout: at 1024px+ width, the layout splits into a top row (video | 3D plot) and a bottom panel (Raw/Windowed/Segments transcript tabs); landscape mobile (640px–1023px) keeps the existing two-column layout with all tabs on the right
-
-- Store embedding model ID and segment count alongside cached 3D points in localStorage — displayed as a small info overlay in the bottom-right corner of the scatter plot
-- Rename "Reset Viz" to "Rerun Viz" in v7 — clicking it shows the model selector and Visualize button with an ✕ to return to the visualization without re-embedding; the prior scatter plot remains visible throughout
-- Keep prior scatter plot visible while a new embedding runs or is cancelled — cancelling mid-progress restores the previous visualization
-
-- Add URL history autocomplete dropdown to YouTube URL inputs across all embedding views (v3–v7) — shows video title (fetched async via YouTube oEmbed) and URL; title appears above URL in the list but selecting an entry sets only the URL value; history persists in localStorage (`yt-url-history`, max 15 entries)
-
-- Cache 3D UMAP points in localStorage keyed by video ID (`yt-3d-points-<videoId>`) across all embedding views (v3–v7) — points are restored automatically on page reload, and overwritten when a new embedding is run for the same video
-
-- Fix v7 mobile: prevent pull-to-refresh and iOS bounce — lock `html` overflow on mount, add `overscroll-y-contain` to inner scrollable areas (word display, segments list) so their overscroll doesn't propagate, use `100dvh` for dynamic viewport height, and add `flex-shrink-0` to YouTube player wrapper
-
-- Fix 3D scatter not rendering in v7 after deferred-init fix — `extraTabContent` wrapper in TranscriptViewer was missing `flex flex-col`, causing `h-full` on the mount div to resolve to zero
-
-- Fix WebGL "zero size framebuffer" errors in ScatterPlot3D, ScatterPlot3DV5, and ScatterPlot3DV6 when component mounts inside a hidden tab — defer Three.js renderer init until container has non-zero dimensions, using a one-shot ResizeObserver
-
-- Add info button (ⓘ) to v7 URL bar that opens a modal; modal contains a "Version Index →" link, replacing the fixed bottom-left link on that view.
-- Add v7: mobile-optimized copy of v5, now the default landing page. Single-column layout on mobile (≤768px). Removes "allow faster" checkbox — video embed hides automatically when speed exceeds 2×. Removes "segments" window mode (words-only). Share URL updated to `#v7`.
-- Warn in v7 (below video, above transcript) when transcript duration doesn't match the YouTube video duration (threshold: >10s or >5%). "Fetch Transcript" button moved into transcript section as "Load", alongside a "Transcript" section header.
-
-- Fix all ESLint warnings and errors: move ref writes out of render into effects, type `progress_callback` params, fix recursive rAF `tick` pattern in `SegmentProjectorModal`, and suppress intentional rule violations with targeted disable comments
-
-- Migrate styling from hand-written CSS files to Tailwind CSS v4; all 8 component CSS files replaced with utility classes in JSX; animations, `color-mix()` rules, and pseudo-element styles retained in `index.css`
-
-- Fix white screen when invalid YouTube URL is entered (e.g. `?v=bad`) — `extractVideoId` now validates the 11-char video ID format for YouTube URL inputs, not just raw strings
-
-- Make v5 the default landing page; index nav moved to `#index` (also accessible via "Version Index" link on all pages)
-- Sync `?videoId=` querystring in real time as YouTube URL is typed into any view (v2, v3, v4, v5)
 - Add download button for 3D embedding points (v3 modal + v5 inline panel) — exports `embeddings-3d.json` once embeddings are complete
+- Sync `?videoId=` querystring in real time as YouTube URL is typed into any view (v2, v3, v4, v5)
+- Make v5 the default landing page; index nav moved to `#index` (also accessible via "Version Index" link on all pages)
+- Fix white screen when invalid YouTube URL is entered (e.g. `?v=bad`) — `extractVideoId` now validates the 11-char video ID format for YouTube URL inputs, not just raw strings
+- Migrate styling from hand-written CSS files to Tailwind CSS v4; all 8 component CSS files replaced with utility classes in JSX; animations, `color-mix()` rules, and pseudo-element styles retained in `index.css`
+- Fix all ESLint warnings and errors: move ref writes out of render into effects, type `progress_callback` params, fix recursive rAF `tick` pattern in `SegmentProjectorModal`, and suppress intentional rule violations with targeted disable comments
+- Warn in v7 (below video, above transcript) when transcript duration doesn't match the YouTube video duration (threshold: >10s or >5%). "Fetch Transcript" button moved into transcript section as "Load", alongside a "Transcript" section header.
+- Add v7: mobile-optimized copy of v5, now the default landing page. Single-column layout on mobile (≤768px). Removes "allow faster" checkbox — video embed hides automatically when speed exceeds 2×. Removes "segments" window mode (words-only). Share URL updated to `#v7`.
+- Add info button (ⓘ) to v7 URL bar that opens a modal; modal contains a "Version Index →" link, replacing the fixed bottom-left link on that view.
+- Fix WebGL "zero size framebuffer" errors in ScatterPlot3D, ScatterPlot3DV5, and ScatterPlot3DV6 when component mounts inside a hidden tab — defer Three.js renderer init until container has non-zero dimensions, using a one-shot ResizeObserver
+- Fix 3D scatter not rendering in v7 after deferred-init fix — `extraTabContent` wrapper in TranscriptViewer was missing `flex flex-col`, causing `h-full` on the mount div to resolve to zero
+- Fix v7 mobile: prevent pull-to-refresh and iOS bounce — lock `html` overflow on mount, add `overscroll-y-contain` to inner scrollable areas (word display, segments list) so their overscroll doesn't propagate, use `100dvh` for dynamic viewport height, and add `flex-shrink-0` to YouTube player wrapper
+- Cache 3D UMAP points in localStorage keyed by video ID (`yt-3d-points-<videoId>`) across all embedding views (v3–v7) — points are restored automatically on page reload, and overwritten when a new embedding is run for the same video
+- Add URL history autocomplete dropdown to YouTube URL inputs across all embedding views (v3–v7) — shows video title (fetched async via YouTube oEmbed) and URL; title appears above URL in the list but selecting an entry sets only the URL value; history persists in localStorage (`yt-url-history`, max 15 entries)
+- Keep prior scatter plot visible while a new embedding runs or is cancelled — cancelling mid-progress restores the previous visualization
+- Rename "Reset Viz" to "Rerun Viz" in v7 — clicking it shows the model selector and Visualize button with an ✕ to return to the visualization without re-embedding; the prior scatter plot remains visible throughout
+- Store embedding model ID and segment count alongside cached 3D points in localStorage — displayed as a small info overlay in the bottom-right corner of the scatter plot
+- v7 desktop layout: at 1024px+ width, the layout splits into a top row (video | 3D plot) and a bottom panel (Raw/Windowed/Segments transcript tabs); landscape mobile (640px–1023px) keeps the existing two-column layout with all tabs on the right
+- Add `#manual` view: type lines of text into a textarea — each line becomes one embedding node; prefix with `- ` to start a new branch, indent to continue it; branches appear as distinct colored paths in the 3D scatter plot, each visually continuing from the branching point; renderer toggle (Points / Tube / Glow) matches the styles available in other embedding views
+- Make Glow renderer adaptive to canvas size and zoom: particle sizes scale with canvas height (`uScale` uniform), fill density increased (12→20 particles per segment), and bloom strength/radius update each frame based on camera distance so the glow stays visible when zoomed out or viewing full-screen
+- Preserve camera position when switching renderers in `#manual` view — camera state is stored in a ref and passed as `initialCameraState` to each renderer on mount
+- Add Share button to `#manual` view — compresses textarea text with pako into a `?share=` query param and copies the URL to clipboard; loading a share URL restores the text automatically
+- Share button in `#manual` gains an "auto-embed" checkbox — when checked, the shared URL triggers embedding automatically on load
+- Default renderer in `#manual` changed to Glow; default embedding model changed to MiniLM-L12 (balanced)
+- Add "Config" tab with a Glow Strength slider (range 0–2, default 1.0) that adjusts bloom intensity live without re-embedding; persisted to localStorage; available in both desktop and mobile layouts; only affects the Glow (Shader) renderer
+- Smooth branch divergence in Tube renderer: branch tubes now prepend several root nodes so both curves share the same CatmullRom tangent at the junction; colors blend from root to branch over the overlap region so branches appear to peel off naturally rather than snap into view
 
 ## Prior work (selected)
 
