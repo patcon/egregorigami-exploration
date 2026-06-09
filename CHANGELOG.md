@@ -31,6 +31,7 @@ Entries are in chronological order (oldest first).
 - Add "Config" tab with a Glow Strength slider (range 0–2, default 1.0) that adjusts bloom intensity live without re-embedding; persisted to localStorage; available in both desktop and mobile layouts; only affects the Glow (Shader) renderer
 - Smooth branch divergence in Tube renderer: branch tubes now prepend several root nodes so both curves share the same CatmullRom tangent at the junction; colors blend from root to branch over the overlap region so branches appear to peel off naturally rather than snap into view
 - Add branching playhead to `#manual` view: ▶/⏸ button and scrubber animate a red sphere through all segments; at the branch point the root sphere disappears and one sphere per branch continues in sync; works in all three renderers (Tube, Glow, Points)
+- Unify main-path playhead: the first `- ` arm (bid=1) is treated as a continuation of the trunk, so the main sphere travels root→arm1 without interruption; actual branch spheres (bid≥2) peel off from the trunk-end fork point as before
 
 ## Prior work (selected)
 

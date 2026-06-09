@@ -21,16 +21,13 @@ What's the best
 What's the best thing
 What's the best thing about
 - What's the best thing about Switzerland [country]?
-  What's the best thing about Switzerland [country]? The
   What's the best thing about Switzerland [country]? The flag
   What's the best thing about Switzerland [country]? The flag is
-  What's the best thing about Switzerland [country]? The flag is a
   What's the best thing about Switzerland [country]? The flag is a big
   What's the best thing about Switzerland [country]? The flag is a big plus.
 - What's the best thing about Switzerland [country with a cross on its flag]?
   What's the best thing about Switzerland [country with a cross on its flag]? The flag
   What's the best thing about Switzerland [country with a cross on its flag]? The flag is
-  What's the best thing about Switzerland [country with a cross on its flag]? The flag is a
   What's the best thing about Switzerland [country with a cross on its flag]? The flag is a big
   What's the best thing about Switzerland [country with a cross on its flag]? The flag is a big plus.`
 
