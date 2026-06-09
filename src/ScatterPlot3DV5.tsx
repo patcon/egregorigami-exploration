@@ -177,18 +177,24 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
         // rides on top of the root tube briefly, then peels away smoothly. Colors
         // blend from root→branch over the overlap region to hide z-fighting and
         // reinforce the "splitting off" visual.
+        // bid=0 (trunk) + bid=1 (first arm) are treated as one continuous main path;
+        // bid≥2 are actual branches that fork from the last trunk (bid=0) point.
         const OVERLAP_NODES = 3
         const numBranches = Math.max(...branchIds) + 1
+        const bid1Indices: number[] = []
+        for (let i = 0; i < n; i++) if (branchIds[i] === 1) bid1Indices.push(i)
         let rootCurve: THREE.CatmullRomCurve3 | null = null
         let rootBaseColor: THREE.Color | null = null
         for (let bid = 0; bid < numBranches; bid++) {
+          if (bid === 1) continue  // merged into bid=0 main-path tube and sphere
           const branchOnly: number[] = []
           for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
           let indices: number[]
           let numPrepended = 0
           let branchParentIdx = -1
           if (bid === 0) {
-            indices = branchOnly
+            // Main path = trunk + first arm, one continuous tube
+            indices = [...branchOnly, ...bid1Indices]
           } else {
             const firstBranchIdx = branchOnly[0]
             for (let i = firstBranchIdx - 1; i >= 0; i--) {
@@ -248,7 +254,10 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
             sphereMesh.visible = false
             scene.add(sphereMesh)
           }
-          branchSpheresArr.push({ mesh: sphereMesh, curve: branchCurve, currentT: 0, parentIdx: bid === 0 ? -1 : branchParentIdx, numPrepended, numIndices: indices.length, hideAfter: bid === 0 ? branchOnly[branchOnly.length - 1] : Infinity })
+          const hideAfter = bid === 0
+            ? (bid1Indices.length > 0 ? bid1Indices[bid1Indices.length - 1] : branchOnly[branchOnly.length - 1])
+            : Infinity
+          branchSpheresArr.push({ mesh: sphereMesh, curve: branchCurve, currentT: 0, parentIdx: bid === 0 ? -1 : branchParentIdx, numPrepended, numIndices: indices.length, hideAfter })
         }
         // Provide a valid curve for sceneRef (only accessed when highlight sphere is visible)
         curve = rootCurve ?? new THREE.CatmullRomCurve3(

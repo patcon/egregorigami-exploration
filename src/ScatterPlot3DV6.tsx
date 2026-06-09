@@ -292,19 +292,30 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       highlightMesh.visible = false
       scene.add(highlightMesh)
 
-      // Per-branch spheres for branching playhead (bid=0 reuses highlightMesh)
+      // Per-branch spheres for branching playhead.
+      // bid=0 (trunk) + bid=1 (first arm) form one continuous main-path sphere;
+      // bid≥2 are actual branches that fork from the last trunk (bid=0) point.
+      // bid=0 reuses highlightMesh so camera-tracking code below works unchanged.
       const branchSpheresLinear: BranchSphereLinear[] = []
       if (branchIds) {
         const numBranches = Math.max(...branchIds) + 1
+        // Pre-collect bid=1 indices so bid=0 sphere can extend through them
+        const bid1Indices: number[] = []
+        for (let i = 0; i < n; i++) if (branchIds[i] === 1) bid1Indices.push(i)
         for (let bid = 0; bid < numBranches; bid++) {
+          if (bid === 1) continue  // merged into bid=0 main-path sphere
           const branchOnly: number[] = []
           for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
           if (branchOnly.length === 0) continue
           let bParentIdx = -1
           let branchPoints: [number, number, number][]
-          const hideAfter = bid === 0 ? branchOnly[branchOnly.length - 1] : Infinity
+          // Main sphere hides after end of arm1 (bid=1); branch spheres never hide
+          const hideAfter = bid === 0
+            ? (bid1Indices.length > 0 ? bid1Indices[bid1Indices.length - 1] : branchOnly[branchOnly.length - 1])
+            : Infinity
           if (bid === 0) {
-            branchPoints = branchOnly.map(i => normalized[i])
+            // Main path = trunk + first arm, treated as one continuous spline
+            branchPoints = [...branchOnly, ...bid1Indices].map(i => normalized[i])
           } else {
             const firstBranchIdx = branchOnly[0]
             for (let i = firstBranchIdx - 1; i >= 0; i--) {
