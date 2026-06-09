@@ -3,17 +3,13 @@
 ## Unreleased
 
 - Add "Config" tab with a Glow Strength slider (range 0–2, default 1.0) that adjusts bloom intensity live without re-embedding; persisted to localStorage; available in both desktop and mobile layouts; only affects the Glow (Shader) renderer
-
 - Default renderer in `#manual` changed to Glow; default embedding model changed to MiniLM-L12 (balanced)
 - Share button in `#manual` gains an "auto-embed" checkbox — when checked, the shared URL triggers embedding automatically on load
-
 - Add Share button to `#manual` view — compresses textarea text with pako into a `?share=` query param and copies the URL to clipboard; loading a share URL restores the text automatically
-
 - Preserve camera position when switching renderers in `#manual` view — camera state is stored in a ref and passed as `initialCameraState` to each renderer on mount
-
 - Make Glow renderer adaptive to canvas size and zoom: particle sizes scale with canvas height (`uScale` uniform), fill density increased (12→20 particles per segment), and bloom strength/radius update each frame based on camera distance so the glow stays visible when zoomed out or viewing full-screen
-
 - Add `#manual` view: type lines of text into a textarea — each line becomes one embedding node; prefix with `- ` to start a new branch, indent to continue it; branches appear as distinct colored paths in the 3D scatter plot, each visually continuing from the branching point; renderer toggle (Points / Tube / Glow) matches the styles available in other embedding views
+- Smooth branch divergence in Tube renderer: branch tubes now prepend several root nodes so both curves share the same CatmullRom tangent at the junction; colors blend from root to branch over the overlap region so branches appear to peel off naturally rather than snap into view
 
 - v7 desktop layout: at 1024px+ width, the layout splits into a top row (video | 3D plot) and a bottom panel (Raw/Windowed/Segments transcript tabs); landscape mobile (640px–1023px) keeps the existing two-column layout with all tabs on the right
 

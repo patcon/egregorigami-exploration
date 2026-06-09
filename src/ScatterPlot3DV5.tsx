@@ -152,14 +152,20 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       let curve: THREE.CatmullRomCurve3
 
       if (branchIds) {
-        // One tube per branch; non-root branches prepend their parent node so the
-        // tube visually starts from the branching point with no gap.
+        // One tube per branch. Non-root branches prepend several root nodes so both
+        // curves share the same CatmullRom tangent at the junction — the branch tube
+        // rides on top of the root tube briefly, then peels away smoothly. Colors
+        // blend from root→branch over the overlap region to hide z-fighting and
+        // reinforce the "splitting off" visual.
+        const OVERLAP_NODES = 3
         const numBranches = Math.max(...branchIds) + 1
         let rootCurve: THREE.CatmullRomCurve3 | null = null
+        let rootBaseColor: THREE.Color | null = null
         for (let bid = 0; bid < numBranches; bid++) {
           const branchOnly: number[] = []
           for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
           let indices: number[]
+          let numPrepended = 0
           if (bid === 0) {
             indices = branchOnly
           } else {
@@ -168,11 +174,20 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
             for (let i = firstBranchIdx - 1; i >= 0; i--) {
               if (branchIds[i] === 0) { parentIdx = i; break }
             }
-            indices = parentIdx >= 0 ? [parentIdx, ...branchOnly] : branchOnly
+            if (parentIdx >= 0) {
+              const overlapStart = Math.max(0, parentIdx - OVERLAP_NODES + 1)
+              const overlapNodes: number[] = []
+              for (let i = overlapStart; i <= parentIdx; i++) overlapNodes.push(i)
+              numPrepended = overlapNodes.length
+              indices = [...overlapNodes, ...branchOnly]
+            } else {
+              indices = branchOnly
+            }
           }
           if (indices.length < 2) continue
           const hueIndex = bid <= 1 ? 0 : bid - 1
           const baseColor = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.55)
+          if (bid === 0) rootBaseColor = baseColor.clone()
           const branchCurve = new THREE.CatmullRomCurve3(
             indices.map(idx => new THREE.Vector3(...normalized[idx])),
             false, 'centripetal'
@@ -186,9 +201,18 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
             const t = ring / branchTubeSegs
             const segIdx = Math.floor(Math.min(t * (indices.length - 1), indices.length - 2))
             const bright = segIdx % 2 === 0 ? 1.2 : 0.7
-            tubeColors[v * 3] = Math.min(1, baseColor.r * bright)
-            tubeColors[v * 3 + 1] = Math.min(1, baseColor.g * bright)
-            tubeColors[v * 3 + 2] = Math.min(1, baseColor.b * bright)
+            // Blend from root color to branch color over the prepended overlap region
+            // so the branch appears to smoothly split off rather than snap into view.
+            let color: THREE.Color
+            if (bid > 0 && numPrepended > 0 && rootBaseColor !== null) {
+              const lerpT = Math.max(0, Math.min(1, segIdx / numPrepended))
+              color = rootBaseColor.clone().lerp(baseColor, lerpT)
+            } else {
+              color = baseColor
+            }
+            tubeColors[v * 3] = Math.min(1, color.r * bright)
+            tubeColors[v * 3 + 1] = Math.min(1, color.g * bright)
+            tubeColors[v * 3 + 2] = Math.min(1, color.b * bright)
           }
           tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
           scene.add(new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })))
