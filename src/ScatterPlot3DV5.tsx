@@ -5,6 +5,16 @@ import type { CameraState, FollowMode } from './scatterTypes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
+interface BranchSphereData {
+  mesh: THREE.Mesh
+  curve: THREE.CatmullRomCurve3
+  currentT: number
+  parentIdx: number   // -1 for root (bid=0)
+  numPrepended: number
+  numIndices: number
+  hideAfter: number   // root sphere hides when hp exceeds this; Infinity for branch spheres
+}
+
 interface Props {
   points: [number, number, number][]
   labels: string[]
@@ -151,6 +161,16 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       // curve is referenced by sceneRef for highlight sphere follow modes
       let curve: THREE.CatmullRomCurve3
 
+      // Highlight sphere — created before tube loop so branch mode can reuse it as root sphere
+      const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
+      const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
+      const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
+      highlightMesh.visible = false
+      scene.add(highlightMesh)
+
+      // Per-branch sphere data for the animate loop (populated in branch mode only)
+      const branchSpheresArr: BranchSphereData[] = []
+
       if (branchIds) {
         // One tube per branch. Non-root branches prepend several root nodes so both
         // curves share the same CatmullRom tangent at the junction — the branch tube
@@ -166,18 +186,18 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
           for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
           let indices: number[]
           let numPrepended = 0
+          let branchParentIdx = -1
           if (bid === 0) {
             indices = branchOnly
           } else {
             const firstBranchIdx = branchOnly[0]
-            let parentIdx = -1
             for (let i = firstBranchIdx - 1; i >= 0; i--) {
-              if (branchIds[i] === 0) { parentIdx = i; break }
+              if (branchIds[i] === 0) { branchParentIdx = i; break }
             }
-            if (parentIdx >= 0) {
-              const overlapStart = Math.max(0, parentIdx - OVERLAP_NODES + 1)
+            if (branchParentIdx >= 0) {
+              const overlapStart = Math.max(0, branchParentIdx - OVERLAP_NODES + 1)
               const overlapNodes: number[] = []
-              for (let i = overlapStart; i <= parentIdx; i++) overlapNodes.push(i)
+              for (let i = overlapStart; i <= branchParentIdx; i++) overlapNodes.push(i)
               numPrepended = overlapNodes.length
               indices = [...overlapNodes, ...branchOnly]
             } else {
@@ -216,6 +236,19 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
           }
           tubeGeo.setAttribute('color', new THREE.BufferAttribute(tubeColors, 3))
           scene.add(new THREE.Mesh(tubeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.1 })))
+
+          // One sphere per branch — bid=0 reuses highlightMesh so camera-tracking code works unchanged
+          let sphereMesh: THREE.Mesh
+          if (bid === 0) {
+            sphereMesh = highlightMesh
+          } else {
+            const sgeo = new THREE.SphereGeometry(0.04, 16, 16)
+            const smat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
+            sphereMesh = new THREE.Mesh(sgeo, smat)
+            sphereMesh.visible = false
+            scene.add(sphereMesh)
+          }
+          branchSpheresArr.push({ mesh: sphereMesh, curve: branchCurve, currentT: 0, parentIdx: bid === 0 ? -1 : branchParentIdx, numPrepended, numIndices: indices.length, hideAfter: bid === 0 ? branchOnly[branchOnly.length - 1] : Infinity })
         }
         // Provide a valid curve for sceneRef (only accessed when highlight sphere is visible)
         curve = rootCurve ?? new THREE.CatmullRomCurve3(
@@ -253,13 +286,6 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       scene.add(new THREE.AmbientLight(0xffffff, 0.7))
       scene.add(new THREE.DirectionalLight(0xffffff, 0.8))
 
-      // Highlight mesh (sphere)
-      const hlGeo = new THREE.SphereGeometry(0.04, 16, 16)
-      const hlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 })
-      const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
-      highlightMesh.visible = false
-      scene.add(highlightMesh)
-
       const raycaster = new THREE.Raycaster()
       raycaster.params.Points!.threshold = 0.05
 
@@ -267,7 +293,31 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       let firstFrame = true
       const animate = () => {
         animId = requestAnimationFrame(animate)
-        // Lerp the curve parameter so the sphere travels along the tube path.
+        if (branchSpheresArr.length > 0) {
+          // Multi-sphere mode: one sphere per branch, all driven by highlightPositionRef.
+          // Root sphere (bid=0) reuses highlightMesh so camera-tracking code below works unchanged.
+          if (sphereVisibleRef.current) {
+            const hp = highlightPositionRef.current ?? 0
+            for (const bs of branchSpheresArr) {
+              let targetT: number
+              if (bs.parentIdx < 0) {
+                // Root: follow from start, stop at end of root curve
+                targetT = Math.min(1, hp / (bs.numIndices - 1))
+              } else {
+                // Branch: starts at branch point, all branches advance in sync
+                const posInCurve = bs.numPrepended - 1 + Math.max(0, hp - bs.parentIdx)
+                targetT = Math.max(0, Math.min(1, posInCurve / (bs.numIndices - 1)))
+              }
+              bs.currentT += (targetT - bs.currentT) * 0.2
+              const show = bs.parentIdx < 0 ? hp <= bs.hideAfter : hp >= bs.parentIdx
+              bs.mesh.visible = show
+              if (show) bs.mesh.position.copy(bs.curve.getPoint(Math.max(0, Math.min(1, bs.currentT))))
+            }
+          } else {
+            for (const bs of branchSpheresArr) bs.mesh.visible = false
+          }
+        } else {
+        // Single-sphere mode: lerp curve parameter toward target.
         // On the first visible frame, snap to target and seed prevFollowTargetRef.
         if (sphereVisibleRef.current) {
           if (firstFrame) {
@@ -284,6 +334,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
         } else {
           firstFrame = false
           highlightMesh.visible = false
+        }
         }
         const mode = followModeRef.current
         if (mode === 'tracking' && highlightMesh.visible) {
@@ -363,12 +414,15 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
     highlightPositionRef.current = highlightPosition
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
-      targetSphereTRef.current = Math.min(1, Math.max(0, highlightPosition / (normalized.length - 1)))
+      if (!branchIds) {
+        // Single-sphere mode: pre-compute T; branch mode computes per-sphere T in the animate loop
+        targetSphereTRef.current = Math.min(1, Math.max(0, highlightPosition / (normalized.length - 1)))
+      }
       sphereVisibleRef.current = true
     } else {
       sphereVisibleRef.current = false
     }
-  }, [highlightPosition])
+  }, [highlightPosition, branchIds])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current
