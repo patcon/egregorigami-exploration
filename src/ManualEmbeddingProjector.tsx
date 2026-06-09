@@ -125,9 +125,34 @@ export default function ManualEmbeddingProjector() {
   const [playheadPos, setPlayheadPos] = useState<number | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const playheadRef = useRef(0)
+  const [playType, setPlayType] = useState<'parallel' | 'forked'>('parallel')
 
-  // Total playhead range: root length + longest branch (branches run in parallel after branch point)
+  // Forked mode layout: precomputed timeline parameters
+  const forkedLayout = useMemo(() => {
+    if (!submitted || !branchIds) return null
+    let mainPathEnd = -1
+    for (let i = 0; i < branchIds.length; i++) {
+      if (branchIds[i] === 0 || branchIds[i] === 1) mainPathEnd = i
+    }
+    let branchPoint = -1
+    for (let i = 0; i < branchIds.length; i++) {
+      if (branchIds[i] === 0) branchPoint = i
+    }
+    let forkLength = 0
+    for (const bid of branchIds) {
+      if (bid === 2) forkLength++
+    }
+    if (mainPathEnd < 0 || branchPoint < 0 || forkLength === 0) return null
+    const BACKTRACK_SPEED_RATIO = 5
+    const backtrackDist = mainPathEnd - branchPoint
+    const backtrackDuration = backtrackDist / BACKTRACK_SPEED_RATIO
+    const forkedMaxTime = mainPathEnd + backtrackDuration + forkLength
+    return { mainPathEnd, branchPoint, forkLength, backtrackDuration, BACKTRACK_SPEED_RATIO, forkedMaxTime }
+  }, [submitted, branchIds])
+
+  // Total playhead range: parallel = root + longest branch; forked = main + backtrack + fork
   const maxPlayheadTime = useMemo(() => {
+    if (playType === 'forked' && forkedLayout) return forkedLayout.forkedMaxTime
     if (!submitted || !branchIds) return submitted ? submitted.length - 1 : 0
     const parentIdx = branchIds.reduce((max, bid, i) => bid === 0 ? i : max, -1)
     if (parentIdx < 0) return submitted.length - 1
@@ -137,7 +162,24 @@ export default function ManualEmbeddingProjector() {
     }
     const maxBranchLen = branchCounts.size > 0 ? Math.max(...branchCounts.values()) : 0
     return parentIdx + maxBranchLen
-  }, [submitted, branchIds])
+  }, [submitted, branchIds, playType, forkedLayout])
+
+  // Derived highlight values for forked mode
+  const { mainHighlight, forkOffset } = useMemo<{ mainHighlight: number | null; forkOffset: number | null }>(() => {
+    if (playType === 'parallel' || !forkedLayout || playheadPos === null) {
+      return { mainHighlight: playheadPos, forkOffset: null }
+    }
+    const { mainPathEnd, branchPoint, backtrackDuration, BACKTRACK_SPEED_RATIO } = forkedLayout
+    if (playheadPos <= mainPathEnd) {
+      return { mainHighlight: playheadPos, forkOffset: null }
+    }
+    const afterMain = playheadPos - mainPathEnd
+    if (afterMain <= backtrackDuration) {
+      const backPos = mainPathEnd - afterMain * BACKTRACK_SPEED_RATIO
+      return { mainHighlight: Math.max(branchPoint, backPos), forkOffset: null }
+    }
+    return { mainHighlight: null, forkOffset: playheadPos - mainPathEnd - backtrackDuration }
+  }, [playheadPos, playType, forkedLayout])
 
   const PLAYHEAD_SPEED = 1.5  // nodes per second
 
@@ -276,7 +318,9 @@ export default function ManualEmbeddingProjector() {
               points={phase.points}
               labels={labels}
               branchIds={branchIds ?? undefined}
-              highlightPosition={playheadPos}
+              highlightPosition={playType === 'forked' ? mainHighlight : playheadPos}
+              forkHighlightOffset={playType === 'forked' ? forkOffset : null}
+              playType={playType}
               onPointClick={() => {}}
               initialCameraState={cameraStateRef.current}
               onCameraChange={s => { cameraStateRef.current = s }}
@@ -287,7 +331,9 @@ export default function ManualEmbeddingProjector() {
               points={phase.points}
               labels={labels}
               branchIds={branchIds ?? undefined}
-              highlightPosition={playheadPos}
+              highlightPosition={playType === 'forked' ? mainHighlight : playheadPos}
+              forkHighlightOffset={playType === 'forked' ? forkOffset : null}
+              playType={playType}
               onPointClick={() => {}}
               initialCameraState={cameraStateRef.current}
               onCameraChange={s => { cameraStateRef.current = s }}
@@ -298,7 +344,9 @@ export default function ManualEmbeddingProjector() {
               points={phase.points}
               labels={labels}
               branchIds={branchIds ?? undefined}
-              highlightPosition={playheadPos}
+              highlightPosition={playType === 'forked' ? mainHighlight : playheadPos}
+              forkHighlightOffset={playType === 'forked' ? forkOffset : null}
+              playType={playType}
               onPointClick={() => {}}
               initialCameraState={cameraStateRef.current}
               onCameraChange={s => { cameraStateRef.current = s }}
@@ -345,6 +393,29 @@ export default function ManualEmbeddingProjector() {
               }}
               className="w-36 accent-red-500 opacity-70 hover:opacity-100 transition-opacity"
             />
+            {forkedLayout && (
+              <div className="flex gap-1">
+                {(['parallel', 'forked'] as const).map(t => (
+                  <button
+                    key={t}
+                    className={[
+                      'text-[11px] py-[3px] px-2 rounded border cursor-pointer transition-[background,color,border-color] duration-150',
+                      t === playType
+                        ? 'bg-[rgba(40,100,200,0.35)] border-[rgba(80,140,255,0.6)] text-white'
+                        : 'bg-black/55 text-white/65 border-white/[0.18] hover:bg-black/75 hover:text-white',
+                    ].join(' ')}
+                    onClick={() => {
+                      setPlayType(t)
+                      setIsPlaying(false)
+                      playheadRef.current = 0
+                      setPlayheadPos(0)
+                    }}
+                  >
+                    {t === 'parallel' ? '⊕ parallel' : '→ forked'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -23,6 +23,8 @@ interface Props {
   onCameraChange?: (state: CameraState) => void
   /** When provided, colors points by branch and draws separate lines per branch */
   branchIds?: number[]
+  playType?: 'parallel' | 'forked'
+  forkHighlightOffset?: number | null
 }
 
 function normalize(points: [number, number, number][]): [number, number, number][] {
@@ -42,7 +44,7 @@ function normalize(points: [number, number, number][]): [number, number, number]
   )
 }
 
-export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, branchIds }: Props) {
+export default function ScatterPlot3D({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, branchIds, playType, forkHighlightOffset }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer
@@ -64,6 +66,8 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
   const currentSphereTRef = useRef(0)  // animated segment index (lerps toward target)
   const sphereVisibleRef = useRef(false)
   const normalizedRef = useRef<[number, number, number][]>([])
+  const playTypeRef = useRef<'parallel' | 'forked'>(playType ?? 'parallel')
+  const forkHighlightOffsetRef = useRef<number | null>(forkHighlightOffset ?? null)
 
   // Build scene once
   useEffect(() => {
@@ -244,9 +248,41 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const animate = () => {
         animId = requestAnimationFrame(animate)
         if (branchSpheresLinear.length > 0) {
-          // Multi-sphere branch mode: one sphere per branch, driven by highlightPositionRef.
-          // Root sphere (bid=0) reuses highlightMesh so camera-tracking code below works.
-          if (sphereVisibleRef.current) {
+          if (!sphereVisibleRef.current) {
+            for (const bs of branchSpheresLinear) bs.mesh.visible = false
+          } else if (playTypeRef.current === 'forked') {
+            const fo = forkHighlightOffsetRef.current
+            const hp = highlightPositionRef.current ?? 0
+            for (const bs of branchSpheresLinear) {
+              if (fo !== null) {
+                if (bs.parentIdx < 0) {
+                  bs.mesh.visible = false
+                } else {
+                  if (!bs.mesh.visible) bs.currentT = 0
+                  bs.mesh.visible = true
+                  const t = Math.min(bs.points.length - 1, Math.max(0, fo))
+                  bs.currentT += (t - bs.currentT) * 0.2
+                  const ct = Math.max(0, Math.min(bs.points.length - 1, bs.currentT))
+                  const a = Math.floor(ct), b = Math.min(bs.points.length - 1, Math.ceil(ct))
+                  const f = ct - a, pa = bs.points[a], pb = bs.points[b]
+                  bs.mesh.position.set(pa[0]+(pb[0]-pa[0])*f, pa[1]+(pb[1]-pa[1])*f, pa[2]+(pb[2]-pa[2])*f)
+                }
+              } else {
+                if (bs.parentIdx < 0) {
+                  bs.mesh.visible = true
+                  const t = Math.min(bs.points.length - 1, Math.max(0, hp))
+                  bs.currentT += (t - bs.currentT) * 0.2
+                  const ct = Math.max(0, Math.min(bs.points.length - 1, bs.currentT))
+                  const a = Math.floor(ct), b = Math.min(bs.points.length - 1, Math.ceil(ct))
+                  const f = ct - a, pa = bs.points[a], pb = bs.points[b]
+                  bs.mesh.position.set(pa[0]+(pb[0]-pa[0])*f, pa[1]+(pb[1]-pa[1])*f, pa[2]+(pb[2]-pa[2])*f)
+                } else {
+                  bs.mesh.visible = false
+                }
+              }
+            }
+          } else {
+            // Parallel mode
             const hp = highlightPositionRef.current ?? 0
             for (const bs of branchSpheresLinear) {
               const show = bs.parentIdx < 0 ? hp <= bs.hideAfter : hp >= bs.parentIdx
@@ -262,8 +298,6 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
                 bs.mesh.position.set(pa[0]+(pb[0]-pa[0])*f, pa[1]+(pb[1]-pa[1])*f, pa[2]+(pb[2]-pa[2])*f)
               }
             }
-          } else {
-            for (const bs of branchSpheresLinear) bs.mesh.visible = false
           }
         } else {
         // Single-sphere mode: lerp the segment index along the piecewise-linear path.
@@ -390,6 +424,14 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       sphereVisibleRef.current = false
     }
   }, [highlightPosition, branchIds])
+
+  useEffect(() => {
+    playTypeRef.current = playType ?? 'parallel'
+    forkHighlightOffsetRef.current = forkHighlightOffset ?? null
+    if (forkHighlightOffset != null && normalizedRef.current.length > 0) {
+      sphereVisibleRef.current = true
+    }
+  }, [playType, forkHighlightOffset])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current
