@@ -45,3 +45,4 @@ Entries are in chronological order (oldest first).
 - Fix text selection when dragging transcript scrubber outside bounds
 - Share raw transcript text (VTT/SRT) instead of processed plain text
 - Add share button that encodes transcript + embedding coordinates in URL
+- Add "forked" playback mode to #manual view — playhead travels the main canonical branch, rapidly zips back to the branch point, then traverses the fork; toggle between "parallel" and "forked" modes via buttons in the playhead controls (only shown when a fork branch exists)
