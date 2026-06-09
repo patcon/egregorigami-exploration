@@ -9,6 +9,14 @@ import type { CameraState, FollowMode } from './scatterTypes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
+interface BranchSphereLinear {
+  mesh: THREE.Mesh
+  points: [number, number, number][]
+  parentIdx: number   // -1 for root
+  hideAfter: number   // root sphere hides when hp exceeds this; Infinity for branch spheres
+  currentT: number
+}
+
 interface Props {
   points: [number, number, number][]
   labels: string[]
@@ -277,12 +285,48 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       const fillMesh = new THREE.Points(fillGeo, fillMat)
       scene.add(fillMesh)
 
-      // Highlight sphere
+      // Highlight sphere — created here; branch mode also creates extras below
       const hlGeo = new THREE.SphereGeometry(0.05, 16, 16)
       const hlMat = new THREE.MeshBasicMaterial({ color: 0xff3333 })
       const highlightMesh = new THREE.Mesh(hlGeo, hlMat)
       highlightMesh.visible = false
       scene.add(highlightMesh)
+
+      // Per-branch spheres for branching playhead (bid=0 reuses highlightMesh)
+      const branchSpheresLinear: BranchSphereLinear[] = []
+      if (branchIds) {
+        const numBranches = Math.max(...branchIds) + 1
+        for (let bid = 0; bid < numBranches; bid++) {
+          const branchOnly: number[] = []
+          for (let i = 0; i < n; i++) if (branchIds[i] === bid) branchOnly.push(i)
+          if (branchOnly.length === 0) continue
+          let bParentIdx = -1
+          let branchPoints: [number, number, number][]
+          const hideAfter = bid === 0 ? branchOnly[branchOnly.length - 1] : Infinity
+          if (bid === 0) {
+            branchPoints = branchOnly.map(i => normalized[i])
+          } else {
+            const firstBranchIdx = branchOnly[0]
+            for (let i = firstBranchIdx - 1; i >= 0; i--) {
+              if (branchIds[i] === 0) { bParentIdx = i; break }
+            }
+            branchPoints = bParentIdx >= 0
+              ? [normalized[bParentIdx], ...branchOnly.map(i => normalized[i])]
+              : branchOnly.map(i => normalized[i])
+          }
+          let sphereMesh: THREE.Mesh
+          if (bid === 0) {
+            sphereMesh = highlightMesh
+          } else {
+            const sgeo = new THREE.SphereGeometry(0.05, 16, 16)
+            const smat = new THREE.MeshBasicMaterial({ color: 0xff3333 })
+            sphereMesh = new THREE.Mesh(sgeo, smat)
+            sphereMesh.visible = false
+            scene.add(sphereMesh)
+          }
+          branchSpheresLinear.push({ mesh: sphereMesh, points: branchPoints, parentIdx: bParentIdx, hideAfter, currentT: 0 })
+        }
+      }
 
       // Post-processing: bloom — strength and radius adapt to camera distance in animate loop
       const composer = new EffectComposer(renderer)
@@ -305,7 +349,30 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         const gs = glowStrengthRef.current
         bloomPass.strength = Math.max(1.0, 1.5 * (camDist / 4.0)) * gs
         bloomPass.radius = Math.min(1.0, 0.5 + 0.08 * (camDist / 4.0)) * gs
-        // Lerp the segment index so the sphere travels along the piecewise-linear path.
+        if (branchSpheresLinear.length > 0) {
+          // Multi-sphere branch mode: one sphere per branch, driven by highlightPositionRef.
+          // Root sphere (bid=0) reuses highlightMesh so camera-tracking code below works.
+          if (sphereVisibleRef.current) {
+            const hp = highlightPositionRef.current ?? 0
+            for (const bs of branchSpheresLinear) {
+              const show = bs.parentIdx < 0 ? hp <= bs.hideAfter : hp >= bs.parentIdx
+              bs.mesh.visible = show
+              if (show) {
+                const targetLocalT = bs.parentIdx < 0
+                  ? Math.min(bs.points.length - 1, hp)
+                  : Math.min(bs.points.length - 1, Math.max(0, hp - bs.parentIdx))
+                bs.currentT += (targetLocalT - bs.currentT) * 0.2
+                const ct = Math.max(0, Math.min(bs.points.length - 1, bs.currentT))
+                const a = Math.floor(ct), b = Math.min(bs.points.length - 1, Math.ceil(ct))
+                const f = ct - a, pa = bs.points[a], pb = bs.points[b]
+                bs.mesh.position.set(pa[0]+(pb[0]-pa[0])*f, pa[1]+(pb[1]-pa[1])*f, pa[2]+(pb[2]-pa[2])*f)
+              }
+            }
+          } else {
+            for (const bs of branchSpheresLinear) bs.mesh.visible = false
+          }
+        } else {
+        // Single-sphere mode: lerp the segment index along the piecewise-linear path.
         // On the first visible frame, snap to target and seed prevFollowTargetRef.
         if (sphereVisibleRef.current) {
           if (firstFrame) {
@@ -337,6 +404,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         } else {
           firstFrame = false
           highlightMesh.visible = false
+        }
         }
         const mode = followModeRef.current
         if (mode === 'tracking' && highlightMesh.visible) {
@@ -426,12 +494,15 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
     highlightPositionRef.current = highlightPosition
     const normalized = normalizedRef.current
     if (highlightPosition !== null && normalized.length > 0) {
-      targetSphereTRef.current = Math.min(normalized.length - 1, Math.max(0, highlightPosition))
+      if (!branchIds) {
+        // Single-sphere mode: pre-compute T; branch mode computes per-sphere T in the animate loop
+        targetSphereTRef.current = Math.min(normalized.length - 1, Math.max(0, highlightPosition))
+      }
       sphereVisibleRef.current = true
     } else {
       sphereVisibleRef.current = false
     }
-  }, [highlightPosition])
+  }, [highlightPosition, branchIds])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current

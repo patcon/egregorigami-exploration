@@ -124,6 +124,53 @@ export default function ManualEmbeddingProjector() {
     [submitted]
   )
 
+  // Playhead: the float segment index driving the highlight sphere(s)
+  const [playheadPos, setPlayheadPos] = useState<number | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const playheadRef = useRef(0)
+
+  // Total playhead range: root length + longest branch (branches run in parallel after branch point)
+  const maxPlayheadTime = useMemo(() => {
+    if (!submitted || !branchIds) return submitted ? submitted.length - 1 : 0
+    const parentIdx = branchIds.reduce((max, bid, i) => bid === 0 ? i : max, -1)
+    if (parentIdx < 0) return submitted.length - 1
+    const branchCounts = new Map<number, number>()
+    for (const bid of branchIds) {
+      if (bid > 0) branchCounts.set(bid, (branchCounts.get(bid) ?? 0) + 1)
+    }
+    const maxBranchLen = branchCounts.size > 0 ? Math.max(...branchCounts.values()) : 0
+    return parentIdx + maxBranchLen
+  }, [submitted, branchIds])
+
+  const PLAYHEAD_SPEED = 1.5  // nodes per second
+
+  useEffect(() => {
+    if (!isPlaying) return
+    let lastTime: number | null = null
+    let rafId: number
+    const tick = (time: number) => {
+      if (lastTime === null) lastTime = time
+      const dt = (time - lastTime) / 1000
+      lastTime = time
+      const next = Math.min(maxPlayheadTime, playheadRef.current + dt * PLAYHEAD_SPEED)
+      playheadRef.current = next
+      setPlayheadPos(next)
+      if (next >= maxPlayheadTime) { setIsPlaying(false); return }
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [isPlaying, maxPlayheadTime])
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      setIsPlaying(false)
+    } else {
+      if (playheadRef.current >= maxPlayheadTime) playheadRef.current = 0
+      setIsPlaying(true)
+    }
+  }
+
   const isRunning = phase.status === 'model-loading' || phase.status === 'embedding' || phase.status === 'umap-running'
   const isDone = phase.status === 'done'
 
@@ -232,7 +279,7 @@ export default function ManualEmbeddingProjector() {
               points={phase.points}
               labels={labels}
               branchIds={branchIds ?? undefined}
-              highlightPosition={null}
+              highlightPosition={playheadPos}
               onPointClick={() => {}}
               initialCameraState={cameraStateRef.current}
               onCameraChange={s => { cameraStateRef.current = s }}
@@ -243,7 +290,7 @@ export default function ManualEmbeddingProjector() {
               points={phase.points}
               labels={labels}
               branchIds={branchIds ?? undefined}
-              highlightPosition={null}
+              highlightPosition={playheadPos}
               onPointClick={() => {}}
               initialCameraState={cameraStateRef.current}
               onCameraChange={s => { cameraStateRef.current = s }}
@@ -254,7 +301,7 @@ export default function ManualEmbeddingProjector() {
               points={phase.points}
               labels={labels}
               branchIds={branchIds ?? undefined}
-              highlightPosition={null}
+              highlightPosition={playheadPos}
               onPointClick={() => {}}
               initialCameraState={cameraStateRef.current}
               onCameraChange={s => { cameraStateRef.current = s }}
@@ -277,6 +324,30 @@ export default function ManualEmbeddingProjector() {
                 {RENDERER_LABELS[r]}
               </button>
             ))}
+          </div>
+
+          {/* Playhead controls */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10 pointer-events-auto">
+            <button
+              className="text-base w-8 h-8 flex items-center justify-center rounded-full border border-white/25 bg-black/55 text-white/80 hover:bg-black/75 hover:text-white transition-[background,color] duration-150"
+              onClick={handlePlayPause}
+              title={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isPlaying ? '⏸' : '▶'}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={maxPlayheadTime}
+              step={0.01}
+              value={playheadPos ?? 0}
+              onChange={e => {
+                const v = parseFloat(e.target.value)
+                playheadRef.current = v
+                setPlayheadPos(v)
+              }}
+              className="w-36 accent-red-500 opacity-70 hover:opacity-100 transition-opacity"
+            />
           </div>
         </div>
       )}
