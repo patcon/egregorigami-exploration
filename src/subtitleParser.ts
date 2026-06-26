@@ -57,13 +57,14 @@ function parseTimestampMs(ts: string): number {
   // Supports HH:MM:SS.mmm or MM:SS.mmm (VTT uses '.', SRT uses ',')
   const normalized = ts.trim().replace(',', '.')
   const parts = normalized.split(':').map(Number)
+  if (parts.some(isNaN)) return NaN
   if (parts.length === 3) {
     return Math.round((parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000)
   }
   if (parts.length === 2) {
     return Math.round((parts[0] * 60 + parts[1]) * 1000)
   }
-  return 0
+  return NaN
 }
 
 function parseCues(raw: string): Cue[] {
@@ -84,11 +85,12 @@ function parseCues(raw: string): Cue[] {
     const startMs = parseTimestampMs(tsParts[0].trim())
     // End timestamp may have extra metadata (VTT position info), take only first token
     const endMs = parseTimestampMs(tsParts[1].trim().split(/\s/)[0])
+    if (isNaN(startMs)) continue
     // Text lines are after the timestamp line
     const textLines = lines.slice(tsLineIdx + 1)
     const text = textLines.join(' ').replace(/<[^>]+>/g, '').trim()
     if (text) {
-      cues.push({ startMs, endMs, text })
+      cues.push({ startMs, endMs: isNaN(endMs) ? startMs : endMs, text })
     }
   }
   return cues

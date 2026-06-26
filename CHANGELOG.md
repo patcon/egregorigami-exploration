@@ -43,6 +43,8 @@
 - Sync `?videoId=` querystring in real time as YouTube URL is typed into any view (v2, v3, v4, v5)
 - Add download button for 3D embedding points (v3 modal + v5 inline panel) — exports `embeddings-3d.json` once embeddings are complete
 
+- Fix VTT subtitle parsing when the last cue has a malformed end timestamp (e.g. `NaN:NaN:NaN.NaN`) — duration no longer displays as NaN and cursor sync works correctly
+
 ## Prior work (selected)
 
 - Add cancel button to embedding progress bar
