@@ -372,26 +372,23 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
             const hp = highlightPositionRef.current ?? 0
             for (const bs of branchSpheresLinear) {
               if (fo !== null) {
-                // Fork phase: only fork sphere(s) visible
+                // Fork phase: only fork sphere(s) visible; easing applied upstream — set directly
                 if (bs.parentIdx < 0) {
                   bs.mesh.visible = false
                 } else {
-                  if (!bs.mesh.visible) bs.currentT = 0
                   bs.mesh.visible = true
-                  const t = Math.min(bs.points.length - 1, Math.max(0, fo))
-                  bs.currentT += (t - bs.currentT) * 0.2
-                  const ct = Math.max(0, Math.min(bs.points.length - 1, bs.currentT))
+                  const ct = Math.max(0, Math.min(bs.points.length - 1, fo))
+                  bs.currentT = ct
                   const a = Math.floor(ct), b = Math.min(bs.points.length - 1, Math.ceil(ct))
                   const f = ct - a, pa = bs.points[a], pb = bs.points[b]
                   bs.mesh.position.set(pa[0]+(pb[0]-pa[0])*f, pa[1]+(pb[1]-pa[1])*f, pa[2]+(pb[2]-pa[2])*f)
                 }
               } else {
-                // Main/backtrack phase: only main sphere visible
+                // Main/backtrack phase: only main sphere visible; easing applied upstream — set directly
                 if (bs.parentIdx < 0) {
                   bs.mesh.visible = true
-                  const t = Math.min(bs.points.length - 1, Math.max(0, hp))
-                  bs.currentT += (t - bs.currentT) * 0.2
-                  const ct = Math.max(0, Math.min(bs.points.length - 1, bs.currentT))
+                  const ct = Math.max(0, Math.min(bs.points.length - 1, hp))
+                  bs.currentT = ct
                   const a = Math.floor(ct), b = Math.min(bs.points.length - 1, Math.ceil(ct))
                   const f = ct - a, pa = bs.points[a], pb = bs.points[b]
                   bs.mesh.position.set(pa[0]+(pb[0]-pa[0])*f, pa[1]+(pb[1]-pa[1])*f, pa[2]+(pb[2]-pa[2])*f)

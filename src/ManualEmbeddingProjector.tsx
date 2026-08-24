@@ -146,7 +146,7 @@ export default function ManualEmbeddingProjector() {
     const BACKTRACK_SPEED_RATIO = 5
     const backtrackDist = mainPathEnd - branchPoint
     const backtrackDuration = backtrackDist / BACKTRACK_SPEED_RATIO
-    const forkedMaxTime = mainPathEnd + backtrackDuration + forkLength
+    const forkedMaxTime = mainPathEnd + backtrackDuration * 2  // fork phase = same duration as backtrack
     return { mainPathEnd, branchPoint, forkLength, backtrackDuration, BACKTRACK_SPEED_RATIO, forkedMaxTime }
   }, [submitted, branchIds])
 
@@ -169,16 +169,21 @@ export default function ManualEmbeddingProjector() {
     if (playType === 'parallel' || !forkedLayout || playheadPos === null) {
       return { mainHighlight: playheadPos, forkOffset: null }
     }
-    const { mainPathEnd, branchPoint, backtrackDuration, BACKTRACK_SPEED_RATIO } = forkedLayout
+    const { mainPathEnd, branchPoint, backtrackDuration, forkLength } = forkedLayout
     if (playheadPos <= mainPathEnd) {
       return { mainHighlight: playheadPos, forkOffset: null }
     }
     const afterMain = playheadPos - mainPathEnd
     if (afterMain <= backtrackDuration) {
-      const backPos = mainPathEnd - afterMain * BACKTRACK_SPEED_RATIO
-      return { mainHighlight: Math.max(branchPoint, backPos), forkOffset: null }
+      // Ease-in: slow start, fast end
+      const t = afterMain / backtrackDuration
+      const eased = t * t
+      return { mainHighlight: mainPathEnd - eased * (mainPathEnd - branchPoint), forkOffset: null }
     }
-    return { mainHighlight: null, forkOffset: playheadPos - mainPathEnd - backtrackDuration }
+    // Ease-out: fast start, slow end — same duration as backtrack
+    const forkT = Math.min(1, (afterMain - backtrackDuration) / backtrackDuration)
+    const eased = 1 - (1 - forkT) * (1 - forkT)
+    return { mainHighlight: null, forkOffset: eased * forkLength }
   }, [playheadPos, playType, forkedLayout])
 
   const PLAYHEAD_SPEED = 1.5  // nodes per second
