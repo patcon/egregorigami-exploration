@@ -15,10 +15,13 @@ export type LiveStatus =
  * re-lays-out stably (warm-started UMAP + Procrustes alignment).
  *
  * Never starts an update while the worker is still running one (layout time
- * grows with transcript length). While busy, only the most recent request is
- * kept and sent as soon as the worker frees up, so updates run back-to-back
- * and each one covers everything that arrived in the meantime.
+ * grows with transcript length). Only the latest requested prefix is kept, and
+ * the worker is fed as soon as it frees up. A large backlog (e.g. after jumping
+ * ahead on the timeline) is sent in batches of MAX_BATCH new segments, so the
+ * view appears quickly and visibly catches up instead of blocking on one huge job.
  */
+const MAX_BATCH = 20
+
 export function useLiveEmbedding() {
   const [points, setPoints] = useState<[number, number, number][] | null>(null)
   const [status, setStatus] = useState<LiveStatus>({ status: 'idle' })
@@ -28,14 +31,23 @@ export function useLiveEmbedding() {
   const inFlightRef = useRef<number | null>(null)
   /** Whether the worker is running a live update — stays true after a reset until it finishes. */
   const busyRef = useRef(false)
-  const queuedRef = useRef<{ texts: string[]; modelId: EmbeddingModelId } | null>(null)
+  /** Latest prefix of segments the view wants laid out. */
+  const targetRef = useRef<{ texts: string[]; modelId: EmbeddingModelId } | null>(null)
+  /** How many segments the in-flight (or last completed) request covered. */
+  const sentCountRef = useRef(0)
 
-  const send = useCallback((worker: Worker, texts: string[], modelId: EmbeddingModelId) => {
+  /** If the worker is free and the target is ahead of what's been sent, send the next batch. */
+  const pump = useCallback((worker: Worker) => {
+    const target = targetRef.current
+    if (busyRef.current || !target) return
+    const n = Math.min(target.texts.length, sentCountRef.current + MAX_BATCH)
+    if (n <= sentCountRef.current) return
     const requestId = ++requestIdRef.current
     inFlightRef.current = requestId
     busyRef.current = true
-    setStatus(s => s.status === 'model-loading' ? s : { status: 'updating', count: texts.length })
-    worker.postMessage({ type: 'live-update', requestId, texts, modelId })
+    sentCountRef.current = n
+    setStatus(s => s.status === 'model-loading' ? s : { status: 'updating', count: n })
+    worker.postMessage({ type: 'live-update', requestId, texts: target.texts.slice(0, n), modelId: target.modelId })
   }, [])
 
   const getWorker = useCallback(() => {
@@ -58,25 +70,20 @@ export function useLiveEmbedding() {
           setStatus({ status: 'error', message: msg.message })
         }
       } // else: stale result from before a reset — drop it, but the worker is free now
-      const next = queuedRef.current
-      queuedRef.current = null
-      if (next) send(w, next.texts, next.modelId)
+      pump(w)
     }
     workerRef.current = w
     return w
-  }, [send])
+  }, [pump])
 
   const update = useCallback((texts: string[], modelId: EmbeddingModelId) => {
-    const w = getWorker()
-    if (busyRef.current) {
-      queuedRef.current = { texts, modelId }
-      return
-    }
-    send(w, texts, modelId)
-  }, [getWorker, send])
+    targetRef.current = { texts, modelId }
+    pump(getWorker())
+  }, [getWorker, pump])
 
   const reset = useCallback(() => {
-    queuedRef.current = null
+    targetRef.current = null
+    sentCountRef.current = 0
     inFlightRef.current = null // busyRef stays as-is: a running job still blocks new sends
     workerRef.current?.postMessage({ type: 'live-reset' })
     setPoints(null)

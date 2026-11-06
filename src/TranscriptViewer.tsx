@@ -1,5 +1,36 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { detectAndParseSubtitle, type SubtitleParseResult } from './subtitleParser'
+
+const WORD_CHUNK = 200
+
+/**
+ * A run of transcript words, memoised. Long transcripts (thousands of words)
+ * used to rebuild every word span on each cursor move, stalling the page for
+ * hundreds of ms. Chunks outside the highlight window get identical props
+ * (hlStart = hlEnd = cursor = -1) and are skipped entirely.
+ */
+const WordChunk = memo(function WordChunk({ start, words, hlStart, hlEnd, cursor, registry }: {
+  start: number
+  words: string[]
+  hlStart: number   // absolute index of first highlighted word in this chunk, or -1
+  hlEnd: number     // absolute index one past the last highlighted word, or -1
+  cursor: number    // absolute cursor index if in this chunk, else -1
+  registry: Map<number, HTMLSpanElement>
+}) {
+  return (
+    <>
+      {words.map((word, j) => {
+        const i = start + j
+        const cls = i === cursor ? 'word in-window cursor' : i >= hlStart && i < hlEnd ? 'word in-window' : 'word'
+        return (
+          <span key={i} className={cls} ref={el => { if (el) registry.set(i, el); else registry.delete(i) }}>
+            {word}{' '}
+          </span>
+        )
+      })}
+    </>
+  )
+})
 
 const DEFAULT_TEXT = `The embedding window is a concept from transformer models where a fixed-size context window moves through a sequence of tokens. As the window slides forward, the model attends to a new set of words, creating a representation of that local context. This visualization lets you see how the window advances through your text over time, simulating the way a transformer might process a long document or video transcript in chunks. Try pasting your own text, adjusting the window size to match your model's context length, and setting a playback duration to match the length of your source video or audio. Watch how the highlighted region moves steadily from the beginning to the end of the transcript, pausing and resuming as you explore.`
 
@@ -67,7 +98,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const textAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const words = text.trim() ? text.trim().split(/\s+/) : []
+  const words = useMemo(() => (text.trim() ? text.trim().split(/\s+/) : []), [text])
+  const wordChunks = useMemo(() => {
+    const chunks: { start: number; words: string[] }[] = []
+    for (let i = 0; i < words.length; i += WORD_CHUNK) chunks.push({ start: i, words: words.slice(i, i + WORD_CHUNK) })
+    return chunks
+  }, [words])
   const overlapPct = Math.min(99, Math.max(0, parseFloat(overlapInput) || 0))
   const windowInputNum = parseInt(windowInput) || 0
   const windowSize = windowMode === 'words'
@@ -465,21 +501,20 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
         <p className="text-text italic">Paste some text above to get started.</p>
       ) : (
         <p className="text-base md:text-lg leading-[1.65] md:leading-[1.8] text-text">
-          {words.map((word, i) => {
-            const inWindow = i >= windowStart && i < windowStart + windowSize
-            const isCursor = i === cursorIndex
-            const cls = ['word', inWindow ? 'in-window' : '', isCursor ? 'cursor' : ''].filter(Boolean).join(' ')
+          {wordChunks.map(({ start, words: chunk }) => {
+            const end = start + chunk.length
+            const windowEnd = windowStart + windowSize
+            const overlaps = windowStart < end && windowEnd > start
             return (
-              <span
-                key={i}
-                ref={el => {
-                  if (el) wordRefsMap.current.set(i, el)
-                  else wordRefsMap.current.delete(i)
-                }}
-                className={cls}
-              >
-                {word}{' '}
-              </span>
+              <WordChunk
+                key={start}
+                start={start}
+                words={chunk}
+                hlStart={overlaps ? Math.max(windowStart, start) : -1}
+                hlEnd={overlaps ? Math.min(windowEnd, end) : -1}
+                cursor={cursorIndex >= start && cursorIndex < end ? cursorIndex : -1}
+                registry={wordRefsMap.current}
+              />
             )
           })}
         </p>

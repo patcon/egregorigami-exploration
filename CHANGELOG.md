@@ -53,6 +53,8 @@ Entries are in chronological order (oldest first).
 - v8 live renderer: path lines are now real thick lines (default 3px, via three.js `Line2`; plain WebGL lines are always 1px), and Config has "Line width" and "Node size" sliders (saved in localStorage; the playhead sphere grows with node size)
 - v8 Config: "Auto-rotate" toggle and "Rotation speed" slider (default ~60s per turn) that slowly orbits the live 3D view around its centre; dragging still works, and it combines with the tracking/following camera modes
 - v8 live mode never starts a layout while the worker is still busy, including right after "Reset live" or a model/video change (previously the next request was sent immediately and queued behind the stale job). The 3D badge now shows how many passed segments are waiting for the next layout.
+- Fix the page stalling (~0.4–0.8s per cursor move) on long transcripts, which was most noticeable when jumping ahead on the timeline and then playing. `TranscriptViewer` now renders words in memoised chunks so only the chunk(s) around the highlight re-render (all views), and v8 memoises its Segments list instead of rebuilding every row on each cursor move.
+- v8 live mode: after a big jump ahead, the backlog is embedded in batches of 20 segments, so points appear within a few seconds and visibly catch up, instead of the 3D view staying blank until the whole backlog is embedded
 
 ## Prior work (selected)
 

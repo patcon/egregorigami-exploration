@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3D from './ScatterPlot3D'
@@ -387,6 +387,22 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
     if (isDesktop && transcriptTab === '3d') setTranscriptTab('windowed')
   }, [isDesktop]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Memoised: rebuilding ~hundreds of rows on every cursor move stalled the page
+  const segmentsContent = useMemo(() => segments && segments.length > 0 ? (
+    <ul className="list-none p-0 m-0 overflow-y-auto overscroll-y-contain flex-1">
+      {segments.map((seg, i) => (
+        <li key={i} className="flex gap-2 py-2 px-3.5 border-b border-border text-[13px] items-start">
+          <span className="text-text opacity-50 min-w-[28px] flex-shrink-0 text-right tabular-nums pt-[1px]">{i + 1}</span>
+          <span className="text-text-h leading-[1.45]">{seg}</span>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+      Load a transcript to see segments.
+    </div>
+  ), [segments])
+
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden overscroll-none">
       {/* Info modal */}
@@ -463,21 +479,6 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             <div className="yt-player-aspect relative w-full aspect-video bg-code-bg rounded flex items-center justify-center">
               <span className="text-text opacity-40 text-[13px]">Paste a YouTube URL above to load the player</span>
             </div>
-          </div>
-        )
-
-        const segmentsContent = segments && segments.length > 0 ? (
-          <ul className="list-none p-0 m-0 overflow-y-auto overscroll-y-contain flex-1">
-            {segments.map((seg, i) => (
-              <li key={i} className="flex gap-2 py-2 px-3.5 border-b border-border text-[13px] items-start">
-                <span className="text-text opacity-50 min-w-[28px] flex-shrink-0 text-right tabular-nums pt-[1px]">{i + 1}</span>
-                <span className="text-text-h leading-[1.45]">{seg}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
-            Load a transcript to see segments.
           </div>
         )
 
