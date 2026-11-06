@@ -6,6 +6,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import type { CameraState, FollowMode } from './scatterTypes'
+import { swingFollowCamera } from './followCamera'
 import { glowPalette } from './palettes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
@@ -461,19 +462,12 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
           const hp = highlightPositionRef.current ?? 0
           const a = Math.max(0, Math.min(norm.length - 2, Math.floor(hp)))
           const currTangent = new THREE.Vector3(...norm[a + 1]).sub(new THREE.Vector3(...norm[a])).normalize()
-          // Rotate camera's orbital offset to track path direction change
+          // Swing the camera's orbital offset toward the path's new direction over several frames
           const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
-          const prevTangent = prevPathTangentRef.current
-          if (prevTangent.lengthSq() > 0) {
-            const dot = prevTangent.dot(currTangent)
-            if (dot < 0.9999 && dot > -0.9999) {
-              oldOffset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(prevTangent, currTangent))
-            }
-          }
+          swingFollowCamera(oldOffset, prevPathTangentRef.current, currTangent)
           camera.position.copy(newTarget).add(oldOffset)
           controls.target.copy(newTarget)
           prevFollowTargetRef.current.copy(newTarget)
-          prevPathTangentRef.current.copy(currTangent)
           controls.update()
         } else {
           controls.enabled = true

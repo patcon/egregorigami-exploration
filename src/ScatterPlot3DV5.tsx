@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
+import { swingFollowCamera } from './followCamera'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
@@ -387,19 +388,12 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
           controls.enabled = true
           const newTarget = highlightMesh.position.clone()
           const currTangent = curve.getTangent(Math.max(0.0001, Math.min(0.9999, currentSphereTRef.current)))
-          // Rotate camera's orbital offset to track path direction change
+          // Swing the camera's orbital offset toward the path's new direction over several frames
           const oldOffset = camera.position.clone().sub(prevFollowTargetRef.current)
-          const prevTangent = prevPathTangentRef.current
-          if (prevTangent.lengthSq() > 0) {
-            const dot = prevTangent.dot(currTangent)
-            if (dot < 0.9999 && dot > -0.9999) {
-              oldOffset.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(prevTangent, currTangent))
-            }
-          }
+          swingFollowCamera(oldOffset, prevPathTangentRef.current, currTangent)
           camera.position.copy(newTarget).add(oldOffset)
           controls.target.copy(newTarget)
           prevFollowTargetRef.current.copy(newTarget)
-          prevPathTangentRef.current.copy(currTangent)
           controls.update()
         } else {
           controls.enabled = true

@@ -47,6 +47,7 @@ Entries are in chronological order (oldest first).
 - "Points + Line" renderer now uses the same blue → cyan → yellow gradient as Glow (was a blue → red HSL sweep); palette shared via `src/palettes.ts`
 - Fix playhead scrub-bar thumb jumping up and left on hover — the hover `transform` stacked a second offset on Tailwind v4's `translate` property, and a stray `margin-top` shifted the bar; now uses `group-hover:scale-130` / `hover:h-[6px]`
 - Transcript auto-scroll now follows the cursor while scrubbing the timeline (previously only during playback)
+- "Following" camera mode now swings smoothly around the cursor when the path changes direction, instead of snapping behind it at every bend (shared `src/followCamera.ts`, used by the tube and glow renderers)
 
 ## Prior work (selected)
 
