@@ -20,6 +20,10 @@ interface Props {
   lineWidth?: number
   /** Node (point) size in world units. */
   nodeSize?: number
+  /** Slowly orbit the camera around its target (the cloud's centre unless panned). */
+  autoRotate?: boolean
+  /** Orbit speed; 1 ≈ one revolution per minute. */
+  autoRotateSpeed?: number
 }
 
 export const DEFAULT_LINE_WIDTH = 3
@@ -56,7 +60,7 @@ function makeBuffers(capacity: number): Buffers {
  * renderers, the scene is built once and point updates tween in place, so the
  * camera and frame of reference stay put while the layout evolves.
  */
-export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE }: Props) {
+export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     camera: THREE.PerspectiveCamera
@@ -81,7 +85,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(highlightPosition)
   const currentSphereTRef = useRef(0)
-  const styleRef = useRef({ lineWidth, nodeSize })
+  const styleRef = useRef({ lineWidth, nodeSize, autoRotate, autoRotateSpeed })
   const labelsRef = useRef(labels)
   useEffect(() => { labelsRef.current = labels }, [labels])
   const onCameraChangeRef = useRef(onCameraChange)
@@ -188,6 +192,9 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       const controls = new OrbitControls(camera, renderer.domElement)
       controls.enableDamping = true
       controls.dampingFactor = 0.08
+      // OrbitControls' autoRotateSpeed 2 = 30s per orbit at 60fps, so speed 1 here ≈ 60s per orbit
+      controls.autoRotate = styleRef.current.autoRotate
+      controls.autoRotateSpeed = styleRef.current.autoRotateSpeed
       if (initialCameraState) {
         camera.position.set(...initialCameraState.position)
         controls.target.set(...initialCameraState.target)
@@ -230,8 +237,12 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
 
       let animId = 0
       let sphereWasVisible = false
+      let lastFrame = performance.now()
       const animate = () => {
         animId = requestAnimationFrame(animate)
+        const now = performance.now()
+        const dt = Math.min(0.1, (now - lastFrame) / 1000) // seconds; clamp after tab switches
+        lastFrame = now
         const n = countRef.current
 
         // Position/colour tween
@@ -282,7 +293,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
           controls.target.copy(newTarget)
           prevFollowTargetRef.current.copy(newTarget)
         }
-        controls.update()
+        controls.update(dt) // dt keeps auto-rotate speed independent of refresh rate
         renderer.render(scene, camera)
       }
       animate()
@@ -330,13 +341,15 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   useEffect(() => { retarget(points) }, [points])
   useEffect(() => { highlightPositionRef.current = highlightPosition }, [highlightPosition])
   useEffect(() => {
-    styleRef.current = { lineWidth, nodeSize }
+    styleRef.current = { lineWidth, nodeSize, autoRotate, autoRotateSpeed }
     const s = sceneRef.current
     if (!s) return
     s.lineMat.linewidth = lineWidth
     s.pointsMat.size = nodeSize
     s.highlightMesh.scale.setScalar(Math.max(1, nodeSize / DEFAULT_NODE_SIZE))
-  }, [lineWidth, nodeSize])
+    s.controls.autoRotate = autoRotate
+    s.controls.autoRotateSpeed = autoRotateSpeed
+  }, [lineWidth, nodeSize, autoRotate, autoRotateSpeed])
 
   const hitTest = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current

@@ -101,6 +101,8 @@ export default function EmbeddingLayoutViewV8() {
   )
   const [lineWidth, setLineWidth] = useState(() => parseFloat(localStorage.getItem('live-line-width') ?? '') || DEFAULT_LINE_WIDTH)
   const [nodeSize, setNodeSize] = useState(() => parseFloat(localStorage.getItem('live-node-size') ?? '') || DEFAULT_NODE_SIZE)
+  const [autoRotate, setAutoRotate] = useState(() => localStorage.getItem('live-auto-rotate') === 'true')
+  const [autoRotateSpeed, setAutoRotateSpeed] = useState(() => parseFloat(localStorage.getItem('live-auto-rotate-speed') ?? '') || 1)
   const [glowStrength, setGlowStrength] = useState(() =>
     parseFloat(localStorage.getItem('glow-strength') ?? '1')
   )
@@ -533,6 +535,27 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 onChange={e => { const v = parseFloat(e.target.value); setNodeSize(v); localStorage.setItem('live-node-size', String(v)) }}
                 className="w-full accent-accent"
               />
+              <label className="flex items-center gap-2 text-[13px] text-text-h font-medium cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={autoRotate}
+                  onChange={e => { setAutoRotate(e.target.checked); localStorage.setItem('live-auto-rotate', String(e.target.checked)) }}
+                />
+                Auto-rotate
+              </label>
+              <div className={`flex flex-col gap-2 ${autoRotate ? '' : 'opacity-40 pointer-events-none'}`}>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="live-auto-rotate-speed" className="text-[13px] text-text-h font-medium">Rotation speed</label>
+                  <span className="text-[13px] text-text opacity-60 tabular-nums">{Math.round(60 / autoRotateSpeed)}s / turn</span>
+                </div>
+                <input
+                  id="live-auto-rotate-speed"
+                  type="range" min={0.1} max={5} step={0.1}
+                  value={autoRotateSpeed}
+                  onChange={e => { const v = parseFloat(e.target.value); setAutoRotateSpeed(v); localStorage.setItem('live-auto-rotate-speed', String(v)) }}
+                  className="w-full accent-accent"
+                />
+              </div>
               <p className="text-[12px] text-text opacity-40 m-0">Live (Points + Line) renderer only.</p>
             </div>
             <div className="flex flex-col gap-2">
@@ -560,7 +583,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const liveThreeDContent = livePoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} />
+            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} />
             <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
               <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
               <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}</div>
