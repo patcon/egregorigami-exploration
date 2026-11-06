@@ -5,6 +5,7 @@ import YoutubeEmbeddingProjector from './YoutubeEmbeddingProjector'
 import EmbeddingLayoutView from './EmbeddingLayoutView'
 import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
 import EmbeddingLayoutViewV7 from './EmbeddingLayoutViewV7'
+import EmbeddingLayoutViewV8 from './EmbeddingLayoutViewV8'
 import MicTranscriptViewer from './MicTranscriptViewer'
 import ManualEmbeddingProjector from './ManualEmbeddingProjector'
 
@@ -66,7 +67,13 @@ function IndexPage() {
           <li>
             <a href="#v7" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Embedding Layout (Mobile)</strong>
-              <span className="text-sm text-text">Mobile-optimized version of v5. (default)</span>
+              <span className="text-sm text-text">Mobile-optimized version of v5.</span>
+            </a>
+          </li>
+          <li>
+            <a href="#v8" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Live Incremental Embedding</strong>
+              <span className="text-sm text-text">v7 plus a live mode: segments are embedded as the transcript plays, and the 3D layout animates as it grows. (default)</span>
             </a>
           </li>
           <li>
@@ -134,9 +141,10 @@ function App() {
   if (hash === '#v5') return <><GitHubCorner /><IndexLink /><EmbeddingLayoutViewV5 /></>
   if (hash === '#v6') return <><GitHubCorner /><IndexLink /><MicTranscriptViewer /></>
   if (hash === '#v7') return <><GitHubCorner /><EmbeddingLayoutViewV7 /></>
+  if (hash === '#v8') return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
   if (hash === '#manual') return <><GitHubCorner /><IndexLink /><ManualEmbeddingProjector /></>
   if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
-  return <><GitHubCorner /><EmbeddingLayoutViewV7 /></>
+  return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
 }
 
 export default App
