@@ -443,12 +443,12 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
         </button>
         <button className="py-1 px-1.5 bg-code-bg text-text-h border border-border rounded-md text-xs cursor-pointer transition-opacity duration-150 hover:opacity-75" onClick={() => handleStep(1)} title="Step forward">⏭</button>
         <div
-          className="scrub-bar flex-1 relative h-[4px] bg-border cursor-pointer rounded-[2px] overflow-visible group mx-1"
+          className="scrub-bar flex-1 relative h-[4px] hover:h-[6px] transition-[height] duration-100 bg-border cursor-pointer rounded-[2px] overflow-visible group mx-1"
           onPointerDown={handleScrubPointerDown}
           onPointerMove={handleScrubPointerMove}
         >
           <div className="scrub-progress absolute left-0 top-0 h-full bg-accent rounded-[2px] pointer-events-none" style={{ width: `${position * 100}%` }} />
-          <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100" style={{ left: `${position * 100}%` }} />
+          <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100 group-hover:scale-130" style={{ left: `${position * 100}%` }} />
         </div>
       </div>
     </>
