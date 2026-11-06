@@ -1,5 +1,6 @@
 import { UMAP } from 'umap-js'
 import type { WorkerCommand, WorkerEvent } from './embeddingWorker.types'
+import { loadTransformers } from './loadTransformers'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPipeline = any
@@ -11,7 +12,7 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
   if (cmd.type === 'embed') {
     try {
       if (!pipelineCache.has(cmd.modelId)) {
-        const { pipeline } = await import('@huggingface/transformers')
+        const { pipeline } = await loadTransformers()
         const instance = await pipeline('feature-extraction', cmd.modelId, {
           progress_callback: (info: unknown) => {
             const pct = (info as { progress?: number })?.progress ?? 0

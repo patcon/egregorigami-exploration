@@ -37,6 +37,7 @@ Entries are in chronological order (oldest first).
 - Cloudflare Worker fetches transcripts via [Supadata](https://supadata.ai) (`mode=native`, existing captions only) when the `SUPADATA_API_KEY` secret is set, since YouTube bot-blocks direct requests from Cloudflare; local `pnpm dev` still fetches from YouTube directly
 - Cache transcripts in Workers KV (`TRANSCRIPTS` binding, keyed by video ID, no expiry) so each video is fetched from Supadata at most once; responses carry an `X-Transcript-Cache: HIT|MISS` header
 - Also cache "no transcript" answers from Supadata (video has no captions or doesn't exist) for 24h under `unavailable:v1:<videoId>`, returned as 404 so the frontend falls back to the manual flow; transient failures (rate limits, auth, outages) are never cached. Existing cached transcripts are untouched
+- Stop bundling ONNX Runtime's ~22 MB `.wasm` into `dist/` — it was already loaded from jsDelivr at runtime; the CDN path is now set explicitly (`src/loadTransformers.ts`) and a Vite plugin drops the unused copy. Build output shrinks from ~24 MB to ~2 MB, well under Cloudflare's 25 MiB per-asset limit
 
 - Fix VTT subtitle parsing when the last cue has a malformed end timestamp (e.g. `NaN:NaN:NaN.NaN`) — duration no longer displays as NaN and cursor sync works correctly
 - Fix embedding model failing to load on the Cloudflare deploy with a CORS error — Hugging Face 404s requests with a `*.workers.dev` Referer, so the site now sends `Referrer-Policy: no-referrer` (via `public/_headers`)

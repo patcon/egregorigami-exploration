@@ -1,3 +1,5 @@
+import { loadTransformers } from './loadTransformers'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPipeline = any
 
@@ -19,7 +21,7 @@ export async function getEmbeddings(
   modelId: EmbeddingModelId = 'Xenova/all-MiniLM-L6-v2'
 ): Promise<Float32Array[]> {
   if (!pipelineCache.has(modelId)) {
-    const { pipeline } = await import('@huggingface/transformers')
+    const { pipeline } = await loadTransformers()
     const instance = await pipeline('feature-extraction', modelId, {
       progress_callback: (info: unknown) => {
         const pct = (info as { progress?: number })?.progress ?? 0
