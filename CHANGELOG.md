@@ -32,6 +32,7 @@ Entries are in chronological order (oldest first).
 - Smooth branch divergence in Tube renderer: branch tubes now prepend several root nodes so both curves share the same CatmullRom tangent at the junction; colors blend from root to branch over the overlap region so branches appear to peel off naturally rather than snap into view
 - Add branching playhead to `#manual` view: ▶/⏸ button and scrubber animate a red sphere through all segments; at the branch point the root sphere disappears and one sphere per branch continues in sync; works in all three renderers (Tube, Glow, Points)
 - Unify main-path playhead: the first `- ` arm (bid=1) is treated as a continuation of the trunk, so the main sphere travels root→arm1 without interruption; actual branch spheres (bid≥2) peel off from the trunk-end fork point as before
+- Add alternative Cloudflare Workers deploy (`pnpm cf:deploy`, `.github/workflows/deploy-cloudflare.yml`) — the Worker serves the built app and `/api/transcript`, so "Fetch Transcript" works in-app instead of linking out to youtube-transcript.io; the GitHub Pages deploy is unchanged
 
 - Fix VTT subtitle parsing when the last cue has a malformed end timestamp (e.g. `NaN:NaN:NaN.NaN`) — duration no longer displays as NaN and cursor sync works correctly
 

@@ -9,6 +9,8 @@ pnpm dev          # Start dev server (required for YouTube transcript features)
 pnpm build        # TypeScript compile + Vite build
 pnpm lint         # ESLint
 pnpm preview      # Preview production build locally
+pnpm cf:dev       # Build for Cloudflare + run the Worker locally (wrangler dev)
+pnpm cf:deploy    # Build for Cloudflare + deploy the Worker
 
 # Extract a transcript to stdout (dev only)
 pnpm extract-transcript -- <youtube-url-or-video-id>
@@ -29,7 +31,7 @@ Single-page React + TypeScript app built with Vite. Hash-based routing in `App.t
 - `#v2` — `YoutubeTranscriptViewer`: Wraps `TranscriptViewer` with a YouTube URL input. Fetches transcript from the local dev server API (`/api/transcript`), then passes text + duration into `TranscriptViewer`.
 - `#v3` — `YoutubeEmbeddingProjector`: URL input → loads segments → `SegmentProjectorModal` runs in-browser embeddings via `@huggingface/transformers` (model: `Xenova/all-MiniLM-L6-v2`) → UMAP 3D reduction → `ScatterPlot3D` (Three.js).
 
-**Dev-only API:** The Vite config registers a `/api/transcript` middleware (via `youtube-transcript-plus`) that proxies YouTube transcript fetching server-side. This endpoint does **not** exist in production builds — `import.meta.env.PROD` guards disable the URL input when deployed.
+**Dev-only API:** The Vite config registers a `/api/transcript` middleware (via `youtube-transcript-plus`) that proxies YouTube transcript fetching server-side. The same handler lives in `server/transcript.ts` and is also served by the Cloudflare Worker (`worker/index.ts`, `wrangler.jsonc`). On the GitHub Pages build the endpoint does **not** exist: `hasTranscriptApi` in `src/env.ts` (true in dev or when built with `VITE_TRANSCRIPT_API=true`) gates the in-app fetch, and views fall back to linking out to youtube-transcript.io.
 
 **Key data flow for #v3:**
 1. `YoutubeEmbeddingProjector` fetches segments → stores in `localStorage` (`yt-segments`)
@@ -40,4 +42,6 @@ Single-page React + TypeScript app built with Vite. Hash-based routing in `App.t
 
 **localStorage keys:** `yt-url`, `yt-transcript`, `yt-duration`, `yt-video-id`, `yt-segments`, `transcript-text`, `transcript-duration`
 
-**Deployment:** GitHub Pages at `/egregorigami-exploration/` (configured in `vite.config.ts` `base`).
+**Deployment:** Two targets, each with its own workflow:
+- GitHub Pages at `/egregorigami-exploration/` (`deploy.yml`, default `base` in `vite.config.ts`). Static only, no transcript API.
+- Cloudflare Workers at `/` (`deploy-cloudflare.yml`, `pnpm build:cf` sets `VITE_BASE=/` and `VITE_TRANSCRIPT_API=true`). Needs the repo secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
