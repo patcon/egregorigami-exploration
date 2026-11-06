@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 
+// Background for every 3D scene: black so the bright gradients (and bloom) read well.
+export const SCENE_BG = new THREE.Color(0x000000)
+
 // Shared along-the-transcript gradient (t = 0 at start, 1 at end).
 export function glowPalette(t: number): THREE.Color {
   // Vivid blue → cyan → bright yellow — optimized for bloom glow

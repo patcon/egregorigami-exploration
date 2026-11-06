@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 import { swingFollowCamera } from './followCamera'
+import { SCENE_BG } from './palettes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
@@ -104,8 +105,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
       const renderer = new THREE.WebGLRenderer({ antialias: true })
       renderer.setSize(w, h)
       renderer.setPixelRatio(window.devicePixelRatio)
-      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117'
-      renderer.setClearColor(new THREE.Color(bgColor))
+      renderer.setClearColor(SCENE_BG)
       mount.appendChild(renderer.domElement)
 
       const scene = new THREE.Scene()

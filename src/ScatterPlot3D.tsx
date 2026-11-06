@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { glowPalette } from './palettes'
+import { glowPalette, SCENE_BG } from './palettes'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 
@@ -82,8 +82,7 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
       const renderer = new THREE.WebGLRenderer({ antialias: true })
       renderer.setSize(w, h)
       renderer.setPixelRatio(window.devicePixelRatio)
-      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117'
-      renderer.setClearColor(new THREE.Color(bgColor))
+      renderer.setClearColor(SCENE_BG)
       mount.appendChild(renderer.domElement)
 
       const scene = new THREE.Scene()

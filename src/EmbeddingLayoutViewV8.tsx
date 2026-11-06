@@ -141,7 +141,7 @@ export default function EmbeddingLayoutViewV8() {
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   // ─── Live (incremental) embedding ────────────────────────────────────────
   const [liveEmbed, setLiveEmbed] = useState(() => localStorage.getItem('live-embed') !== 'false')
-  const [liveEvery, setLiveEvery] = useState(() => Math.max(1, parseInt(localStorage.getItem('live-embed-every') ?? '3') || 3))
+  const [liveEvery, setLiveEvery] = useState(() => Math.max(1, parseInt(localStorage.getItem('live-embed-every') ?? '1') || 1))
   const { points: livePoints, status: liveStatus, update: liveUpdate, reset: liveReset } = useLiveEmbedding()
   const liveCompletedRef = useRef(0)   // segments the playhead has passed (only grows)
   const liveLaidOutRef = useRef(0)     // segments included in the last layout request

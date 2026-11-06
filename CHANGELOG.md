@@ -48,7 +48,8 @@ Entries are in chronological order (oldest first).
 - Fix playhead scrub-bar thumb jumping up and left on hover — the hover `transform` stacked a second offset on Tailwind v4's `translate` property, and a stray `margin-top` shifted the bar; now uses `group-hover:scale-130` / `hover:h-[6px]`
 - Transcript auto-scroll now follows the cursor while scrubbing the timeline (previously only during playback)
 - "Following" camera mode now swings smoothly around the cursor when the path changes direction, instead of snapping behind it at every bend (shared `src/followCamera.ts`, used by the tube and glow renderers)
-- Add v8, now the default landing page: v7 plus a live mode ("Embed as transcript plays", on by default in Config) that simulates live-event transcription. Segments are embedded once the playhead passes them, and the 3D layout is recomputed every N segments ("Re-layout every N segments", default 3) and animates to its new positions. Each layout warm-starts UMAP from the previous one and is Procrustes-aligned onto the previous frame, so the view doesn't flip or spin. New `ScatterPlot3DLive` Points + Line renderer tweens positions in place.
+- Add v8, now the default landing page: v7 plus a live mode ("Embed as transcript plays", on by default in Config) that simulates live-event transcription. Segments are embedded once the playhead passes them, and the 3D layout is recomputed every N segments ("Re-layout every N segments", default 3) and animates to its new positions. Each layout warm-starts UMAP from the previous one and is Procrustes-aligned onto the previous frame, so the view doesn't flip or spin. New `ScatterPlot3DLive` Points + Line renderer tweens positions in place. Re-layout default is every 1 segment.
+- All 3D renderers (Points + Line, Cividis Tube, Glow, Live) now use a black background so the colour gradients read well in light mode too (shared `SCENE_BG` in `src/palettes.ts`)
 
 ## Prior work (selected)
 

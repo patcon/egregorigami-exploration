@@ -7,7 +7,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 import { swingFollowCamera } from './followCamera'
-import { glowPalette } from './palettes'
+import { glowPalette, SCENE_BG } from './palettes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
@@ -152,7 +152,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       mount.appendChild(renderer.domElement)
 
       const scene = new THREE.Scene()
-      scene.background = new THREE.Color(0x080b10)
+      scene.background = SCENE_BG
 
       const camera = new THREE.PerspectiveCamera(60, w / h, 0.01, 100)
       camera.position.set(0, 0, 4)
