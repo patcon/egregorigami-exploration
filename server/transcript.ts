@@ -15,6 +15,9 @@ async function fetchViaYoutube(videoId: string): Promise<TranscriptSegment[]> {
   )
 }
 
+/** The video has no fetchable transcript (vs. a transient failure). Safe to cache. */
+export class TranscriptUnavailableError extends Error {}
+
 type SupadataChunk = { text: string; offset: number; duration: number; lang?: string }
 
 /**
@@ -35,6 +38,9 @@ async function fetchViaSupadata(videoId: string, apiKey: string): Promise<Transc
     content?: SupadataChunk[]
     error?: string
     message?: string
+  }
+  if (res.status === 206 || res.status === 404) {
+    throw new TranscriptUnavailableError(`Supadata ${res.status}: ${data.error ?? 'transcript-unavailable'}${data.message ? ` — ${data.message}` : ''}`)
   }
   if (res.status !== 200 || !Array.isArray(data.content)) {
     throw new Error(`Supadata ${res.status}: ${data.error ?? 'unexpected response'}${data.message ? ` — ${data.message}` : ''}`)
@@ -64,6 +70,7 @@ export async function fetchTranscriptResponse(
     const totalDuration = last ? last.offset + last.duration : 0
     return { status: 200, body: { segments, totalDuration } }
   } catch (e) {
-    return { status: 500, body: { error: String(e) } }
+    // 404 = this video has no transcript (cacheable); 500 = transient/unknown failure.
+    return { status: e instanceof TranscriptUnavailableError ? 404 : 500, body: { error: String(e) } }
   }
 }
