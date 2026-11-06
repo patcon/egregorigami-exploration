@@ -35,7 +35,7 @@ const TWEEN_MS = 900
 // The live layout is centred on the origin with RMS radius ~0.9 (see liveLayout.ts)
 const GRID_SIZE = 6
 const GRID_DIVISIONS = 24
-const GRID_Y = -1.6
+const GRID_Y = -1.2
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
 /** Mutable buffers shared by the points and the path line. Grown by doubling. */
@@ -237,11 +237,11 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       scene.add(highlightMesh)
 
       // World-fixed (not tied to the cloud), so it stays put while points re-layout
-      const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x555555, 0x2a2a2a)
+      const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x8a8a8a, 0x4a4a4a)
       grid.position.y = GRID_Y
       const gridMat = grid.material as THREE.LineBasicMaterial
       gridMat.transparent = true
-      gridMat.opacity = 0.8
+      gridMat.opacity = 1
       gridMat.depthWrite = false
       grid.visible = styleRef.current.showGrid
       scene.add(grid)
