@@ -24,12 +24,18 @@ interface Props {
   autoRotate?: boolean
   /** Orbit speed; 1 ≈ one revolution per minute. */
   autoRotateSpeed?: number
+  /** Fixed floor grid under the cloud, as a stable reference while points move. */
+  showGrid?: boolean
 }
 
 export const DEFAULT_LINE_WIDTH = 3
 export const DEFAULT_NODE_SIZE = 0.04
 
 const TWEEN_MS = 900
+// The live layout is centred on the origin with RMS radius ~0.9 (see liveLayout.ts)
+const GRID_SIZE = 6
+const GRID_DIVISIONS = 24
+const GRID_Y = -1.6
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
 /** Mutable buffers shared by the points and the path line. Grown by doubling. */
@@ -60,7 +66,7 @@ function makeBuffers(capacity: number): Buffers {
  * renderers, the scene is built once and point updates tween in place, so the
  * camera and frame of reference stay put while the layout evolves.
  */
-export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1 }: Props) {
+export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1, showGrid = true }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     camera: THREE.PerspectiveCamera
@@ -70,6 +76,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     pointsMat: THREE.PointsMaterial
     lineMat: LineMaterial
     highlightMesh: THREE.Mesh
+    grid: THREE.GridHelper
     raycaster: THREE.Raycaster
     bgColor: THREE.Color
   } | null>(null)
@@ -85,7 +92,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(highlightPosition)
   const currentSphereTRef = useRef(0)
-  const styleRef = useRef({ lineWidth, nodeSize, autoRotate, autoRotateSpeed })
+  const styleRef = useRef({ lineWidth, nodeSize, autoRotate, autoRotateSpeed, showGrid })
   const labelsRef = useRef(labels)
   useEffect(() => { labelsRef.current = labels }, [labels])
   const onCameraChangeRef = useRef(onCameraChange)
@@ -229,10 +236,20 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       highlightMesh.scale.setScalar(Math.max(1, styleRef.current.nodeSize / DEFAULT_NODE_SIZE))
       scene.add(highlightMesh)
 
+      // World-fixed (not tied to the cloud), so it stays put while points re-layout
+      const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x555555, 0x2a2a2a)
+      grid.position.y = GRID_Y
+      const gridMat = grid.material as THREE.LineBasicMaterial
+      gridMat.transparent = true
+      gridMat.opacity = 0.8
+      gridMat.depthWrite = false
+      grid.visible = styleRef.current.showGrid
+      scene.add(grid)
+
       const raycaster = new THREE.Raycaster()
       raycaster.params.Points!.threshold = 0.05
 
-      sceneRef.current = { camera, controls, pointsMesh, lineMesh, pointsMat, lineMat, highlightMesh, raycaster, bgColor }
+      sceneRef.current = { camera, controls, pointsMesh, lineMesh, pointsMat, lineMat, highlightMesh, grid, raycaster, bgColor }
       if (pendingPointsRef.current) { retarget(pendingPointsRef.current); pendingPointsRef.current = null }
 
       let animId = 0
@@ -341,7 +358,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   useEffect(() => { retarget(points) }, [points])
   useEffect(() => { highlightPositionRef.current = highlightPosition }, [highlightPosition])
   useEffect(() => {
-    styleRef.current = { lineWidth, nodeSize, autoRotate, autoRotateSpeed }
+    styleRef.current = { lineWidth, nodeSize, autoRotate, autoRotateSpeed, showGrid }
     const s = sceneRef.current
     if (!s) return
     s.lineMat.linewidth = lineWidth
@@ -349,7 +366,8 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     s.highlightMesh.scale.setScalar(Math.max(1, nodeSize / DEFAULT_NODE_SIZE))
     s.controls.autoRotate = autoRotate
     s.controls.autoRotateSpeed = autoRotateSpeed
-  }, [lineWidth, nodeSize, autoRotate, autoRotateSpeed])
+    s.grid.visible = showGrid
+  }, [lineWidth, nodeSize, autoRotate, autoRotateSpeed, showGrid])
 
   const hitTest = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current

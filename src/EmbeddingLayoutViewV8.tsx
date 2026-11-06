@@ -102,6 +102,7 @@ export default function EmbeddingLayoutViewV8() {
   const [lineWidth, setLineWidth] = useState(() => parseFloat(localStorage.getItem('live-line-width') ?? '') || DEFAULT_LINE_WIDTH)
   const [nodeSize, setNodeSize] = useState(() => parseFloat(localStorage.getItem('live-node-size') ?? '') || DEFAULT_NODE_SIZE)
   const [autoRotate, setAutoRotate] = useState(() => localStorage.getItem('live-auto-rotate') === 'true')
+  const [showGrid, setShowGrid] = useState(() => localStorage.getItem('live-show-grid') !== 'false')
   const [autoRotateSpeed, setAutoRotateSpeed] = useState(() => parseFloat(localStorage.getItem('live-auto-rotate-speed') ?? '') || 1)
   const [glowStrength, setGlowStrength] = useState(() =>
     parseFloat(localStorage.getItem('glow-strength') ?? '1')
@@ -557,6 +558,14 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   className="w-full accent-accent"
                 />
               </div>
+              <label className="flex items-center gap-2 text-[13px] text-text-h font-medium cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={showGrid}
+                  onChange={e => { setShowGrid(e.target.checked); localStorage.setItem('live-show-grid', String(e.target.checked)) }}
+                />
+                Ground grid
+              </label>
               <p className="text-[12px] text-text opacity-40 m-0">Live (Points + Line) renderer only.</p>
             </div>
             <div className="flex flex-col gap-2">
@@ -584,7 +593,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const liveThreeDContent = livePoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} />
+            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} showGrid={showGrid} />
             <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
               <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
               <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}{liveCompleted - livePoints.length > 0 ? ` · ${liveCompleted - livePoints.length} waiting` : ''}</div>
