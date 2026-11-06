@@ -6,7 +6,7 @@ import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
 import { hasTranscriptApi } from './env'
 
-const noTranscriptApi = !hasTranscriptApi
+const noTranscriptApiBuild = !hasTranscriptApi
 
 export default function YoutubeTranscriptViewer() {
   const [urlInput, setUrlInput] = useState(() => {
@@ -16,9 +16,11 @@ export default function YoutubeTranscriptViewer() {
   })
   const {
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
-    status, errorMessage, handleLoad, handleSubtitleLoad,
+    status, errorMessage, handleLoad, handleSubtitleLoad, serverFailed,
     setLoadedVideoId, setWordTimestamps,
   } = useYoutubeTranscript(urlInput)
+  // Fall back to the manual flow when the build has no API or the server fetch failed
+  const noTranscriptApi = noTranscriptApiBuild || serverFailed
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)

@@ -30,6 +30,9 @@ export function useYoutubeTranscript(
   const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  // Video ID whose server-side fetch last failed; views fall back to the manual
+  // (external tool + VTT upload) flow for that video.
+  const [failedVideoId, setFailedVideoId] = useState<string | null>(null)
   const [wordTimestamps, setWordTimestamps] = useState<number[] | null>(
     () => JSON.parse(localStorage.getItem('yt-word-timestamps') ?? 'null')
   )
@@ -43,6 +46,7 @@ export function useYoutubeTranscript(
     }
     setStatus('loading')
     setErrorMessage('')
+    setFailedVideoId(null)
     try {
       const res = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`)
       const data = await res.json()
@@ -64,7 +68,8 @@ export function useYoutubeTranscript(
       options?.onLoaded?.({ text, duration, videoId, wordTimestamps: wt })
     } catch (e) {
       setStatus('error')
-      setErrorMessage(String(e))
+      setFailedVideoId(videoId)
+      setErrorMessage(`${String(e)} — couldn't fetch the transcript server-side. Use the ↗ button to get it from youtube-transcript.io, then load the downloaded VTT.`)
     }
   }, [urlInput, options?.onLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -81,7 +86,10 @@ export function useYoutubeTranscript(
     options?.onSubtitleLoaded?.(result)
   }, [options?.onSubtitleLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const serverFailed = failedVideoId !== null && failedVideoId === extractVideoId(urlInput)
+
   return {
+    serverFailed,
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount, status, errorMessage,
     handleLoad, handleSubtitleLoad,
     setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,

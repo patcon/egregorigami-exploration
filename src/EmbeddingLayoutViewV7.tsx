@@ -17,7 +17,7 @@ import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
 import { hasTranscriptApi } from './env'
 
-const noTranscriptApi = !hasTranscriptApi
+const noTranscriptApiBuild = !hasTranscriptApi
 
 export default function EmbeddingLayoutViewV7() {
   const [urlInput, setUrlInput] = useState(() => {
@@ -100,7 +100,7 @@ export default function EmbeddingLayoutViewV7() {
 
   const {
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
-    status, errorMessage: loadError, handleLoad, handleSubtitleLoad,
+    status, errorMessage: loadError, handleLoad, handleSubtitleLoad, serverFailed,
     setLoadedText, setLoadedDuration, setLoadedVideoId, setWordTimestamps, setLoadCount,
   } = useYoutubeTranscript(urlInput, {
     onLoaded: ({ text }) => {
@@ -115,6 +115,8 @@ export default function EmbeddingLayoutViewV7() {
       setHasTranscriptText(true)
     },
   })
+  // Fall back to the manual flow when the build has no API or the server fetch failed
+  const noTranscriptApi = noTranscriptApiBuild || serverFailed
 
   // Alias to match original variable name used in JSX
   const loadStatus = status
