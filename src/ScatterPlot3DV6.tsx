@@ -6,6 +6,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import type { CameraState, FollowMode } from './scatterTypes'
+import { glowPalette } from './palettes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
@@ -52,22 +53,6 @@ function normalize(points: [number, number, number][]): [number, number, number]
       return range === 0 ? 0 : ((v - mins[i]) / range) * 2 - 1
     }) as [number, number, number]
   )
-}
-
-function glowPalette(t: number): THREE.Color {
-  // Vivid blue → cyan → bright yellow — optimized for bloom glow
-  const lut = [
-    [0.10, 0.30, 1.00],  // t=0.00  vivid blue
-    [0.00, 0.55, 1.00],  // t=0.25  dodger blue
-    [0.00, 0.90, 0.95],  // t=0.50  cyan
-    [0.60, 1.00, 0.20],  // t=0.75  yellow-green
-    [1.00, 0.95, 0.05],  // t=1.00  bright yellow
-  ]
-  const scaled = Math.min(0.9999, Math.max(0, t)) * (lut.length - 1)
-  const lo = Math.floor(scaled), hi = lo + 1
-  const f = scaled - lo
-  const [r, g, b] = lut[lo].map((v, i) => v + f * (lut[hi][i] - v))
-  return new THREE.Color(r, g, b)
 }
 
 const vertexShader = /* glsl */`

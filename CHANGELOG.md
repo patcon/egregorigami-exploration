@@ -43,6 +43,7 @@ Entries are in chronological order (oldest first).
 - Normalize Glow renderer bloom by point count — long transcripts no longer blow out into a white haze (bloom scales by `sqrt(150 / segments)`, floored at 0.25)
 - Default to the Glow renderer in v5 and v7 (a previously saved renderer choice still wins)
 - With auto-scroll on, clicking a point in the 3D embedding (v5, v7) now scrolls the transcript to that spot, even while paused
+- "Points + Line" renderer now uses the same blue → cyan → yellow gradient as Glow (was a blue → red HSL sweep); palette shared via `src/palettes.ts`
 
 ## Prior work (selected)
 

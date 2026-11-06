@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { glowPalette } from './palettes'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 
@@ -117,16 +118,15 @@ export default function ScatterPlot3D({ points, labels, highlightPosition, onPoi
         positions[i * 3] = normalized[i][0]
         positions[i * 3 + 1] = normalized[i][1]
         positions[i * 3 + 2] = normalized[i][2]
-        let hue: number
+        let color: THREE.Color
         if (branchIds) {
           // branchId 0 and 1 share the same hue (first branch continues the parent color);
           // branchId 2+ each get the next distinct hue.
           const hueIndex = branchIds[i] <= 1 ? 0 : branchIds[i] - 1
-          hue = BRANCH_HUES[hueIndex % BRANCH_HUES.length]
+          color = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.55)
         } else {
-          hue = (1 - i / (n - 1)) * 240 // blue→red
+          color = glowPalette(n > 1 ? i / (n - 1) : 0)
         }
-        const color = new THREE.Color().setHSL(hue / 360, 1, 0.55)
         colors[i * 3] = color.r
         colors[i * 3 + 1] = color.g
         colors[i * 3 + 2] = color.b
