@@ -176,14 +176,17 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying])
 
-  // Auto-scroll cursor word into view (only while playing and auto-scroll enabled)
+  const [isScrubbing, setIsScrubbing] = useState(false)
+
+  // Auto-scroll cursor word into view (while playing or scrubbing, with auto-scroll enabled).
+  // Scrubbing jumps instantly — smooth scrolls restart on every pointermove and lag behind.
   useEffect(() => {
-    if (!isPlaying || !autoScroll || words.length === 0) return
+    if (!(isPlaying || isScrubbing) || !autoScroll || words.length === 0) return
     const el = wordRefsMap.current.get(cursorIndex)
     if (el && textAreaRef.current) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.scrollIntoView({ block: 'center', behavior: isScrubbing ? 'auto' : 'smooth' })
     }
-  }, [isPlaying, autoScroll, cursorIndex, words.length])
+  }, [isPlaying, isScrubbing, autoScroll, cursorIndex, words.length])
 
   // Jump to an explicitly requested word (e.g. clicking a point in the embedding),
   // regardless of play state, when auto-scroll is enabled.
@@ -209,6 +212,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     e.currentTarget.setPointerCapture(e.pointerId)
     scrubRectRef.current = e.currentTarget.getBoundingClientRect()
     stopPlayback()
+    setIsScrubbing(true)
     applyScrubPos(e.clientX)
   }, [stopPlayback, applyScrubPos])
 
@@ -446,6 +450,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
           className="scrub-bar flex-1 relative h-[4px] hover:h-[6px] transition-[height] duration-100 bg-border cursor-pointer rounded-[2px] overflow-visible group mx-1"
           onPointerDown={handleScrubPointerDown}
           onPointerMove={handleScrubPointerMove}
+          onLostPointerCapture={() => setIsScrubbing(false)}
         >
           <div className="scrub-progress absolute left-0 top-0 h-full bg-accent rounded-[2px] pointer-events-none" style={{ width: `${position * 100}%` }} />
           <div className="scrub-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-full pointer-events-none transition-transform duration-100 group-hover:scale-130" style={{ left: `${position * 100}%` }} />

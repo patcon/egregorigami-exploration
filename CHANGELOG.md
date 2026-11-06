@@ -46,6 +46,7 @@ Entries are in chronological order (oldest first).
 - With auto-scroll on, clicking a point in the 3D embedding (v5, v7) now scrolls the transcript to that spot, even while paused
 - "Points + Line" renderer now uses the same blue → cyan → yellow gradient as Glow (was a blue → red HSL sweep); palette shared via `src/palettes.ts`
 - Fix playhead scrub-bar thumb jumping up and left on hover — the hover `transform` stacked a second offset on Tailwind v4's `translate` property, and a stray `margin-top` shifted the bar; now uses `group-hover:scale-130` / `hover:h-[6px]`
+- Transcript auto-scroll now follows the cursor while scrubbing the timeline (previously only during playback)
 
 ## Prior work (selected)
 
