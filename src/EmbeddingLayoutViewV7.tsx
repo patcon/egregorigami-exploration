@@ -15,8 +15,9 @@ import { useYoutubeTranscript } from './useYoutubeTranscript'
 import { loadCached, saveCached } from './usePointsCache'
 import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
+import { hasTranscriptApi } from './env'
 
-const isProd = import.meta.env.PROD
+const noTranscriptApi = !hasTranscriptApi
 
 export default function EmbeddingLayoutViewV7() {
   const [urlInput, setUrlInput] = useState(() => {
@@ -372,7 +373,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 localStorage.removeItem('yt-word-timestamps')
               }
             }}
-            onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
+            onKeyDown={e => { if (e.key === 'Enter' && !noTranscriptApi) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
             history={urlHistory}
           />
@@ -487,17 +488,17 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
           onSpeedChange: setPlaybackRate,
           hideSegmentsMode: true,
           onSubtitleLoad: handleSubtitleLoad,
-          hideFileLoad: !isProd,
+          hideFileLoad: !noTranscriptApi,
           tab: transcriptTab,
           onTabChange: setTranscriptTab,
           warning: durationMismatch ? `⚠ Transcript duration (${totalSecs}s) doesn't match video (${Math.round(videoDuration!)}s) — transcript may be out of date.` : undefined,
           prependTextareaButtons: (
             <button
               className="flex-shrink-0 py-1.5 px-3 rounded-md border-0 bg-accent text-white text-[13px] font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
-              disabled={isProd ? !currentVideoId : loadStatus === 'loading'}
+              onClick={noTranscriptApi ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+              disabled={noTranscriptApi ? !currentVideoId : loadStatus === 'loading'}
             >
-              {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch${isProd ? ' ↗' : ''}`}
+              {!noTranscriptApi && loadStatus === 'loading' ? 'Loading…' : `Fetch${noTranscriptApi ? ' ↗' : ''}`}
             </button>
           ),
         }

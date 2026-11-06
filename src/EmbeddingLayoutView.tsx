@@ -13,8 +13,9 @@ import { useYoutubeTranscript } from './useYoutubeTranscript'
 import { usePointsCache } from './usePointsCache'
 import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
+import { hasTranscriptApi } from './env'
 
-const isProd = import.meta.env.PROD
+const noTranscriptApi = !hasTranscriptApi
 
 export default function EmbeddingLayoutView() {
   const [urlInput, setUrlInput] = useState(() => {
@@ -281,21 +282,21 @@ export default function EmbeddingLayoutView() {
                 localStorage.removeItem('yt-word-timestamps')
               }
             }}
-            onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
+            onKeyDown={e => { if (e.key === 'Enter' && !noTranscriptApi) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
             history={urlHistory}
           />
           <button className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
-            disabled={isProd ? !currentVideoId : loadStatus === 'loading'}>
-            {!isProd && loadStatus === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
+            onClick={noTranscriptApi ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+            disabled={noTranscriptApi ? !currentVideoId : loadStatus === 'loading'}>
+            {!noTranscriptApi && loadStatus === 'loading' ? 'Loading…' : `Fetch Transcript${noTranscriptApi ? ' ↗' : ''}`}
           </button>
           <button className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleShare}>
             {shareCopied ? 'Copied!' : 'Share'}
           </button>
         </div>
         {loadStatus === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{loadError}</p>}
-        {isProd && (
+        {noTranscriptApi && (
           <p className="youtube-notice">
             {currentVideoId
               ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>
