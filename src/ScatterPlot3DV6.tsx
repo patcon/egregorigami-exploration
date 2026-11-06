@@ -9,6 +9,10 @@ import type { CameraState, FollowMode } from './scatterTypes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
+// Segment count at which bloom is at full strength; more points → proportionally less bloom.
+const BLOOM_REFERENCE_POINTS = 150
+const MIN_DENSITY_SCALE = 0.25
+
 interface BranchSphereLinear {
   mesh: THREE.Mesh
   points: [number, number, number][]
@@ -348,6 +352,9 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
       composer.addPass(new RenderPass(scene, camera))
       const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 1.5, 0.6, 0.10)
       composer.addPass(bloomPass)
+      // Points are normalized into a fixed box, so long transcripts pack more bright
+      // pixels into the same area and bloom piles up. Scale strength down with count.
+      const densityScale = Math.min(1, Math.max(MIN_DENSITY_SCALE, Math.sqrt(BLOOM_REFERENCE_POINTS / Math.max(1, n))))
       composer.addPass(new OutputPass())
 
       const raycaster = new THREE.Raycaster()
@@ -362,7 +369,7 @@ export default function ScatterPlot3DV6({ points, labels, highlightPosition, onP
         // so compensate by boosting strength as zoom increases.
         const camDist = camera.position.distanceTo(controls.target)
         const gs = glowStrengthRef.current
-        bloomPass.strength = Math.max(1.0, 1.5 * (camDist / 4.0)) * gs
+        bloomPass.strength = Math.max(1.0, 1.5 * (camDist / 4.0)) * gs * densityScale
         bloomPass.radius = Math.min(1.0, 0.5 + 0.08 * (camDist / 4.0)) * gs
         if (branchSpheresLinear.length > 0) {
           if (!sphereVisibleRef.current) {

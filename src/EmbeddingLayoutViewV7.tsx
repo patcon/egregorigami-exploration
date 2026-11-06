@@ -92,7 +92,7 @@ export default function EmbeddingLayoutViewV7() {
 
   type RendererType = 'original' | 'cividis-tube' | 'glow'
   const [rendererType, setRendererType] = useState<RendererType>(() =>
-    (localStorage.getItem('scatter-renderer') as RendererType) ?? 'cividis-tube'
+    (localStorage.getItem('scatter-renderer') as RendererType) ?? 'glow'
   )
   const [glowStrength, setGlowStrength] = useState(() =>
     parseFloat(localStorage.getItem('glow-strength') ?? '1')

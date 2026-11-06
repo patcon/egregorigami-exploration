@@ -39,6 +39,8 @@ Entries are in chronological order (oldest first).
 
 - Fix VTT subtitle parsing when the last cue has a malformed end timestamp (e.g. `NaN:NaN:NaN.NaN`) — duration no longer displays as NaN and cursor sync works correctly
 - Fix embedding model failing to load on the Cloudflare deploy with a CORS error — Hugging Face 404s requests with a `*.workers.dev` Referer, so the site now sends `Referrer-Policy: no-referrer` (via `public/_headers`)
+- Normalize Glow renderer bloom by point count — long transcripts no longer blow out into a white haze (bloom scales by `sqrt(150 / segments)`, floored at 0.25)
+- Default to the Glow renderer in v5 and v7 (a previously saved renderer choice still wins)
 
 ## Prior work (selected)
 
