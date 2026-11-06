@@ -4,8 +4,9 @@ import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import { extractVideoId, computeExternalPosition } from './videoUtils'
 import { useVideoKeyboardControls } from './useVideoKeyboardControls'
 import { useYoutubeTranscript } from './useYoutubeTranscript'
+import { hasTranscriptApi } from './env'
 
-const isProd = import.meta.env.PROD
+const noTranscriptApiBuild = !hasTranscriptApi
 
 export default function YoutubeTranscriptViewer() {
   const [urlInput, setUrlInput] = useState(() => {
@@ -15,9 +16,11 @@ export default function YoutubeTranscriptViewer() {
   })
   const {
     loadedText, loadedDuration, loadedVideoId, wordTimestamps, loadCount,
-    status, errorMessage, handleLoad, handleSubtitleLoad,
+    status, errorMessage, handleLoad, handleSubtitleLoad, serverFailed,
     setLoadedVideoId, setWordTimestamps,
   } = useYoutubeTranscript(urlInput)
+  // Fall back to the manual flow when the build has no API or the server fetch failed
+  const noTranscriptApi = noTranscriptApiBuild || serverFailed
   const [videoTime, setVideoTime] = useState(0)
   const [seekTarget, setSeekTarget] = useState<number | undefined>(undefined)
   const [transcriptPlaying, setTranscriptPlaying] = useState(false)
@@ -68,19 +71,19 @@ export default function YoutubeTranscriptViewer() {
                 localStorage.removeItem('yt-word-timestamps')
               }
             }}
-            onKeyDown={e => { if (e.key === 'Enter' && !isProd) handleLoad() }}
+            onKeyDown={e => { if (e.key === 'Enter' && !noTranscriptApi) handleLoad() }}
             placeholder="https://www.youtube.com/watch?v=..."
           />
           <button
             className="py-1.5 px-3.5 rounded-md border-0 bg-accent text-white text-sm font-medium cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-85 disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={isProd ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
-            disabled={isProd ? !currentVideoId : status === 'loading'}
+            onClick={noTranscriptApi ? () => window.open(transcriptToolUrl, '_blank') : handleLoad}
+            disabled={noTranscriptApi ? !currentVideoId : status === 'loading'}
           >
-            {!isProd && status === 'loading' ? 'Loading…' : `Fetch Transcript${isProd ? ' ↗' : ''}`}
+            {!noTranscriptApi && status === 'loading' ? 'Loading…' : `Fetch Transcript${noTranscriptApi ? ' ↗' : ''}`}
           </button>
         </div>
         {status === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{errorMessage}</p>}
-        {isProd && (
+        {noTranscriptApi && (
           <p className="youtube-notice">
             {currentVideoId
               ? <>Paste or load the downloaded transcript below. VTT or SRT preferred — copied plaintext lacks timing and will degrade the experience.</>

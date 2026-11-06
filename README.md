@@ -6,6 +6,14 @@ A set of in-browser visualizations built with React + TypeScript + Vite, deploye
 
 **Live:** https://patcon.github.io/egregorigami-exploration/
 
+### Cloudflare Workers deploy
+
+There's also a Cloudflare Worker deploy that serves the app plus a `/api/transcript` endpoint, so transcripts load in-app (on GitHub Pages you have to download a VTT from youtube-transcript.io instead).
+
+- Locally: `pnpm cf:dev` or `pnpm cf:deploy` (after `pnpm wrangler login`)
+- Transcripts: YouTube bot-blocks direct requests from Cloudflare, so the Worker fetches via [Supadata](https://supadata.ai) when `SUPADATA_API_KEY` is set. For `wrangler dev`, copy `.env.example` to `.env` (gitignored) and fill it in; for the deployed Worker run `pnpm wrangler secret put SUPADATA_API_KEY` once. Secrets persist across deploys, so CI doesn't need it.
+- CI: `.github/workflows/deploy-cloudflare.yml` runs on every push to `main`, alongside the Pages deploy. It needs two repo secrets: `CLOUDFLARE_API_TOKEN` (the "Edit Cloudflare Workers" template) and `CLOUDFLARE_ACCOUNT_ID`.
+
 ## Views
 
 | Hash | Name | Description |
