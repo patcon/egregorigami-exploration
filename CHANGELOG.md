@@ -50,6 +50,7 @@ Entries are in chronological order (oldest first).
 - "Following" camera mode now swings smoothly around the cursor when the path changes direction, instead of snapping behind it at every bend (shared `src/followCamera.ts`, used by the tube and glow renderers)
 - Add v8, now the default landing page: v7 plus a live mode ("Embed as transcript plays", on by default in Config) that simulates live-event transcription. Segments are embedded once the playhead passes them, and the 3D layout is recomputed every N segments ("Re-layout every N segments", default 3) and animates to its new positions. Each layout warm-starts UMAP from the previous one and is Procrustes-aligned onto the previous frame, so the view doesn't flip or spin. New `ScatterPlot3DLive` Points + Line renderer tweens positions in place. Re-layout default is every 1 segment.
 - All 3D renderers (Points + Line, Cividis Tube, Glow, Live) now use a black background so the colour gradients read well in light mode too (shared `SCENE_BG` in `src/palettes.ts`)
+- v8 live renderer: path lines are now real thick lines (default 3px, via three.js `Line2`; plain WebGL lines are always 1px), and Config has "Line width" and "Node size" sliders (saved in localStorage; the playhead sphere grows with node size)
 
 ## Prior work (selected)
 

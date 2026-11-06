@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { Line2 } from 'three/addons/lines/Line2.js'
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { glowPalette, SCENE_BG } from './palettes'
 import { swingFollowCamera } from './followCamera'
 import type { CameraState, FollowMode } from './scatterTypes'
@@ -13,7 +16,14 @@ interface Props {
   onPointClick: (index: number) => void
   initialCameraState?: CameraState
   onCameraChange?: (state: CameraState) => void
+  /** Path line width in screen pixels. */
+  lineWidth?: number
+  /** Node (point) size in world units. */
+  nodeSize?: number
 }
+
+export const DEFAULT_LINE_WIDTH = 3
+export const DEFAULT_NODE_SIZE = 0.04
 
 const TWEEN_MS = 900
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
@@ -46,13 +56,15 @@ function makeBuffers(capacity: number): Buffers {
  * renderers, the scene is built once and point updates tween in place, so the
  * camera and frame of reference stay put while the layout evolves.
  */
-export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange }: Props) {
+export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     camera: THREE.PerspectiveCamera
     controls: OrbitControls
     pointsMesh: THREE.Points
-    lineMesh: THREE.Line
+    lineMesh: Line2
+    pointsMat: THREE.PointsMaterial
+    lineMat: LineMaterial
     highlightMesh: THREE.Mesh
     raycaster: THREE.Raycaster
     bgColor: THREE.Color
@@ -69,6 +81,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightPositionRef = useRef<number | null>(highlightPosition)
   const currentSphereTRef = useRef(0)
+  const styleRef = useRef({ lineWidth, nodeSize })
   const labelsRef = useRef(labels)
   useEffect(() => { labelsRef.current = labels }, [labels])
   const onCameraChangeRef = useRef(onCameraChange)
@@ -96,6 +109,25 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     return pointAt(a + 1, new THREE.Vector3()).sub(pointAt(a, new THREE.Vector3())).normalize()
   }
 
+  /**
+   * Copy the displayed positions/colours into the thick path line. Line2 is
+   * screen-space (real pixel widths, unlike THREE.Line which is always 1px) but
+   * can't share the points' buffer, so it's rebuilt while points are moving.
+   */
+  const syncLine = () => {
+    const s = sceneRef.current
+    if (!s) return
+    const n = countRef.current
+    s.lineMesh.visible = n >= 2
+    if (n < 2) return
+    const b = buffersRef.current
+    const geo = new LineGeometry()
+    geo.setPositions((b.position.array as Float32Array).subarray(0, n * 3))
+    geo.setColors((b.color.array as Float32Array).subarray(0, n * 3))
+    s.lineMesh.geometry.dispose()
+    s.lineMesh.geometry = geo
+  }
+
   /** Start tweening from what's on screen now to `next`. */
   const retarget = (next: [number, number, number][]) => {
     const s = sceneRef.current
@@ -108,10 +140,8 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       const grown = makeBuffers(cap)
       ;(grown.position.array as Float32Array).set(buf.position.array as Float32Array)
       ;(grown.color.array as Float32Array).set(buf.color.array as Float32Array)
-      for (const geo of [s.pointsMesh.geometry, s.lineMesh.geometry]) {
-        geo.setAttribute('position', grown.position)
-        geo.setAttribute('color', grown.color)
-      }
+      s.pointsMesh.geometry.setAttribute('position', grown.position)
+      s.pointsMesh.geometry.setAttribute('color', grown.color)
       buffersRef.current = buf = grown
     }
     const prevN = countRef.current
@@ -131,7 +161,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     }
     countRef.current = n
     s.pointsMesh.geometry.setDrawRange(0, n)
-    s.lineMesh.geometry.setDrawRange(0, n)
+    syncLine()
     tweenStartRef.current = performance.now()
   }
 
@@ -176,26 +206,26 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       pointsGeo.setAttribute('position', buf.position)
       pointsGeo.setAttribute('color', buf.color)
       pointsGeo.setDrawRange(0, 0)
-      const pointsMesh = new THREE.Points(pointsGeo, new THREE.PointsMaterial({ size: 0.04, sizeAttenuation: true, vertexColors: true }))
+      const pointsMat = new THREE.PointsMaterial({ size: styleRef.current.nodeSize, sizeAttenuation: true, vertexColors: true })
+      const pointsMesh = new THREE.Points(pointsGeo, pointsMat)
       pointsMesh.frustumCulled = false
       scene.add(pointsMesh)
 
-      const lineGeo = new THREE.BufferGeometry()
-      lineGeo.setAttribute('position', buf.position)
-      lineGeo.setAttribute('color', buf.color)
-      lineGeo.setDrawRange(0, 0)
-      const lineMesh = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ vertexColors: true, opacity: 0.35, transparent: true }))
+      const lineMat = new LineMaterial({ vertexColors: true, linewidth: styleRef.current.lineWidth, opacity: 0.6, transparent: true, depthWrite: false })
+      const lineMesh = new Line2(new LineGeometry(), lineMat)
+      lineMesh.visible = false
       lineMesh.frustumCulled = false
       scene.add(lineMesh)
 
       const highlightMesh = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff2222 }))
       highlightMesh.visible = false
+      highlightMesh.scale.setScalar(Math.max(1, styleRef.current.nodeSize / DEFAULT_NODE_SIZE))
       scene.add(highlightMesh)
 
       const raycaster = new THREE.Raycaster()
       raycaster.params.Points!.threshold = 0.05
 
-      sceneRef.current = { camera, controls, pointsMesh, lineMesh, highlightMesh, raycaster, bgColor }
+      sceneRef.current = { camera, controls, pointsMesh, lineMesh, pointsMat, lineMat, highlightMesh, raycaster, bgColor }
       if (pendingPointsRef.current) { retarget(pendingPointsRef.current); pendingPointsRef.current = null }
 
       let animId = 0
@@ -218,6 +248,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
           b.position.needsUpdate = true
           b.color.needsUpdate = true
           pointsGeo.computeBoundingSphere() // keeps raycasting accurate as points move
+          syncLine()
           if (raw >= 1) tweenStartRef.current = null
         }
 
@@ -294,8 +325,18 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // retarget only reads refs; re-run on new points only
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { retarget(points) }, [points])
   useEffect(() => { highlightPositionRef.current = highlightPosition }, [highlightPosition])
+  useEffect(() => {
+    styleRef.current = { lineWidth, nodeSize }
+    const s = sceneRef.current
+    if (!s) return
+    s.lineMat.linewidth = lineWidth
+    s.pointsMat.size = nodeSize
+    s.highlightMesh.scale.setScalar(Math.max(1, nodeSize / DEFAULT_NODE_SIZE))
+  }, [lineWidth, nodeSize])
 
   const hitTest = (e: React.MouseEvent<HTMLDivElement>) => {
     const s = sceneRef.current

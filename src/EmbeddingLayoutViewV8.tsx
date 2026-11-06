@@ -4,7 +4,7 @@ import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
 import ScatterPlot3DV6 from './ScatterPlot3DV6'
-import ScatterPlot3DLive from './ScatterPlot3DLive'
+import ScatterPlot3DLive, { DEFAULT_LINE_WIDTH, DEFAULT_NODE_SIZE } from './ScatterPlot3DLive'
 import { useLiveEmbedding } from './useLiveEmbedding'
 import type { CameraState } from './scatterTypes'
 import { EMBEDDING_MODELS, type EmbeddingModelId } from './embedSegments'
@@ -99,6 +99,8 @@ export default function EmbeddingLayoutViewV8() {
   const [rendererType, setRendererType] = useState<RendererType>(() =>
     (localStorage.getItem('scatter-renderer') as RendererType) ?? 'glow'
   )
+  const [lineWidth, setLineWidth] = useState(() => parseFloat(localStorage.getItem('live-line-width') ?? '') || DEFAULT_LINE_WIDTH)
+  const [nodeSize, setNodeSize] = useState(() => parseFloat(localStorage.getItem('live-node-size') ?? '') || DEFAULT_NODE_SIZE)
   const [glowStrength, setGlowStrength] = useState(() =>
     parseFloat(localStorage.getItem('glow-strength') ?? '1')
   )
@@ -508,6 +510,31 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
               </div>
               <p className="text-[12px] text-text opacity-40 m-0">Lower is more responsive; higher means fewer, bigger moves.</p>
             </div>
+            <div className={`flex flex-col gap-2 ${liveEmbed ? '' : 'opacity-40 pointer-events-none'}`}>
+              <div className="flex items-center justify-between">
+                <label htmlFor="live-line-width" className="text-[13px] text-text-h font-medium">Line width</label>
+                <span className="text-[13px] text-text opacity-60 tabular-nums">{lineWidth.toFixed(1)} px</span>
+              </div>
+              <input
+                id="live-line-width"
+                type="range" min={0.5} max={10} step={0.5}
+                value={lineWidth}
+                onChange={e => { const v = parseFloat(e.target.value); setLineWidth(v); localStorage.setItem('live-line-width', String(v)) }}
+                className="w-full accent-accent"
+              />
+              <div className="flex items-center justify-between">
+                <label htmlFor="live-node-size" className="text-[13px] text-text-h font-medium">Node size</label>
+                <span className="text-[13px] text-text opacity-60 tabular-nums">{(nodeSize / DEFAULT_NODE_SIZE).toFixed(2)}×</span>
+              </div>
+              <input
+                id="live-node-size"
+                type="range" min={0.01} max={0.16} step={0.005}
+                value={nodeSize}
+                onChange={e => { const v = parseFloat(e.target.value); setNodeSize(v); localStorage.setItem('live-node-size', String(v)) }}
+                className="w-full accent-accent"
+              />
+              <p className="text-[12px] text-text opacity-40 m-0">Live (Points + Line) renderer only.</p>
+            </div>
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-[13px] text-text-h font-medium">Glow Strength</label>
@@ -533,7 +560,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const liveThreeDContent = livePoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />
+            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} />
             <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
               <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
               <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}</div>
