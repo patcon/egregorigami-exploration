@@ -20,6 +20,8 @@ interface TranscriptViewerProps {
   onAllowFasterChange?: (allow: boolean) => void
   externalRawText?: string
   externalPosition?: number
+  /** Scroll this word into view (if auto-scroll is on). Bump `nonce` to re-trigger for the same word. */
+  scrollToWord?: { wordIndex: number; nonce: number }
   externalPlaying?: boolean
   onScrub?: (pos: number) => void
   onPlayingChange?: (playing: boolean) => void
@@ -40,7 +42,7 @@ interface TranscriptViewerProps {
   extraTabContent?: React.ReactNode
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, scrollToWord, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
   const isCollapsed = collapsible && open === false
   const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
@@ -182,6 +184,16 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
       el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
   }, [isPlaying, autoScroll, cursorIndex, words.length])
+
+  // Jump to an explicitly requested word (e.g. clicking a point in the embedding),
+  // regardless of play state, when auto-scroll is enabled.
+  useEffect(() => {
+    if (!scrollToWord || !autoScroll) return
+    const el = wordRefsMap.current.get(scrollToWord.wordIndex)
+    if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  // Only fire on new requests, not when the auto-scroll toggle changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToWord])
 
   const scrubRectRef = useRef<DOMRect | null>(null)
 

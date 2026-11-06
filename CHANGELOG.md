@@ -42,6 +42,7 @@ Entries are in chronological order (oldest first).
 - Fix embedding model failing to load on the Cloudflare deploy with a CORS error — Hugging Face 404s requests with a `*.workers.dev` Referer, so the site now sends `Referrer-Policy: no-referrer` (via `public/_headers`)
 - Normalize Glow renderer bloom by point count — long transcripts no longer blow out into a white haze (bloom scales by `sqrt(150 / segments)`, floored at 0.25)
 - Default to the Glow renderer in v5 and v7 (a previously saved renderer choice still wins)
+- With auto-scroll on, clicking a point in the 3D embedding (v5, v7) now scrolls the transcript to that spot, even while paused
 
 ## Prior work (selected)
 

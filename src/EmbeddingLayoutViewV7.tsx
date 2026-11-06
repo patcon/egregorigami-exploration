@@ -135,6 +135,7 @@ export default function EmbeddingLayoutViewV7() {
 
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [clickSeekPosition, setClickSeekPosition] = useState<number | undefined>(undefined)
+  const [scrollToWord, setScrollToWord] = useState<{ wordIndex: number; nonce: number } | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
   const cameraStateRef = useRef<CameraState | null>(null)
   const currentWordIndexRef = useRef(0)
@@ -254,6 +255,7 @@ export default function EmbeddingLayoutViewV7() {
     const initialCursor = Math.min(windowSize - 1, words.length - 1)
     const wordIndex = Math.min(words.length - 1, initialCursor + idx * step)
     setClickSeekPosition(words.length > 1 ? wordIndex / (words.length - 1) : 0)
+    setScrollToWord(prev => ({ wordIndex, nonce: (prev?.nonce ?? 0) + 1 }))
     const secs = totalSecsRef.current
     if (!secs) return
     const ts = wordTimestampsRef.current
@@ -483,6 +485,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
           onWindowChange: handleWindowChange,
           onParamsBlur: handleParamsBlur,
           onCursorChange: handleCursorChange,
+          scrollToWord,
           externalPosition: (videoHidden ? undefined : externalPosition) ?? clickSeekPosition,
           externalPlaying: videoHidden ? undefined : ytPlaying,
           onScrub: handleScrub,

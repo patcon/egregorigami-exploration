@@ -107,6 +107,7 @@ export default function EmbeddingLayoutViewV5() {
   // Scatter highlight state
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const [clickSeekPosition, setClickSeekPosition] = useState<number | undefined>(undefined)
+  const [scrollToWord, setScrollToWord] = useState<{ wordIndex: number; nonce: number } | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
   const cameraStateRef = useRef<CameraState | null>(null)
   const currentWordIndexRef = useRef(0)
@@ -228,6 +229,7 @@ export default function EmbeddingLayoutViewV5() {
     // Always set a direct word-index position so the transcript cursor jumps
     // even when no video is loaded (externalPosition would otherwise be undefined)
     setClickSeekPosition(words.length > 1 ? wordIndex / (words.length - 1) : 0)
+    setScrollToWord(prev => ({ wordIndex, nonce: (prev?.nonce ?? 0) + 1 }))
     // Also seek the video if available
     const secs = totalSecsRef.current
     if (!secs) return
@@ -369,6 +371,7 @@ export default function EmbeddingLayoutViewV5() {
             onCursorChange={handleCursorChange}
             onAllowFasterChange={allow => { setAllowFaster(allow); if (!allow) { setYtPlaying(false); setTranscriptPlaying(false) } }}
             externalPosition={(allowFaster ? undefined : externalPosition) ?? clickSeekPosition}
+            scrollToWord={scrollToWord}
             externalPlaying={allowFaster ? undefined : ytPlaying}
             onScrub={handleScrub}
             onPlayingChange={setTranscriptPlaying}
