@@ -5,7 +5,9 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   // Transcript cache keyed by video ID ("egregorigami-exploration-transcripts").
-  "kv_namespaces": [{ "binding": "TRANSCRIPTS", "id": "8c741b11761247d08d7ef6071cdb5eae" }],
+  // "remote": true makes `wrangler dev` read/write the production KV namespace
+  // (shared cache, fewer Supadata credits) instead of a local simulated one.
+  "kv_namespaces": [{ "binding": "TRANSCRIPTS", "id": "8c741b11761247d08d7ef6071cdb5eae", "remote": true }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
