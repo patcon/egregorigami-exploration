@@ -586,7 +586,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} />
             <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
               <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
-              <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}</div>
+              <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}{liveCompleted - livePoints.length > 0 ? ` · ${liveCompleted - livePoints.length} waiting` : ''}</div>
             </div>
           </div>
         ) : (

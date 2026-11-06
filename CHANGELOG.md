@@ -52,6 +52,7 @@ Entries are in chronological order (oldest first).
 - All 3D renderers (Points + Line, Cividis Tube, Glow, Live) now use a black background so the colour gradients read well in light mode too (shared `SCENE_BG` in `src/palettes.ts`)
 - v8 live renderer: path lines are now real thick lines (default 3px, via three.js `Line2`; plain WebGL lines are always 1px), and Config has "Line width" and "Node size" sliders (saved in localStorage; the playhead sphere grows with node size)
 - v8 Config: "Auto-rotate" toggle and "Rotation speed" slider (default ~60s per turn) that slowly orbits the live 3D view around its centre; dragging still works, and it combines with the tracking/following camera modes
+- v8 live mode never starts a layout while the worker is still busy, including right after "Reset live" or a model/video change (previously the next request was sent immediately and queued behind the stale job). The 3D badge now shows how many passed segments are waiting for the next layout.
 
 ## Prior work (selected)
 
