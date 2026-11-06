@@ -2,3 +2,5 @@ allowBuilds:
   onnxruntime-node: true
   protobufjs: true
   sharp: true
+# Match pnpm v11 CI default: reject packages published less than a day ago.
+minimumReleaseAge: 1440
