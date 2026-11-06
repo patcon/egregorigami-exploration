@@ -38,6 +38,7 @@ Entries are in chronological order (oldest first).
 - Cache transcripts in Workers KV (`TRANSCRIPTS` binding, keyed by video ID, no expiry) so each video is fetched from Supadata at most once; responses carry an `X-Transcript-Cache: HIT|MISS` header
 
 - Fix VTT subtitle parsing when the last cue has a malformed end timestamp (e.g. `NaN:NaN:NaN.NaN`) — duration no longer displays as NaN and cursor sync works correctly
+- Fix embedding model failing to load on the Cloudflare deploy with a CORS error — Hugging Face 404s requests with a `*.workers.dev` Referer, so the site now sends `Referrer-Policy: no-referrer` (via `public/_headers`)
 
 ## Prior work (selected)
 

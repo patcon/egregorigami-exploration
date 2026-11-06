@@ -1,0 +1,5 @@
+# Cloudflare Workers static-assets headers (ignored by GitHub Pages).
+# Hugging Face 404s (without CORS headers) any request whose Referer is on
+# *.workers.dev, which breaks transformers.js model downloads. Don't send one.
+/*
+  Referrer-Policy: no-referrer
