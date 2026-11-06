@@ -4,6 +4,8 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Transcript cache keyed by video ID. Wrangler provisions the namespace on first deploy.
+  "kv_namespaces": [{ "binding": "TRANSCRIPTS" }],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

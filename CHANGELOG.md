@@ -35,6 +35,7 @@ Entries are in chronological order (oldest first).
 - Add alternative Cloudflare Workers deploy (`pnpm cf:deploy`, `.github/workflows/deploy-cloudflare.yml`) — the Worker serves the built app and `/api/transcript`, so "Fetch Transcript" works in-app instead of linking out to youtube-transcript.io; the GitHub Pages deploy is unchanged
 - Fall back to the manual transcript flow (youtube-transcript.io link + VTT upload) when the server-side `/api/transcript` fetch fails for a video — YouTube often bot-blocks Cloudflare's datacenter IPs
 - Cloudflare Worker fetches transcripts via [Supadata](https://supadata.ai) (`mode=native`, existing captions only) when the `SUPADATA_API_KEY` secret is set, since YouTube bot-blocks direct requests from Cloudflare; local `pnpm dev` still fetches from YouTube directly
+- Cache transcripts in Workers KV (`TRANSCRIPTS` binding, keyed by video ID, no expiry) so each video is fetched from Supadata at most once; responses carry an `X-Transcript-Cache: HIT|MISS` header
 
 - Fix VTT subtitle parsing when the last cue has a malformed end timestamp (e.g. `NaN:NaN:NaN.NaN`) — duration no longer displays as NaN and cursor sync works correctly
 
