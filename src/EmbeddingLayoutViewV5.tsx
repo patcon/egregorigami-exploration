@@ -499,7 +499,7 @@ export default function EmbeddingLayoutViewV5() {
                   }}
                 >
                   <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Cividis Tube</option>
+                  <option value="cividis-tube">Tube</option>
                   <option value="glow">Glow (Shader)</option>
                 </select>
                 <div className="flex gap-2 items-center">

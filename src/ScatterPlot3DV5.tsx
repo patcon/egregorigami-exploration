@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { CameraState, FollowMode } from './scatterTypes'
 import { swingFollowCamera } from './followCamera'
-import { SCENE_BG } from './palettes'
+import { glowPalette, SCENE_BG } from './palettes'
 
 const BRANCH_HUES = [220, 30, 120, 280, 60, 180, 320, 150]
 
@@ -44,27 +44,6 @@ function normalize(points: [number, number, number][]): [number, number, number]
       return range === 0 ? 0 : ((v - mins[i]) / range) * 2 - 1
     }) as [number, number, number]
   )
-}
-
-function cividis(t: number): THREE.Color {
-  const lut = [
-    [0.000, 0.122, 0.302],  // t=0.0  dark navy
-    [0.122, 0.267, 0.420],  // t=0.1
-    [0.216, 0.342, 0.456],  // t=0.2
-    [0.300, 0.416, 0.469],  // t=0.3
-    [0.379, 0.488, 0.468],  // t=0.4
-    [0.456, 0.560, 0.450],  // t=0.5
-    [0.543, 0.630, 0.414],  // t=0.6
-    [0.643, 0.698, 0.352],  // t=0.7
-    [0.759, 0.764, 0.256],  // t=0.8
-    [0.877, 0.826, 0.125],  // t=0.9
-    [0.996, 0.908, 0.145],  // t=1.0  bright yellow
-  ]
-  const scaled = Math.min(0.9999, Math.max(0, t)) * (lut.length - 1)
-  const lo = Math.floor(scaled), hi = lo + 1
-  const f = scaled - lo
-  const [r, g, b] = lut[lo].map((v, i) => v + f * (lut[hi][i] - v))
-  return new THREE.Color(r, g, b)
 }
 
 export default function ScatterPlot3DV5({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, branchIds, playType, forkHighlightOffset }: Props) {
@@ -146,7 +125,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
           const hueIndex = branchIds[i] <= 1 ? 0 : branchIds[i] - 1
           c = new THREE.Color().setHSL(BRANCH_HUES[hueIndex % BRANCH_HUES.length] / 360, 1, 0.55)
         } else {
-          c = cividis(i / (n - 1))
+          c = glowPalette(i / (n - 1))
         }
         colors[i * 3] = c.r
         colors[i * 3 + 1] = c.g
@@ -284,7 +263,7 @@ export default function ScatterPlot3DV5({ points, labels, highlightPosition, onP
         for (let v = 0; v < tubeGeo.attributes.position.count; v++) {
           const ring = Math.floor(v / vertsPerRing)
           const t = ring / TUBE_SEGMENTS
-          const c = cividis(t)
+          const c = glowPalette(t)
           // Alternate brightness between node-to-node segments to show spacing
           const segIdx = Math.floor(Math.min(t * (normalized.length - 1), normalized.length - 2))
           const bright = segIdx % 2 === 0 ? 1.2 : 0.7

@@ -16,6 +16,7 @@ import { loadCached, saveCached } from './usePointsCache'
 import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
 import { hasTranscriptApi } from './env'
+import HomeLink from './HomeLink'
 
 const noTranscriptApiBuild = !hasTranscriptApi
 
@@ -138,6 +139,10 @@ export default function EmbeddingLayoutViewV7() {
   const [scrollToWord, setScrollToWord] = useState<{ wordIndex: number; nonce: number } | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
   const cameraStateRef = useRef<CameraState | null>(null)
+  // Renderers only read this when they mount (to keep the camera across renderer
+  // switches/remounts), so a render-time snapshot of the latest camera is what we want.
+  // eslint-disable-next-line react-hooks/refs
+  const initialCamera = cameraStateRef.current ?? undefined
   const currentWordIndexRef = useRef(0)
   const wordTimestampsRef = useRef(wordTimestamps)
   useEffect(() => { wordTimestampsRef.current = wordTimestamps }, [wordTimestamps])
@@ -347,20 +352,42 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
       <dialog
         ref={infoDialogRef}
         onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
-        className="backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(360px,90vw)] shadow-lg"
+        className="m-auto text-left backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-0 w-[min(440px,92vw)] max-h-[90dvh] shadow-lg"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold m-0">About</h2>
-          <button onClick={() => setInfoOpen(false)} className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none">×</button>
+        <div className="flex flex-col gap-5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-text-h m-0">Embedding layout</h2>
+              <p className="text-[13px] leading-snug m-0">
+                A talk's transcript is split into overlapping windows, embedded, and laid out as a path through
+                3D space, so you can see where the conversation wanders and returns.
+              </p>
+            </div>
+            <button
+              onClick={() => setInfoOpen(false)}
+              className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none -mt-1"
+              aria-label="Close"
+            >×</button>
+          </div>
+
+          <ul className="m-0 pl-4 list-disc flex flex-col gap-1.5 text-[13px] leading-snug">
+            <li>Paste a YouTube URL; its transcript is fetched automatically. Window size and overlap set how it's split into segments.</li>
+            <li><b className="text-text-h">Visualize</b> embeds every segment at once and draws the path.</li>
+            <li>The playhead follows the video along the path; click a point to jump to that moment.</li>
+            <li><b className="text-text-h">Share</b> copies a link with the transcript and the 3D layout.</li>
+          </ul>
+
+          <p className="text-[12px] leading-snug opacity-75 m-0">
+            To watch the path grow as the talk plays, see{' '}
+            <a href="#v8" onClick={() => setInfoOpen(false)} className="text-accent no-underline hover:underline">Live Incremental Embedding →</a>
+          </p>
         </div>
-        <a href="#index" onClick={() => setInfoOpen(false)} className="text-sm text-accent no-underline hover:underline">
-          Version Index →
-        </a>
       </dialog>
 
       {/* URL Bar */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
+          <HomeLink />
           <button
             onClick={() => setInfoOpen(true)}
             className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"
@@ -462,9 +489,9 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const threeDContent = displayPoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-            {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} glowStrength={glowStrength} />}
+            {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={initialCamera} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={initialCamera} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={initialCamera} onCameraChange={s => { cameraStateRef.current = s }} glowStrength={glowStrength} />}
             {displayMeta && (
               <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
                 <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>
@@ -624,7 +651,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   }}
                 >
                   <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Cividis Tube</option>
+                  <option value="cividis-tube">Tube</option>
                   <option value="glow">Glow (Shader)</option>
                 </select>
                 <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">

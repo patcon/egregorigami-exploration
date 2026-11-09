@@ -71,23 +71,29 @@ interface TranscriptViewerProps {
   onTabChange?: (tab: string) => void
   extraTabs?: Array<{ id: string; label: React.ReactNode }>
   extraTabContent?: React.ReactNode
+  /** Namespace for the transcript's own localStorage keys (text, raw text, duration). Window settings stay shared. */
+  storagePrefix?: string
+  /** Drive the speed selector from outside (e.g. shared across v9 sessions). */
+  externalSpeed?: number
 }
 
-export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, scrollToWord, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent }: TranscriptViewerProps = {}) {
+export default function TranscriptViewer({ initialText, initialDuration, onWindowChange, onParamsBlur, onCursorChange, onAllowFasterChange, externalRawText, externalPosition, scrollToWord, externalPlaying, onScrub, onPlayingChange, onSpeedChange, maxSpeed, onSubtitleLoad, hideSegmentsMode, label, prependTextareaButtons, hideFileLoad, collapsible, open, onToggle, warning, tab, onTabChange, extraTabs, extraTabContent, storagePrefix = '', externalSpeed }: TranscriptViewerProps = {}) {
   const isCollapsed = collapsible && open === false
-  const [rawText, setRawText] = useState(() => localStorage.getItem('transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
-  const [text, setText] = useState(() => initialText ?? localStorage.getItem('transcript-text') ?? DEFAULT_TEXT)
-  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
+  const [rawText, setRawText] = useState(() => localStorage.getItem(storagePrefix + 'transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
+  const [text, setText] = useState(() => initialText ?? localStorage.getItem(storagePrefix + 'transcript-text') ?? DEFAULT_TEXT)
+  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '100')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
   useEffect(() => {
     if (hideSegmentsMode && windowMode === 'segments') setWindowMode('words')
   }, [hideSegmentsMode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [overlapInput, setOverlapInput] = useState(() => localStorage.getItem('transcript-overlap') ?? '80')
-  const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem('transcript-duration') ?? '30')
+  const [durationInput, setDurationInput] = useState(() => initialDuration ?? localStorage.getItem(storagePrefix + 'transcript-duration') ?? '30')
   const duration = Math.max(1, parseTimecode(durationInput) || 1)
-  const [speed, setSpeed] = useState(1)
+  const [speed, setSpeed] = useState(externalSpeed ?? 1)
+  useEffect(() => { if (externalSpeed !== undefined) setSpeed(externalSpeed) }, [externalSpeed])
   const [position, setPosition] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
+  // Start in step with an external player, so remounting mid-playback doesn't report a spurious pause
+  const [isPlaying, setIsPlaying] = useState(() => externalPlaying ?? false)
   const [autoScroll, setAutoScroll] = useState(() => localStorage.getItem('transcript-auto-scroll') !== 'false')
   const [allowFaster, setAllowFaster] = useState(() => localStorage.getItem('transcript-allow-faster') === 'true')
 
@@ -272,13 +278,13 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     setRawText(raw)
     setText(parsed.text)
     setDurationInput(String(parsed.durationSecs))
-    localStorage.setItem('transcript-raw-text', raw)
-    localStorage.setItem('transcript-text', parsed.text)
-    localStorage.setItem('transcript-duration', String(parsed.durationSecs))
+    localStorage.setItem(storagePrefix + 'transcript-raw-text', raw)
+    localStorage.setItem(storagePrefix + 'transcript-text', parsed.text)
+    localStorage.setItem(storagePrefix + 'transcript-duration', String(parsed.durationSecs))
     setPosition(0)
     stopPlayback()
     onSubtitleLoad?.(parsed)
-  }, [stopPlayback, onSubtitleLoad])
+  }, [stopPlayback, onSubtitleLoad, storagePrefix])
 
   const handleFileLoad = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -293,8 +299,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
         const normalized = raw.replace(/\s+/g, ' ').trim()
         setRawText(raw)
         setText(normalized)
-        localStorage.setItem('transcript-raw-text', raw)
-        localStorage.setItem('transcript-text', normalized)
+        localStorage.setItem(storagePrefix + 'transcript-raw-text', raw)
+        localStorage.setItem(storagePrefix + 'transcript-text', normalized)
         setPosition(0)
         stopPlayback()
       }
@@ -302,7 +308,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
     reader.readAsText(file)
     // Reset so the same file can be re-selected
     e.target.value = ''
-  }, [applySubtitleResult, stopPlayback])
+  }, [applySubtitleResult, stopPlayback, storagePrefix])
 
   useEffect(() => {
     onWindowChange?.({ windowSize, overlapPct, text })
@@ -352,8 +358,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             const normalized = raw.replace(/\s+/g, ' ').trim()
             setRawText(raw)
             setText(normalized)
-            localStorage.setItem('transcript-raw-text', raw)
-            localStorage.setItem('transcript-text', normalized)
+            localStorage.setItem(storagePrefix + 'transcript-raw-text', raw)
+            localStorage.setItem(storagePrefix + 'transcript-text', normalized)
             setPosition(0)
             stopPlayback()
           }}
@@ -368,8 +374,8 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
               const normalized = raw.replace(/\s+/g, ' ').trim()
               setRawText(raw)
               setText(normalized)
-              localStorage.setItem('transcript-raw-text', raw)
-              localStorage.setItem('transcript-text', normalized)
+              localStorage.setItem(storagePrefix + 'transcript-raw-text', raw)
+              localStorage.setItem(storagePrefix + 'transcript-text', normalized)
               setPosition(0)
               stopPlayback()
             }
@@ -433,7 +439,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
             type="text"
             className={`w-[64px] ${inputBase} ${parseTimecode(durationInput) > 0 ? '' : inputError}`}
             value={durationInput}
-            onChange={e => { setDurationInput(e.target.value); localStorage.setItem('transcript-duration', e.target.value) }}
+            onChange={e => { setDurationInput(e.target.value); localStorage.setItem(storagePrefix + 'transcript-duration', e.target.value) }}
             placeholder="30 or 4:28"
           />
         </label>

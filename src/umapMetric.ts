@@ -20,4 +20,4 @@ function cosine(a: Vector, b: Vector) {
   return na && nb ? 1 - d / Math.sqrt(na * nb) : 1
 }
 
-export const umapDistanceFn = (metric: UmapMetric = 'euclidean') => (metric === 'cosine' ? cosine : euclidean)
+export const umapDistanceFn = (metric: UmapMetric = 'cosine') => (metric === 'cosine' ? cosine : euclidean)

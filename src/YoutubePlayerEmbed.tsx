@@ -16,15 +16,20 @@ interface YoutubePlayerEmbedProps {
   playbackRate?: number
   onVideoDuration?: (secs: number) => void
   noBottomMargin?: boolean
+  /** Mute the player (e.g. a background session in v9). */
+  muted?: boolean
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration, noBottomMargin }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration, noBottomMargin, muted }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const onTimeUpdateRef = useRef(onTimeUpdate)
   const onPlayStateChangeRef = useRef(onPlayStateChange)
   const onVideoDurationRef = useRef(onVideoDuration)
+  const mutedRef = useRef(muted)
+  const playingRef = useRef(playing)
+  useEffect(() => { mutedRef.current = muted; playingRef.current = playing })
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate
     onPlayStateChangeRef.current = onPlayStateChange
@@ -76,6 +81,9 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
           onReady: (event: YT.PlayerEvent) => {
             // Only expose the player once it's fully initialized
             playerRef.current = event.target
+            if (mutedRef.current) event.target.mute()
+            // Join in if playback was already requested before the player was ready
+            if (playingRef.current) event.target.playVideo()
             const dur = event.target.getDuration()
             if (dur > 0) onVideoDurationRef.current?.(dur)
           },
@@ -145,6 +153,13 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
     if (playing) playerRef.current.playVideo()
     else playerRef.current.pauseVideo()
   }, [playing])
+
+  // Mute
+  useEffect(() => {
+    if (muted === undefined || !playerRef.current) return
+    if (muted) playerRef.current.mute()
+    else playerRef.current.unMute()
+  }, [muted])
 
   // Playback rate
   useEffect(() => {

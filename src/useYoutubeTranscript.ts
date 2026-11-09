@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import { extractVideoId } from './videoUtils'
+import { hasTranscriptApi } from './env'
+import { readShareParam } from './shareUrl'
 
 export type TranscriptLoadedResult = {
   text: string
@@ -20,12 +22,17 @@ export function useYoutubeTranscript(
   options?: {
     onLoaded?: (result: TranscriptLoadedResult) => void
     onSubtitleLoaded?: (result: SubtitleLoadResult) => void
+    /** Namespace for localStorage keys, so several transcripts can coexist (v9). */
+    storagePrefix?: string
+    /** Fetch the transcript automatically when the URL names a new video (default true). */
+    autoFetch?: boolean
   },
 ) {
-  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem('yt-transcript'))
-  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem('yt-duration'))
+  const p = options?.storagePrefix ?? ''
+  const [loadedText, setLoadedText] = useState<string | null>(() => localStorage.getItem(p + 'yt-transcript'))
+  const [loadedDuration, setLoadedDuration] = useState<string | null>(() => localStorage.getItem(p + 'yt-duration'))
   const [loadedVideoId, setLoadedVideoId] = useState<string | null>(() =>
-    extractVideoId(localStorage.getItem('yt-url') ?? '') ? localStorage.getItem('yt-video-id') : null
+    extractVideoId(localStorage.getItem(p + 'yt-url') ?? '') ? localStorage.getItem(p + 'yt-video-id') : null
   )
   const [loadCount, setLoadCount] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
@@ -34,7 +41,7 @@ export function useYoutubeTranscript(
   // (external tool + VTT upload) flow for that video.
   const [failedVideoId, setFailedVideoId] = useState<string | null>(null)
   const [wordTimestamps, setWordTimestamps] = useState<number[] | null>(
-    () => JSON.parse(localStorage.getItem('yt-word-timestamps') ?? 'null')
+    () => JSON.parse(localStorage.getItem(p + 'yt-word-timestamps') ?? 'null')
   )
 
   const handleLoad = useCallback(async () => {
@@ -58,12 +65,12 @@ export function useYoutubeTranscript(
       setLoadedVideoId(videoId)
       setWordTimestamps(wt)
       setLoadCount(c => c + 1)
-      localStorage.setItem('yt-url', urlInput)
-      localStorage.setItem('yt-transcript', text)
-      localStorage.setItem('yt-duration', duration)
-      localStorage.setItem('yt-video-id', videoId)
-      localStorage.setItem('yt-word-timestamps', JSON.stringify(wt))
-      localStorage.setItem('transcript-raw-text', segmentsToVtt(data.segments))
+      localStorage.setItem(p + 'yt-url', urlInput)
+      localStorage.setItem(p + 'yt-transcript', text)
+      localStorage.setItem(p + 'yt-duration', duration)
+      localStorage.setItem(p + 'yt-video-id', videoId)
+      localStorage.setItem(p + 'yt-word-timestamps', JSON.stringify(wt))
+      localStorage.setItem(p + 'transcript-raw-text', segmentsToVtt(data.segments))
       setStatus('idle')
       options?.onLoaded?.({ text, duration, videoId, wordTimestamps: wt })
     } catch (e) {
@@ -79,12 +86,38 @@ export function useYoutubeTranscript(
     setWordTimestamps(result.wordTimestamps)
     setLoadedVideoId(null)
     setLoadCount(c => c + 1)
-    localStorage.setItem('yt-transcript', result.text)
-    localStorage.setItem('yt-duration', String(result.durationSecs))
-    localStorage.setItem('yt-word-timestamps', JSON.stringify(result.wordTimestamps))
-    localStorage.removeItem('yt-video-id')
+    localStorage.setItem(p + 'yt-transcript', result.text)
+    localStorage.setItem(p + 'yt-duration', String(result.durationSecs))
+    localStorage.setItem(p + 'yt-word-timestamps', JSON.stringify(result.wordTimestamps))
+    localStorage.removeItem(p + 'yt-video-id')
     options?.onSubtitleLoaded?.(result)
   }, [options?.onSubtitleLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch: when the URL comes to name a new video, fetch its transcript as if
+  // Fetch had been pressed. Only where the transcript API exists (not the static
+  // GitHub Pages build, which uses the manual VTT flow).
+  // - On first load, a transcript already held (fetched, or an uploaded VTT) is kept.
+  // - A video opened from a share link that carries its transcript isn't fetched,
+  //   so the shared copy isn't overwritten.
+  // - A failed fetch isn't retried until the URL changes again.
+  const prevVideoIdRef = useRef<string | null | undefined>(undefined)
+  const [sharedVideo] = useState(() => {
+    const shared = readShareParam()
+    return shared?.rawText && shared.videoId ? shared.videoId : null
+  })
+  const sharedVideoSkippedRef = useRef(false)
+  useEffect(() => {
+    if (options?.autoFetch === false || !hasTranscriptApi) return
+    const vid = extractVideoId(urlInput)
+    const prev = prevVideoIdRef.current
+    prevVideoIdRef.current = vid
+    if (!vid || vid === prev) return
+    if (vid === sharedVideo && !sharedVideoSkippedRef.current) { sharedVideoSkippedRef.current = true; return }
+    const firstLoad = prev === undefined
+    if (firstLoad && loadedText?.trim() && (loadedVideoId === vid || loadedVideoId === null)) return
+    if (!firstLoad && vid === loadedVideoId) return
+    handleLoad()
+  }, [urlInput]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const serverFailed = failedVideoId !== null && failedVideoId === extractVideoId(urlInput)
 

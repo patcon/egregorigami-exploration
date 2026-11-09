@@ -39,7 +39,7 @@ function dot(a: Float32Array, b: Float32Array) {
  * near their most similar existing points), then Procrustes-aligns the result
  * onto the previously displayed frame so the view doesn't flip or spin.
  */
-export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3, metric = 'euclidean' }: LiveLayoutOptions = {}) {
+export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3, metric = 'cosine' }: LiveLayoutOptions = {}) {
   let vectors: Float32Array[] = []
   let prevRaw: Vec3[] = []      // last UMAP output, in UMAP's own coordinates
   let prevAligned: Vec3[] = []  // last displayed coordinates

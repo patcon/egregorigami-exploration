@@ -6,6 +6,7 @@ import EmbeddingLayoutView from './EmbeddingLayoutView'
 import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
 import EmbeddingLayoutViewV7 from './EmbeddingLayoutViewV7'
 import EmbeddingLayoutViewV8 from './EmbeddingLayoutViewV8'
+import EmbeddingLayoutViewV9 from './EmbeddingLayoutViewV9'
 import MicTranscriptViewer from './MicTranscriptViewer'
 import ManualEmbeddingProjector from './ManualEmbeddingProjector'
 
@@ -19,69 +20,43 @@ function useHash() {
   return hash
 }
 
+/**
+ * Variants on the landing page, newest first. `dates` is when the bulk of the
+ * work on each happened (from git history), not every later touch-up.
+ */
+const VARIANTS = [
+  { href: '#v9', title: 'Parallel Live Sessions', dates: 'Nov 9, 2026', description: 'v8\'s live mode for up to four videos at once: simulates parallel conference sessions playing together and embedding into one shared 3D space. (default)' },
+  { href: '#v8', title: 'Live Incremental Embedding', dates: 'Nov 6–9, 2026', description: 'v7 plus a live mode: segments are embedded as the transcript plays, and the 3D layout animates as it grows.' },
+  { href: '#manual', title: 'Manual Branching Projector', dates: 'Apr 9, 2026', description: 'Type or paste lines of text — each line becomes an embedding node; use bullet syntax to create branches visualized in 3D.' },
+  { href: '#v7', title: 'Embedding Layout (Mobile)', dates: 'Apr 6–8, 2026', description: 'Mobile-optimized version of v5.' },
+  { href: '#v6', title: 'Live Mic Transcript Visualizer', dates: 'Mar 29, 2026', description: 'Record speech via your microphone and watch the embedding window slide through the live transcript.' },
+  { href: '#v5', title: 'Embedding Layout (New Renderers)', dates: 'Mar 21, 2026', description: 'Same as v4, with switchable renderers: original points, tube, and glow shader.' },
+  { href: '#v4', title: 'Embedding Layout', dates: 'Mar 21, 2026', description: 'Side-by-side view: YouTube player and transcript with an inline 3D embedding panel.' },
+  { href: '#v3', title: 'Embedding Projector', dates: 'Mar 20–21, 2026', description: 'Generate sentence embeddings in-browser and explore the 3D semantic space with an interactive scatter plot.' },
+  { href: '#v2', title: 'YouTube Transcript Visualizer', dates: 'Mar 20–21, 2026', description: 'Paste a YouTube URL and watch the embedding window slide through the transcript.' },
+  { href: '#v1', title: 'Transcript Window Visualizer', dates: 'Mar 20–21, 2026', description: 'Watch an embedding context window slide through a transcript in real time.' },
+]
+
 function IndexPage() {
   return (
     <>
       <section id="center" className="flex flex-col gap-[25px] content-center items-center flex-1 max-[1024px]:px-5 max-[1024px]:pt-8 max-[1024px]:pb-6 max-[1024px]:gap-[18px]">
         <div>
           <h1>egregorigami</h1>
-          <p>Explorations of collective intelligence, narrative space, and protein folding.</p>
+          <p>Explorations of collective intelligence and narrative space.</p>
         </div>
         <ul className="list-none p-0 m-0 flex flex-col gap-2 text-left">
-          <li>
-            <a href="#v1" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Transcript Window Visualizer</strong>
-              <span className="text-sm text-text">Watch an embedding context window slide through a transcript in real time.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v2" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">YouTube Transcript Visualizer</strong>
-              <span className="text-sm text-text">Paste a YouTube URL and watch the embedding window slide through the transcript.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v3" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Embedding Projector</strong>
-              <span className="text-sm text-text">Generate sentence embeddings in-browser and explore the 3D semantic space with an interactive scatter plot.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v4" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Embedding Layout</strong>
-              <span className="text-sm text-text">Side-by-side view: YouTube player and transcript with an inline 3D embedding panel.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v5" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Embedding Layout (New Renderers)</strong>
-              <span className="text-sm text-text">Same as v4, with switchable renderers: original points, Cividis tube, and glow shader.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v6" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Live Mic Transcript Visualizer</strong>
-              <span className="text-sm text-text">Record speech via your microphone and watch the embedding window slide through the live transcript.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v7" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Embedding Layout (Mobile)</strong>
-              <span className="text-sm text-text">Mobile-optimized version of v5.</span>
-            </a>
-          </li>
-          <li>
-            <a href="#v8" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Live Incremental Embedding</strong>
-              <span className="text-sm text-text">v7 plus a live mode: segments are embedded as the transcript plays, and the 3D layout animates as it grows. (default)</span>
-            </a>
-          </li>
-          <li>
-            <a href="#manual" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
-              <strong className="text-base">Manual Branching Projector</strong>
-              <span className="text-sm text-text">Type or paste lines of text — each line becomes an embedding node; use bullet syntax to create branches visualized in 3D.</span>
-            </a>
-          </li>
+          {VARIANTS.map(v => (
+            <li key={v.href}>
+              <a href={v.href} className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+                <span className="flex items-baseline justify-between gap-4">
+                  <strong className="text-base">{v.title}</strong>
+                  <span className="text-xs text-text opacity-60 whitespace-nowrap tabular-nums">{v.dates}</span>
+                </span>
+                <span className="text-sm text-text">{v.description}</span>
+              </a>
+            </li>
+          ))}
         </ul>
       </section>
       <div className="ticks"></div>
@@ -142,9 +117,10 @@ function App() {
   if (hash === '#v6') return <><GitHubCorner /><IndexLink /><MicTranscriptViewer /></>
   if (hash === '#v7') return <><GitHubCorner /><EmbeddingLayoutViewV7 /></>
   if (hash === '#v8') return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
+  if (hash === '#v9') return <><GitHubCorner /><EmbeddingLayoutViewV9 /></>
   if (hash === '#manual') return <><GitHubCorner /><IndexLink /><ManualEmbeddingProjector /></>
   if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
-  return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
+  return <><GitHubCorner /><EmbeddingLayoutViewV9 /></>
 }
 
 export default App
