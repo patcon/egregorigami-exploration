@@ -24,8 +24,10 @@ export function glowPalette(t: number): THREE.Color {
 const TRACK_LUTS: number[][][] = [
   [[0.10, 0.30, 1.00], [0.00, 0.70, 1.00], [0.30, 1.00, 0.95]], // A: blue → cyan → aqua
   [[0.85, 0.10, 0.75], [1.00, 0.35, 0.35], [1.00, 0.80, 0.10]], // B: magenta → coral → amber
+  [[0.05, 0.55, 0.25], [0.30, 0.90, 0.35], [0.85, 1.00, 0.55]], // C: forest → green → pale lime
+  [[0.40, 0.15, 0.95], [0.65, 0.45, 1.00], [1.00, 0.75, 0.95]], // D: violet → lavender → pink
 ]
-export const TRACK_SWATCHES = ['#1ab2ff', '#ff5a5a']
+export const TRACK_SWATCHES = ['#1ab2ff', '#ff5a5a', '#4cd964', '#a070ff']
 
 export function trackPalette(track: number, t: number): THREE.Color {
   const lut = TRACK_LUTS[track % TRACK_LUTS.length]

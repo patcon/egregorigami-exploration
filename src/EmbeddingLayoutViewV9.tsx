@@ -16,17 +16,19 @@ import UrlHistoryInput from './UrlHistoryInput'
 import { hasTranscriptApi } from './env'
 import { UMAP_METRICS, type UmapMetric } from './umapMetric'
 import { TRACK_SWATCHES } from './palettes'
+import HomeLink from './HomeLink'
 
 /**
- * v9: parallel live sessions. Two transcripts (e.g. two conference talks
+ * v9: parallel live sessions. Up to four transcripts (e.g. conference talks
  * happening at once) play simultaneously and are embedded, as they're spoken,
  * into one shared 3D space. One session is "active" at a time: its video,
- * transcript tabs and playhead are shown; the other keeps playing muted in
+ * transcript tabs and playhead are shown; the others keep playing muted in
  * the background. Config (window, model, UMAP, speed, styling) is shared.
  */
 
-const SESSION_IDS = ['a', 'b'] as const
+const SESSION_IDS = ['a', 'b', 'c', 'd'] as const
 type SessionId = typeof SESSION_IDS[number]
+const MAX_SESSIONS = SESSION_IDS.length
 const sessionLabel = (k: number) => String.fromCharCode(65 + k)
 
 /** UMAP needs more points than neighbours; below this the live view just waits. */
@@ -70,16 +72,101 @@ function textFromRaw(raw: string | null) {
   return detectAndParseSubtitle(raw)?.text ?? raw.replace(/\s+/g, ' ').trim()
 }
 
+/** Example video sets, linked from the info modal (each loads via the query string). */
+const SAMPLE_SETS = {
+  /** Living Room Conversations episodes */
+  livingRoom: ['HMycIvbhmCU', 'V1SKd6zmpsw'],
+  /** 39C3 talks */
+  ccc: ['6Cedq6RnjZM', 'XTgIJUwmz0Q', 'ubLr1MWiqwA'],
+}
+const sampleHref = (videoIds: string[], settings?: { window: number; overlap: number }) =>
+  '?' + videoIds.map((v, k) => `${SESSION_IDS[k]}=${v}`).join('&')
+  + (settings ? `&window=${settings.window}&overlap=${settings.overlap}` : '')
+  + '#v9'
+
+/** Example sets shown in the info modal: each "Load" link fills the sessions via the query string. */
+const EXAMPLE_SETS = [
+  {
+    title: 'Living Room Conversations',
+    description: 'Small-group conversations across differences — two discussions side by side, with a 100-word window and 80% overlap.',
+    loadLabel: 'Load 2 episodes',
+    href: sampleHref(SAMPLE_SETS.livingRoom, { window: 100, overlap: 80 }),
+    links: [{ label: 'Playlist', href: 'https://www.youtube.com/playlist?list=PLdH_E8WPD_iv2OPkVyJESUnfuWD7qPZSE' }],
+  },
+  {
+    title: '39C3 — Chaos Communication Congress 2025',
+    description: 'Three talks, with a 40-word window and 20% overlap. Find more talks that ran at the same time in the schedule.',
+    loadLabel: 'Load 3 talks',
+    href: sampleHref(SAMPLE_SETS.ccc, { window: 40, overlap: 20 }),
+    links: [
+      { label: 'Schedule', href: 'https://fahrplan.events.ccc.de/congress/2025/fahrplan/' },
+      { label: 'Recordings', href: 'https://www.youtube.com/@mediacccde' },
+    ],
+  },
+]
+
+/** Pre-filled on first visit so there's something to try without hunting for videos. */
+const DEFAULT_VIDEO_URLS: Record<SessionId, string> = {
+  a: `https://www.youtube.com/watch?v=${SAMPLE_SETS.livingRoom[0]}`,
+  b: `https://www.youtube.com/watch?v=${SAMPLE_SETS.livingRoom[1]}`,
+  c: '',
+  d: '',
+}
+
+/** How many sessions to show: up to the last one named in the query string, else the last count used. */
+function initialSessionCount() {
+  const qs = new URLSearchParams(window.location.search)
+  const lastInQuery = SESSION_IDS.reduce((last, id, k) => (qs.get(id) ? k + 1 : last), 0)
+  if (lastInQuery > 0) return lastInQuery
+  const stored = parseInt(localStorage.getItem('v9-count') ?? '')
+  return stored >= 1 && stored <= MAX_SESSIONS ? stored : 2
+}
+
+/**
+ * Optional `?window=<words>&overlap=<percent>`: written to the shared settings
+ * before the transcript viewer mounts (it reads them from localStorage).
+ * Returns which of the two were given, so the URL can keep tracking them.
+ */
+function adoptQueryWindowParams() {
+  const qs = new URLSearchParams(window.location.search)
+  const win = parseInt(qs.get('window') ?? '')
+  const overlap = parseFloat(qs.get('overlap') ?? '')
+  const hasWindow = win >= 1
+  const hasOverlap = overlap >= 0 && overlap <= 99
+  if (hasWindow) localStorage.setItem('transcript-window', String(win))
+  if (hasOverlap) localStorage.setItem('transcript-overlap', String(overlap))
+  return { window: hasWindow, overlap: hasOverlap }
+}
+
+/** Per-session localStorage keys (used here, in useYoutubeTranscript and in TranscriptViewer). */
+const SESSION_STORAGE_KEYS = ['yt-url', 'yt-transcript', 'yt-duration', 'yt-video-id', 'yt-word-timestamps', 'transcript-raw-text', 'transcript-text']
+
+/**
+ * The video named for this session in the query string, if any. When it differs
+ * from the video last stored for the session, that session's stored transcript
+ * belongs to another video, so it's cleared. This runs before the session's
+ * other state reads localStorage.
+ */
+function adoptQueryVideo(id: SessionId, prefix: string) {
+  const qs = new URLSearchParams(window.location.search).get(id)
+  if (!qs) return null
+  if (extractVideoId(localStorage.getItem(prefix + 'yt-url') ?? '') !== qs) {
+    SESSION_STORAGE_KEYS.forEach(k => localStorage.removeItem(prefix + k))
+    localStorage.setItem(prefix + 'yt-url', `https://www.youtube.com/watch?v=${qs}`)
+  }
+  return qs
+}
+
 /**
  * One parallel session: its own video and transcript. Time is shared: every
  * session sits at the same event time (clamped to its own length).
  */
 function useSession(id: SessionId, eventTime: number) {
   const prefix = `v9-${id}:`
+  const [queryVideo] = useState(() => adoptQueryVideo(id, prefix))
   const [urlInput, setUrlInput] = useState(() => {
-    const qs = new URLSearchParams(window.location.search).get(id)
-    if (qs) return `https://www.youtube.com/watch?v=${qs}`
-    return localStorage.getItem(prefix + 'yt-url') ?? ''
+    if (queryVideo) return `https://www.youtube.com/watch?v=${queryVideo}`
+    return localStorage.getItem(prefix + 'yt-url') ?? DEFAULT_VIDEO_URLS[id]
   })
   const videoId = extractVideoId(urlInput)
   const [text, setText] = useState(() =>
@@ -96,6 +183,13 @@ function useSession(id: SessionId, eventTime: number) {
     onLoaded: ({ text }) => { setText(text); setVideoDuration(null) },
     onSubtitleLoaded: ({ text }) => { setText(text) },
   })
+  // A video arriving by link (query string) with no transcript yet: fetch it, once, on load
+  const autoFetchedRef = useRef(false)
+  useEffect(() => {
+    if (autoFetchedRef.current) return
+    autoFetchedRef.current = true
+    if (hasTranscriptApi && queryVideo && !text.trim()) transcript.handleLoad()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const words = useMemo(() => text.trim().split(/\s+/).filter(Boolean), [text])
   const totalSecs = transcript.loadedDuration ? parseInt(transcript.loadedDuration) : null
   const durationMismatch = videoDuration !== null && totalSecs !== null
@@ -126,20 +220,42 @@ function useSession(id: SessionId, eventTime: number) {
 export default function EmbeddingLayoutViewV9() {
   // One clock for the whole event, so sessions can never drift apart
   const [eventTime, setEventTime] = useState(0)
-  const sessions = [useSession('a', eventTime), useSession('b', eventTime)]
-  const [active, setActive] = useState(() => (localStorage.getItem('v9-active') === 'b' ? 1 : 0))
+  // All slots always exist (hooks can't be conditional); only the first `sessionCount` are in play
+  const allSessions = [useSession('a', eventTime), useSession('b', eventTime), useSession('c', eventTime), useSession('d', eventTime)]
+  const [sessionCount, setSessionCount] = useState(initialSessionCount)
+  const sessions = allSessions.slice(0, sessionCount)
+  const [active, setActive] = useState(() => {
+    const k = SESSION_IDS.indexOf(localStorage.getItem('v9-active') as SessionId)
+    return k >= 0 && k < sessionCount ? k : 0
+  })
   const switchTo = useCallback((k: number) => { setActive(k); localStorage.setItem('v9-active', SESSION_IDS[k]) }, [])
   const cur = sessions[active]
 
-  // ?a=<videoId>&b=<videoId>
-  const videoIdA = sessions[0].videoId, videoIdB = sessions[1].videoId
+  const changeSessionCount = (n: number) => {
+    setSessionCount(n)
+    localStorage.setItem('v9-count', String(n))
+  }
+  const addSession = () => {
+    const k = sessionCount
+    allSessions[k].setSeekTarget(eventTime) // start its video where the event is, not at 0
+    changeSessionCount(k + 1)
+    switchTo(k)
+  }
+  const removeLastSession = () => {
+    if (active === sessionCount - 1) switchTo(sessionCount - 2)
+    changeSessionCount(sessionCount - 1)
+  }
+
+  // ?a=<videoId>&b=<videoId>… for the sessions in play
+  const videoIdsKey = sessions.map(s => s.videoId ?? '').join(',')
   useEffect(() => {
+    const vids = videoIdsKey.split(',')
     const url = new URL(window.location.href)
-    ;([['a', videoIdA], ['b', videoIdB]] as const).forEach(([key, vid]) => {
-      if (vid) url.searchParams.set(key, vid); else url.searchParams.delete(key)
+    SESSION_IDS.forEach((key, k) => {
+      if (vids[k]) url.searchParams.set(key, vids[k]); else url.searchParams.delete(key)
     })
     history.replaceState(null, '', url.toString())
-  }, [videoIdA, videoIdB])
+  }, [videoIdsKey])
 
   const { history: urlHistory } = useUrlHistory(cur.urlInput, cur.videoId)
 
@@ -148,13 +264,40 @@ export default function EmbeddingLayoutViewV9() {
   const [playbackRate, setPlaybackRate] = useState(1)
   const fastMode = playbackRate > MAX_VIDEO_SPEED
 
-  // Shared window settings, reported by whichever transcript viewer is showing
-  const [windowSize, setWindowSize] = useState(() => Math.max(1, parseInt(localStorage.getItem('transcript-window') ?? '40') || 40))
+  // Shared window settings, reported by whichever transcript viewer is showing.
+  // The query string (if given) is adopted first, so both reads below see it.
+  const [windowParamsInQuery] = useState(adoptQueryWindowParams)
+  const [windowSize, setWindowSize] = useState(() => Math.max(1, parseInt(localStorage.getItem('transcript-window') ?? '100') || 100))
   const [overlapPct, setOverlapPct] = useState(() => Math.min(99, Math.max(0, parseFloat(localStorage.getItem('transcript-overlap') ?? '80') || 0)))
 
-  const segmentsA = useMemo(() => computeChunks(sessions[0].text, windowSize, overlapPct), [sessions[0].text, windowSize, overlapPct]) // eslint-disable-line react-hooks/exhaustive-deps
-  const segmentsB = useMemo(() => computeChunks(sessions[1].text, windowSize, overlapPct), [sessions[1].text, windowSize, overlapPct]) // eslint-disable-line react-hooks/exhaustive-deps
-  const segments = [segmentsA, segmentsB]
+  // Share: the URL already carries each session's video; add the current window and
+  // overlap so the recipient segments (and so embeds) the transcripts the same way
+  const [shareCopied, setShareCopied] = useState(false)
+  const handleShare = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('window', String(windowSize))
+    url.searchParams.set('overlap', String(overlapPct))
+    url.hash = '#v9'
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    })
+  }
+
+  // A window/overlap given in the query string stays in it and follows later edits
+  // (so the URL keeps sharing what's on screen); one that wasn't given isn't added.
+  useEffect(() => {
+    if (!windowParamsInQuery.window && !windowParamsInQuery.overlap) return
+    const url = new URL(window.location.href)
+    if (windowParamsInQuery.window) url.searchParams.set('window', String(windowSize))
+    if (windowParamsInQuery.overlap) url.searchParams.set('overlap', String(overlapPct))
+    history.replaceState(null, '', url.toString())
+  }, [windowParamsInQuery, windowSize, overlapPct])
+
+  const segments = useMemo(
+    () => sessions.map(s => computeChunks(s.text, windowSize, overlapPct)),
+    [sessionCount, windowSize, overlapPct, ...allSessions.map(s => s.text)], // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   const highlights = sessions.map((s, k) => {
     if (s.position === undefined || s.words.length === 0) return null
@@ -179,13 +322,14 @@ export default function EmbeddingLayoutViewV9() {
   }, [])
 
   // Which video drives the clock: the active session's while it's still running,
-  // otherwise the other's. With none (no videos, all ended, or faster than YouTube
-  // allows) the clock is simulated.
+  // otherwise the first other one still running. With none (no videos, all ended,
+  // or faster than YouTube allows) the clock is simulated.
   const videoRunning = (k: number) => {
     const s = sessions[k]
     return !!s.videoId && eventTime < (s.videoEnd ?? Infinity) - 0.5
   }
-  const driver = fastMode ? -1 : ([active, 1 - active].find(videoRunning) ?? -1)
+  const driverOrder = [active, ...sessions.map((_, k) => k).filter(k => k !== active)]
+  const driver = fastMode ? -1 : (driverOrder.find(videoRunning) ?? -1)
 
   useEffect(() => {
     if (!playing || driver !== -1) return
@@ -204,7 +348,7 @@ export default function EmbeddingLayoutViewV9() {
 
   // Videos report their time ~4×/s. The driver sets the clock; the others are
   // nudged back if they drift (buffering, ads, slow start).
-  const lastCorrectionRef = useRef<number[]>([0, 0])
+  const lastCorrectionRef = useRef<number[]>(Array(MAX_SESSIONS).fill(0))
   const handleVideoTime = (k: number, t: number) => {
     if (fastMode) return
     if (k === driver) { setEventTime(t); return }
@@ -225,7 +369,7 @@ export default function EmbeddingLayoutViewV9() {
     fastPrevRef.current = fastMode
   }, [fastMode, seekAll])
 
-  // Keyboard: space plays/pauses, arrows seek ±10s (both sessions)
+  // Keyboard: space plays/pauses, arrows seek ±10s (all sessions)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
@@ -269,29 +413,30 @@ export default function EmbeddingLayoutViewV9() {
   const [glowStrength, setGlowStrength] = useState(() => parseFloat(localStorage.getItem('glow-strength') ?? '1'))
 
   // ─── Live embedding into one shared space ────────────────────────────────
-  // Segments from both sessions are appended in the order the playheads pass
-  // them; the worker embeds that growing list incrementally, so both paths are
+  // Segments from every session are appended in the order the playheads pass
+  // them; the worker embeds that growing list incrementally, so all paths are
   // laid out by the same UMAP.
   type Entry = { track: number; seg: number; text: string }
   const { points: livePoints, status: liveStatus, update: liveUpdate, reset: liveReset } = useLiveEmbedding()
   const entriesRef = useRef<Entry[]>([])
   const [entries, setEntries] = useState<Entry[]>([])
-  const completedRef = useRef<number[]>([0, 0])  // per session: segments passed (only grows)
+  const completedRef = useRef<number[]>(Array(MAX_SESSIONS).fill(0))  // per session: segments passed (only grows)
   const laidOutRef = useRef(0)                    // entries included in the last layout request
   const [liveEpoch, setLiveEpoch] = useState(0)
 
   const resetLive = useCallback(() => {
     entriesRef.current = []
     setEntries([])
-    completedRef.current = [0, 0]
+    completedRef.current = Array(MAX_SESSIONS).fill(0)
     laidOutRef.current = 0
     liveReset()
     setLiveEpoch(e => e + 1)
   }, [liveReset])
 
   const segKey = (segs: string[]) => segs.length > 0 ? `${segs.length}:${segs[0]}` : ''
-  const segmentsKeyA = segKey(segmentsA), segmentsKeyB = segKey(segmentsB)
-  useEffect(() => { resetLive() }, [segmentsKeyA, segmentsKeyB, selectedModel, umapMetric, resetLive])
+  // One key per session in play, so adding or removing a session also restarts the layout
+  const segmentsKey = segments.map(segKey).join('|')
+  useEffect(() => { resetLive() }, [segmentsKey, selectedModel, umapMetric, resetLive])
 
   /** Event time (secs) when segment `seg` of session `k` finished being spoken. */
   const segmentSpokenAt = (k: number, seg: number) => {
@@ -304,15 +449,15 @@ export default function EmbeddingLayoutViewV9() {
     return n > 1 && s.totalSecs ? (w / (n - 1)) * s.totalSecs : w
   }
 
-  const [hlA, hlB] = highlights
+  const highlightsKey = highlights.map(h => h ?? '-').join(',')
   useEffect(() => {
-    // After a jump ahead, both sessions can have a backlog. Merge them in the order
+    // After a jump ahead, every session can have a backlog. Merge them in the order
     // the segments were spoken (as if the jump hadn't happened), so the worker's
-    // batches grow both paths together instead of finishing one session first.
+    // batches grow all paths together instead of finishing one session first.
     const pending: (Entry & { at: number })[] = []
     let reachedEnd = false
-    ;[hlA, hlB].forEach((hl, k) => {
-      const segs = k === 0 ? segmentsA : segmentsB
+    highlights.forEach((hl, k) => {
+      const segs = segments[k]
       if (hl === null || segs.length === 0) return
       const passed = Math.min(segs.length, Math.floor(hl) + 1)
       for (let i = completedRef.current[k]; i < passed; i++) {
@@ -331,13 +476,13 @@ export default function EmbeddingLayoutViewV9() {
       laidOutRef.current = total
       liveUpdate(entriesRef.current.map(e => e.text), selectedModel, umapMetric)
     }
-  // segmentsA/B are covered by liveEpoch (a change resets and bumps it)
+  // highlights/segments are covered by highlightsKey and liveEpoch (a segments change resets and bumps it)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hlA, hlB, liveEpoch, liveEvery, selectedModel, umapMetric, liveUpdate])
+  }, [highlightsKey, liveEpoch, liveEvery, selectedModel, umapMetric, liveUpdate])
 
   const pointTracks = useMemo(() => entries.map(e => e.track), [entries])
   const pointLabels = useMemo(() => entries.map(e => e.text), [entries])
-  const laidOutPerTrack = [0, 1].map(k => livePoints ? pointTracks.slice(0, livePoints.length).filter(t => t === k).length : 0)
+  const laidOutPerTrack = sessions.map((_, k) => livePoints ? pointTracks.slice(0, livePoints.length).filter(t => t === k).length : 0)
 
   // ─── Interaction ─────────────────────────────────────────────────────────
   const [scrollToWord, setScrollToWord] = useState<{ wordIndex: number; nonce: number } | undefined>(undefined)
@@ -430,9 +575,26 @@ export default function EmbeddingLayoutViewV9() {
         >
           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: TRACK_SWATCHES[k] }} />
           <span className="font-semibold">{sessionLabel(k)}</span>
-          <span className="opacity-75 text-[12px]">{!s.totalSecs ? '—' : s.ended ? 'ended' : formatTime(s.time)}</span>
+          {/* With 3+ sessions the times would crowd out the URL field on phones */}
+          <span className={`opacity-75 text-[12px] ${sessions.length > 2 ? 'hidden sm:inline' : ''}`}>{!s.totalSecs ? '—' : s.ended ? 'ended' : formatTime(s.time)}</span>
         </button>
       ))}
+      {sessionCount > 1 && (
+        <button
+          onClick={removeLastSession}
+          title={`Remove session ${sessionLabel(sessionCount - 1)}`}
+          aria-label={`Remove session ${sessionLabel(sessionCount - 1)}`}
+          className="py-1.5 px-2 text-[13px] cursor-pointer border-0 border-l border-border bg-code-bg text-text-h hover:bg-border"
+        >−</button>
+      )}
+      {sessionCount < MAX_SESSIONS && (
+        <button
+          onClick={addSession}
+          title={`Add session ${sessionLabel(sessionCount)}`}
+          aria-label={`Add session ${sessionLabel(sessionCount)}`}
+          className="py-1.5 px-2 text-[13px] cursor-pointer border-0 border-l border-border bg-code-bg text-text-h hover:bg-border"
+        >+</button>
+      )}
     </div>
   )
 
@@ -473,7 +635,7 @@ export default function EmbeddingLayoutViewV9() {
 
   const configContent = (
     <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-      <p className="text-[12px] text-text opacity-60 m-0">Settings here (and window size, overlap and speed) apply to both sessions.</p>
+      <p className="text-[12px] text-text opacity-60 m-0">Settings here (and window size, overlap and speed) apply to every session.</p>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label htmlFor="v9-umap-metric" className="text-[13px] text-text-h font-medium">UMAP distance</label>
@@ -500,7 +662,7 @@ export default function EmbeddingLayoutViewV9() {
             className="w-16 py-1 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] tabular-nums"
           />
         </div>
-        <p className="text-[12px] text-text opacity-40 m-0">Counts new segments from either session.</p>
+        <p className="text-[12px] text-text opacity-40 m-0">Counts new segments from any session.</p>
       </div>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -559,19 +721,20 @@ export default function EmbeddingLayoutViewV9() {
     </div>
   )
 
-  const anyText = segmentsA.length > 0 || segmentsB.length > 0
+  const anyText = segments.some(segs => segs.length > 0)
   // The scene (grid, auto-rotate) shows from the start; status text sits over it until the first points arrive
   const threeDContent = (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
       <RendererToggle value={rendererType} onChange={chooseRenderer} autoRotate={autoRotate} onAutoRotateChange={chooseAutoRotate} />
+      {/* Keyed on the session count too: the plot sizes its per-track paths once, on mount */}
       <ScatterPlot3DMulti
-        key={rendererType}
+        key={`${rendererType}-${sessionCount}`}
         renderer={rendererType}
         glowStrength={glowStrength}
         points={livePoints ?? NO_POINTS}
         pointTracks={pointTracks}
         labels={pointLabels}
-        trackCount={2}
+        trackCount={sessionCount}
         highlights={highlights}
         activeTrack={active}
         onPointClick={handlePointClick}
@@ -586,7 +749,7 @@ export default function EmbeddingLayoutViewV9() {
       {livePoints !== null ? (
       <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
         <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
-        {[0, 1].map(k => (
+        {sessions.map((_, k) => (
           <div key={k} className="flex items-center justify-end gap-1">
             <span className="w-2 h-2 rounded-full inline-block" style={{ background: TRACK_SWATCHES[k] }} />
             {sessionLabel(k)}: {laidOutPerTrack[k]} / {segments[k].length}
@@ -604,9 +767,9 @@ export default function EmbeddingLayoutViewV9() {
         : liveStatus.status === 'updating'
         ? 'Embedding…'
         : !anyText
-        ? 'Load a transcript into session A and/or B, then press play.'
+        ? 'Load a transcript into at least one session, then press play.'
         : entries.length < LIVE_MIN_SEGMENTS
-        ? `Press play — points appear after ${LIVE_MIN_SEGMENTS} segments across both sessions (${entries.length} so far).`
+        ? `Press play — points appear after ${LIVE_MIN_SEGMENTS} segments across all sessions (${entries.length} so far).`
         : 'Embedding…'}
     </div>
       )}
@@ -655,37 +818,66 @@ export default function EmbeddingLayoutViewV9() {
       <dialog
         ref={infoDialogRef}
         onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
-        className="m-auto backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(380px,90vw)] shadow-lg"
+        className="m-auto text-left backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-0 w-[min(440px,92vw)] max-h-[90dvh] shadow-lg"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold m-0">Parallel sessions</h2>
-          <button onClick={() => setInfoOpen(false)} className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none">×</button>
+        <div className="flex flex-col gap-5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-text-h m-0">Parallel sessions</h2>
+              <p className="text-[13px] leading-snug m-0">
+                Up to four talks play at once and are embedded, as they're spoken, into one shared 3D space.
+              </p>
+            </div>
+            <button
+              onClick={() => setInfoOpen(false)}
+              className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none -mt-1"
+              aria-label="Close"
+            >×</button>
+          </div>
+
+          <ul className="m-0 pl-4 list-disc flex flex-col gap-1.5 text-[13px] leading-snug">
+            <li>Paste a YouTube URL for each session. <b className="text-text-h">+</b> / <b className="text-text-h">−</b> beside the session toggle adds or removes one.</li>
+            <li>All sessions share one clock; the hidden ones play muted. The toggle picks whose video, transcript and playhead you see.</li>
+            <li><b className="text-text-h">Share</b> copies a link to the current sessions, window and overlap.</li>
+          </ul>
+
+          <section className="flex flex-col gap-2.5">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider opacity-60 m-0">Try an example</h3>
+            {EXAMPLE_SETS.map(ex => (
+              <div key={ex.title} className="flex flex-col gap-2 rounded-lg border border-border bg-code-bg p-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[13px] font-semibold text-text-h">{ex.title}</span>
+                  <span className="text-[12px] leading-snug opacity-75">{ex.description}</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <a
+                    href={ex.href}
+                    className="py-1 px-3 rounded-md bg-accent text-white text-[12px] font-medium no-underline hover:opacity-85 whitespace-nowrap"
+                  >
+                    {ex.loadLabel}
+                  </a>
+                  {ex.links.map(l => (
+                    <a
+                      key={l.href}
+                      href={l.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12px] text-accent no-underline hover:underline whitespace-nowrap"
+                    >
+                      {l.label} ↗
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
         </div>
-        <p className="text-sm m-0 mb-3">
-          Simulates two conference sessions running at the same time. Load a video into A and B; both play together
-          (the hidden one muted) and are embedded into one shared space as they're spoken. The A/B toggle switches which
-          session's video, transcript and playhead you're looking at.
-        </p>
-        <p className="text-sm m-0 mb-3">
-          Need videos? Try the{' '}
-          <a
-            href="https://www.youtube.com/playlist?list=PLdH_E8WPD_iv2OPkVyJESUnfuWD7qPZSE"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent no-underline hover:underline"
-          >
-            Living Room Conversations playlist ↗
-          </a>
-          : small-group conversations across differences, good for comparing two discussions side by side.
-        </p>
-        <a href="#index" onClick={() => setInfoOpen(false)} className="text-sm text-accent no-underline hover:underline">
-          Version Index →
-        </a>
       </dialog>
 
       {/* URL bar: session toggle + the active session's URL */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
+          <HomeLink />
           <button
             onClick={() => setInfoOpen(true)}
             className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"
@@ -700,6 +892,13 @@ export default function EmbeddingLayoutViewV9() {
             placeholder={`Session ${sessionLabel(active)}: https://www.youtube.com/watch?v=...`}
             history={urlHistory}
           />
+          <button
+            className="py-1.5 px-3.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border"
+            onClick={handleShare}
+            title="Copy a link to these sessions, with the current window and overlap"
+          >
+            {shareCopied ? 'Copied!' : 'Share'}
+          </button>
         </div>
         {loadStatus === 'error' && <p className="text-[13px] text-[#e53e3e] m-0">{cur.transcript.errorMessage}</p>}
       </div>
@@ -751,7 +950,7 @@ export default function EmbeddingLayoutViewV9() {
             {(liveStatus.status === 'updating' || liveStatus.status === 'model-loading') && <div className="spinner" />}
             {liveStatus.status === 'model-loading'
               ? `Loading model… ${liveStatus.progress}%`
-              : `Live: ${livePoints?.length ?? 0} embedded (A ${laidOutPerTrack[0]} · B ${laidOutPerTrack[1]})`}
+              : `Live: ${livePoints?.length ?? 0} embedded (${laidOutPerTrack.map((n, k) => `${sessionLabel(k)} ${n}`).join(' · ')})`}
           </span>
           <select
             className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
