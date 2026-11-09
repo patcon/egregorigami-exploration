@@ -6,6 +6,7 @@ import EmbeddingLayoutView from './EmbeddingLayoutView'
 import EmbeddingLayoutViewV5 from './EmbeddingLayoutViewV5'
 import EmbeddingLayoutViewV7 from './EmbeddingLayoutViewV7'
 import EmbeddingLayoutViewV8 from './EmbeddingLayoutViewV8'
+import EmbeddingLayoutViewV9 from './EmbeddingLayoutViewV9'
 import MicTranscriptViewer from './MicTranscriptViewer'
 import ManualEmbeddingProjector from './ManualEmbeddingProjector'
 
@@ -77,6 +78,12 @@ function IndexPage() {
             </a>
           </li>
           <li>
+            <a href="#v9" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
+              <strong className="text-base">Parallel Live Sessions</strong>
+              <span className="text-sm text-text">v8's live mode for two videos at once: simulates parallel conference sessions playing together and embedding into one shared 3D space.</span>
+            </a>
+          </li>
+          <li>
             <a href="#manual" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Manual Branching Projector</strong>
               <span className="text-sm text-text">Type or paste lines of text — each line becomes an embedding node; use bullet syntax to create branches visualized in 3D.</span>
@@ -142,6 +149,7 @@ function App() {
   if (hash === '#v6') return <><GitHubCorner /><IndexLink /><MicTranscriptViewer /></>
   if (hash === '#v7') return <><GitHubCorner /><EmbeddingLayoutViewV7 /></>
   if (hash === '#v8') return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
+  if (hash === '#v9') return <><GitHubCorner /><EmbeddingLayoutViewV9 /></>
   if (hash === '#manual') return <><GitHubCorner /><IndexLink /><ManualEmbeddingProjector /></>
   if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
   return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
