@@ -60,6 +60,8 @@ Entries are in chronological order (oldest first).
 - Tube and Glow renderers now work in the live views (v8, v9), not just after a full Visualize run: a Renderer selector in the live settings switches between Points + Line, Tube and Glow, and the path rebuilds as the layout tweens. Line width sets the tube's thickness and the glow's trail; v9 dims the inactive session's tube/glow and gains a Glow strength slider. Shared code is in `src/livePathVisuals.ts`.
 - Tube renderer uses the shared blue → cyan → yellow gradient instead of cividis, whose dull grey-olive middle was a leftover from the old white background; renamed "Cividis Tube" to "Tube" in the selectors
 - v9 playheads are red again (both sessions), matching v8; the active session's is still drawn larger
+- Renderer switch (Lines / Tubes / Glow) and an auto-rotate button are now overlaid on the 3D view in v8 and v9, as well as in Config. Glow is the default renderer in v9 too (v8 already defaulted to it). The v8 static view gets the same renderer switch in place of the dropdown next to "Rerun Viz"; auto-rotate there stays live-only.
+- UMAP distance now defaults to Cosine in v8 and v9 (an explicitly saved "Euclidean" choice is kept)
 
 ## Prior work (selected)
 

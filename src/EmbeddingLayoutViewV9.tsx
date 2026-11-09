@@ -3,6 +3,7 @@ import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3DMulti from './ScatterPlot3DMulti'
 import type { LiveRenderer } from './livePathVisuals'
+import RendererToggle from './RendererToggle'
 import { DEFAULT_LINE_WIDTH, DEFAULT_NODE_SIZE } from './ScatterPlot3DLive'
 import { useLiveEmbedding } from './useLiveEmbedding'
 import type { CameraState } from './scatterTypes'
@@ -250,7 +251,7 @@ export default function EmbeddingLayoutViewV9() {
     const stored = localStorage.getItem('projector-model')
     return (EMBEDDING_MODELS.find(m => m.id === stored) ?? EMBEDDING_MODELS.find(m => m.default)!).id
   })
-  const [umapMetric, setUmapMetric] = useState<UmapMetric>(() => localStorage.getItem('umap-metric') === 'cosine' ? 'cosine' : 'euclidean')
+  const [umapMetric, setUmapMetric] = useState<UmapMetric>(() => localStorage.getItem('umap-metric') === 'euclidean' ? 'euclidean' : 'cosine')
   const [liveEvery, setLiveEvery] = useState(() => Math.max(1, parseInt(localStorage.getItem('live-embed-every') ?? '1') || 1))
   const [lineWidth, setLineWidth] = useState(() => parseFloat(localStorage.getItem('live-line-width') ?? '') || DEFAULT_LINE_WIDTH)
   const [nodeSize, setNodeSize] = useState(() => parseFloat(localStorage.getItem('live-node-size') ?? '') || DEFAULT_NODE_SIZE)
@@ -259,8 +260,10 @@ export default function EmbeddingLayoutViewV9() {
   const [autoRotateSpeed, setAutoRotateSpeed] = useState(() => parseFloat(localStorage.getItem('live-auto-rotate-speed') ?? '') || 1)
   const [rendererType, setRendererType] = useState<LiveRenderer>(() => {
     const stored = localStorage.getItem('scatter-renderer')
-    return stored === 'cividis-tube' || stored === 'glow' ? stored : 'original'
+    return stored === 'original' || stored === 'cividis-tube' ? stored : 'glow'
   })
+  const chooseRenderer = (v: LiveRenderer) => { setRendererType(v); localStorage.setItem('scatter-renderer', v) }
+  const chooseAutoRotate = (on: boolean) => { setAutoRotate(on); localStorage.setItem('live-auto-rotate', String(on)) }
   const [glowStrength, setGlowStrength] = useState(() => parseFloat(localStorage.getItem('glow-strength') ?? '1'))
 
   // ─── Live embedding into one shared space ────────────────────────────────
@@ -502,10 +505,10 @@ export default function EmbeddingLayoutViewV9() {
           <label htmlFor="v9-renderer" className="text-[13px] text-text-h font-medium">Renderer</label>
           <select id="v9-renderer" value={rendererType}
             className="py-1 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer"
-            onChange={e => { const v = e.target.value as LiveRenderer; setRendererType(v); localStorage.setItem('scatter-renderer', v) }}>
-            <option value="original">Points + Line</option>
-            <option value="cividis-tube">Tube</option>
-            <option value="glow">Glow (Shader)</option>
+            onChange={e => chooseRenderer(e.target.value as LiveRenderer)}>
+            <option value="original">Lines</option>
+            <option value="cividis-tube">Tubes</option>
+            <option value="glow">Glow</option>
           </select>
         </div>
         <div className={`flex flex-col gap-2 ${rendererType === 'glow' ? '' : 'opacity-40 pointer-events-none'}`}>
@@ -533,7 +536,7 @@ export default function EmbeddingLayoutViewV9() {
           className="w-full accent-accent" />
         <label className="flex items-center gap-2 text-[13px] text-text-h font-medium cursor-pointer mt-2">
           <input type="checkbox" checked={autoRotate}
-            onChange={e => { setAutoRotate(e.target.checked); localStorage.setItem('live-auto-rotate', String(e.target.checked)) }} />
+            onChange={e => chooseAutoRotate(e.target.checked)} />
           Auto-rotate
         </label>
         <div className={`flex flex-col gap-2 ${autoRotate ? '' : 'opacity-40 pointer-events-none'}`}>
@@ -557,6 +560,7 @@ export default function EmbeddingLayoutViewV9() {
   const anyText = segmentsA.length > 0 || segmentsB.length > 0
   const threeDContent = livePoints !== null ? (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+      <RendererToggle value={rendererType} onChange={chooseRenderer} autoRotate={autoRotate} onAutoRotateChange={chooseAutoRotate} />
       <ScatterPlot3DMulti
         key={rendererType}
         renderer={rendererType}

@@ -4,6 +4,7 @@ import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3D from './ScatterPlot3D'
 import ScatterPlot3DV5 from './ScatterPlot3DV5'
 import ScatterPlot3DV6 from './ScatterPlot3DV6'
+import RendererToggle from './RendererToggle'
 import ScatterPlot3DLive, { DEFAULT_LINE_WIDTH, DEFAULT_NODE_SIZE } from './ScatterPlot3DLive'
 import { useLiveEmbedding } from './useLiveEmbedding'
 import type { CameraState } from './scatterTypes'
@@ -100,6 +101,8 @@ export default function EmbeddingLayoutViewV8() {
   const [rendererType, setRendererType] = useState<RendererType>(() =>
     (localStorage.getItem('scatter-renderer') as RendererType) ?? 'glow'
   )
+  const chooseRenderer = (v: RendererType) => { setRendererType(v); localStorage.setItem('scatter-renderer', v) }
+  const chooseAutoRotate = (on: boolean) => { setAutoRotate(on); localStorage.setItem('live-auto-rotate', String(on)) }
   const [lineWidth, setLineWidth] = useState(() => parseFloat(localStorage.getItem('live-line-width') ?? '') || DEFAULT_LINE_WIDTH)
   const [nodeSize, setNodeSize] = useState(() => parseFloat(localStorage.getItem('live-node-size') ?? '') || DEFAULT_NODE_SIZE)
   const [autoRotate, setAutoRotate] = useState(() => localStorage.getItem('live-auto-rotate') === 'true')
@@ -147,7 +150,7 @@ export default function EmbeddingLayoutViewV8() {
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   // ─── Live (incremental) embedding ────────────────────────────────────────
   const [liveEmbed, setLiveEmbed] = useState(() => localStorage.getItem('live-embed') !== 'false')
-  const [umapMetric, setUmapMetric] = useState<UmapMetric>(() => localStorage.getItem('umap-metric') === 'cosine' ? 'cosine' : 'euclidean')
+  const [umapMetric, setUmapMetric] = useState<UmapMetric>(() => localStorage.getItem('umap-metric') === 'euclidean' ? 'euclidean' : 'cosine')
   const [liveEvery, setLiveEvery] = useState(() => Math.max(1, parseInt(localStorage.getItem('live-embed-every') ?? '1') || 1))
   const { points: livePoints, status: liveStatus, update: liveUpdate, reset: liveReset } = useLiveEmbedding()
   const liveCompletedRef = useRef(0)   // segments the playhead has passed (only grows)
@@ -537,15 +540,11 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   id="live-renderer"
                   className="py-1 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer"
                   value={rendererType}
-                  onChange={e => {
-                    const v = e.target.value as RendererType
-                    setRendererType(v)
-                    localStorage.setItem('scatter-renderer', v)
-                  }}
+                  onChange={e => chooseRenderer(e.target.value as RendererType)}
                 >
-                  <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Tube</option>
-                  <option value="glow">Glow (Shader)</option>
+                  <option value="original">Lines</option>
+                  <option value="cividis-tube">Tubes</option>
+                  <option value="glow">Glow</option>
                 </select>
               </div>
               <div className="flex items-center justify-between">
@@ -574,7 +573,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 <input
                   type="checkbox"
                   checked={autoRotate}
-                  onChange={e => { setAutoRotate(e.target.checked); localStorage.setItem('live-auto-rotate', String(e.target.checked)) }}
+                  onChange={e => chooseAutoRotate(e.target.checked)}
                 />
                 Auto-rotate
               </label>
@@ -626,6 +625,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const liveThreeDContent = livePoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+            <RendererToggle value={rendererType} onChange={chooseRenderer} autoRotate={autoRotate} onAutoRotateChange={chooseAutoRotate} />
             <ScatterPlot3DLive key={rendererType} renderer={rendererType} glowStrength={glowStrength} points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} showGrid={showGrid} />
             <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
               <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
@@ -648,6 +648,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const threeDContent = liveEmbed ? liveThreeDContent : displayPoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+            <RendererToggle value={rendererType} onChange={chooseRenderer} />
             {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
             {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
             {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} glowStrength={glowStrength} />}
@@ -835,19 +836,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 >
                   Rerun Viz
                 </button>
-                <select
-                  className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"
-                  value={rendererType}
-                  onChange={e => {
-                    const v = e.target.value as RendererType
-                    setRendererType(v)
-                    localStorage.setItem('scatter-renderer', v)
-                  }}
-                >
-                  <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Tube</option>
-                  <option value="glow">Glow (Shader)</option>
-                </select>
+                <div className="flex-1" />
                 <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">
                   ⬇ <span className="sr-only">Download 3D points as JSON</span>
                 </button>
