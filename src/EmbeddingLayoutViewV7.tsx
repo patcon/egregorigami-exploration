@@ -325,6 +325,15 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
     : 'https://www.youtube-transcript.io'
 
+  const [infoOpen, setInfoOpen] = useState(false)
+  const infoDialogRef = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const dialog = infoDialogRef.current
+    if (!dialog) return
+    if (infoOpen) dialog.showModal()
+    else dialog.close()
+  }, [infoOpen])
+
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
@@ -339,10 +348,51 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden overscroll-none">
+      {/* Info modal */}
+      <dialog
+        ref={infoDialogRef}
+        onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
+        className="m-auto text-left backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-0 w-[min(440px,92vw)] max-h-[90dvh] shadow-lg"
+      >
+        <div className="flex flex-col gap-5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-text-h m-0">Embedding layout</h2>
+              <p className="text-[13px] leading-snug m-0">
+                A talk's transcript is split into overlapping windows, embedded, and laid out as a path through
+                3D space, so you can see where the conversation wanders and returns.
+              </p>
+            </div>
+            <button
+              onClick={() => setInfoOpen(false)}
+              className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none -mt-1"
+              aria-label="Close"
+            >×</button>
+          </div>
+
+          <ul className="m-0 pl-4 list-disc flex flex-col gap-1.5 text-[13px] leading-snug">
+            <li>Paste a YouTube URL and fetch its transcript; window size and overlap set how it's split into segments.</li>
+            <li><b className="text-text-h">Visualize</b> embeds every segment at once and draws the path.</li>
+            <li>The playhead follows the video along the path; click a point to jump to that moment.</li>
+            <li><b className="text-text-h">Share</b> copies a link with the transcript and the 3D layout.</li>
+          </ul>
+
+          <p className="text-[12px] leading-snug opacity-75 m-0">
+            To watch the path grow as the talk plays, see{' '}
+            <a href="#v8" onClick={() => setInfoOpen(false)} className="text-accent no-underline hover:underline">Live Incremental Embedding →</a>
+          </p>
+        </div>
+      </dialog>
+
       {/* URL Bar */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
           <HomeLink />
+          <button
+            onClick={() => setInfoOpen(true)}
+            className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"
+            aria-label="About"
+          >i</button>
           <UrlHistoryInput
             value={urlInput}
             onChange={val => {

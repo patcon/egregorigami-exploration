@@ -67,6 +67,7 @@ Entries are in chronological order (oldest first).
 - Default transcript window is now 100 words (was 40), in v9 and every view using `TranscriptViewer`; a saved window size is kept
 - v7/v8/v9: a home icon in the URL bar links back to the version index, instead of the link being tucked inside the ⓘ modal. v7 and v8 drop the ⓘ button, since that link was the modal's only content; v9 keeps its modal for the parallel-sessions explanation.
 - v8: the ⓘ button and info modal are back (beside the home icon), now explaining live incremental embedding, with a link to v9
+- v7: the ⓘ button and info modal are back too, now explaining the embedding layout (Visualize, playhead, point clicks, Share), with a link to v8
 
 ## Prior work (selected)
 
