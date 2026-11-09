@@ -18,6 +18,7 @@ import { loadCached, saveCached } from './usePointsCache'
 import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
 import { hasTranscriptApi } from './env'
+import { UMAP_METRICS, type UmapMetric } from './umapMetric'
 
 const noTranscriptApiBuild = !hasTranscriptApi
 
@@ -146,6 +147,7 @@ export default function EmbeddingLayoutViewV8() {
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   // ─── Live (incremental) embedding ────────────────────────────────────────
   const [liveEmbed, setLiveEmbed] = useState(() => localStorage.getItem('live-embed') !== 'false')
+  const [umapMetric, setUmapMetric] = useState<UmapMetric>(() => localStorage.getItem('umap-metric') === 'cosine' ? 'cosine' : 'euclidean')
   const [liveEvery, setLiveEvery] = useState(() => Math.max(1, parseInt(localStorage.getItem('live-embed-every') ?? '1') || 1))
   const { points: livePoints, status: liveStatus, update: liveUpdate, reset: liveReset } = useLiveEmbedding()
   const liveCompletedRef = useRef(0)   // segments the playhead has passed (only grows)
@@ -229,9 +231,9 @@ export default function EmbeddingLayoutViewV8() {
   // Keep ref in sync so cursor handler always sees latest segments
   useEffect(() => { segmentsRef.current = segments }, [segments])
 
-  // Start the live layout over when its inputs change (video, model, chunking, toggle)
+  // Start the live layout over when its inputs change (video, model, metric, chunking, toggle)
   const segmentsKey = segments && segments.length > 0 ? `${segments.length}:${segments[0]}` : ''
-  useEffect(() => { resetLive() }, [currentVideoId, selectedModel, segmentsKey, liveEmbed, resetLive])
+  useEffect(() => { resetLive() }, [currentVideoId, selectedModel, umapMetric, segmentsKey, liveEmbed, resetLive])
 
   // Live mode: as the playhead passes segments, embed them and re-layout every N segments.
   // The embedded set only grows — scrubbing back just moves the highlight.
@@ -247,9 +249,9 @@ export default function EmbeddingLayoutViewV8() {
     const isFirst = liveLaidOutRef.current === 0
     if (isFirst || passed - liveLaidOutRef.current >= liveEvery || passed === segs.length) {
       liveLaidOutRef.current = passed
-      liveUpdate(segs.slice(0, passed), selectedModel)
+      liveUpdate(segs.slice(0, passed), selectedModel, umapMetric)
     }
-  }, [highlightIndex, liveEmbed, liveEvery, selectedModel, liveUpdate])
+  }, [highlightIndex, liveEmbed, liveEvery, selectedModel, umapMetric, liveUpdate])
 
   // When video becomes visible again (speed drops to ≤2), seek YouTube to transcript cursor position
   const videoHiddenPrevRef = useRef(false)
@@ -337,7 +339,7 @@ const totalSecs = loadedDuration ? parseInt(loadedDuration) : null
 
   const runEmbeddingOnChunks = (chunks: string[]) => {
     if (chunks.length === 0) return
-    runEmbedding(chunks, selectedModel)
+    runEmbedding(chunks, selectedModel, umapMetric)
   }
 
   const handleRunEmbedding = () => {
@@ -495,6 +497,20 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 Embed as transcript plays
               </label>
               <p className="text-[12px] text-text opacity-40 m-0">Simulates a live event: segments are embedded once the playhead passes them, and the 3D layout animates as it grows. Each new layout is aligned to the previous one so the view stays steady.</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="umap-metric" className="text-[13px] text-text-h font-medium">UMAP distance</label>
+                <select
+                  id="umap-metric"
+                  value={umapMetric}
+                  onChange={e => { const v = e.target.value as UmapMetric; setUmapMetric(v); localStorage.setItem('umap-metric', v) }}
+                  className="py-1 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px]"
+                >
+                  {UMAP_METRICS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </div>
+              <p className="text-[12px] text-text opacity-40 m-0">Metric UMAP uses to find each segment's neighbours. Changing it restarts the live layout (and applies to the next full "Run embedding"). Embeddings are unit-length, so both rank neighbours the same; expect similar, not identical, shapes.</p>
             </div>
             <div className={`flex flex-col gap-2 ${liveEmbed ? '' : 'opacity-40 pointer-events-none'}`}>
               <div className="flex items-center justify-between">

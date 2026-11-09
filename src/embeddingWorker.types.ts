@@ -1,7 +1,9 @@
+import type { UmapMetric } from './umapMetric'
+
 export type WorkerCommand =
-  | { type: 'embed'; texts: string[]; modelId: string }
+  | { type: 'embed'; texts: string[]; modelId: string; metric?: UmapMetric }
   /** Incremental: embed only texts not yet seen this session, then re-layout stably. */
-  | { type: 'live-update'; requestId: number; texts: string[]; modelId: string }
+  | { type: 'live-update'; requestId: number; texts: string[]; modelId: string; metric: UmapMetric }
   | { type: 'live-reset' }
 
 export type WorkerEvent =

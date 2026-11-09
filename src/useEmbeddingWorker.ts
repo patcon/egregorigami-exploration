@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import type { WorkerEvent } from './embeddingWorker.types'
 import type { EmbeddingModelId } from './embedSegments'
+import type { UmapMetric } from './umapMetric'
 import EmbeddingWorker from './embeddingWorker?worker'
 
 export type EmbedPhase =
@@ -38,9 +39,9 @@ export function useEmbeddingWorker() {
     return workerRef.current
   }, [])
 
-  const runEmbedding = useCallback((texts: string[], modelId: EmbeddingModelId) => {
+  const runEmbedding = useCallback((texts: string[], modelId: EmbeddingModelId, metric?: UmapMetric) => {
     setPhase({ status: 'model-loading', progress: 0 })
-    getWorker().postMessage({ type: 'embed', texts, modelId })
+    getWorker().postMessage({ type: 'embed', texts, modelId, metric })
   }, [getWorker])
 
   const cancelEmbedding = useCallback(() => {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WorkerEvent } from './embeddingWorker.types'
 import type { EmbeddingModelId } from './embedSegments'
+import type { UmapMetric } from './umapMetric'
 import EmbeddingWorker from './embeddingWorker?worker'
 
 export type LiveStatus =
@@ -32,7 +33,7 @@ export function useLiveEmbedding() {
   /** Whether the worker is running a live update — stays true after a reset until it finishes. */
   const busyRef = useRef(false)
   /** Latest prefix of segments the view wants laid out. */
-  const targetRef = useRef<{ texts: string[]; modelId: EmbeddingModelId } | null>(null)
+  const targetRef = useRef<{ texts: string[]; modelId: EmbeddingModelId; metric: UmapMetric } | null>(null)
   /** How many segments the in-flight (or last completed) request covered. */
   const sentCountRef = useRef(0)
 
@@ -47,7 +48,7 @@ export function useLiveEmbedding() {
     busyRef.current = true
     sentCountRef.current = n
     setStatus(s => s.status === 'model-loading' ? s : { status: 'updating', count: n })
-    worker.postMessage({ type: 'live-update', requestId, texts: target.texts.slice(0, n), modelId: target.modelId })
+    worker.postMessage({ type: 'live-update', requestId, texts: target.texts.slice(0, n), modelId: target.modelId, metric: target.metric })
   }, [])
 
   const getWorker = useCallback(() => {
@@ -76,8 +77,8 @@ export function useLiveEmbedding() {
     return w
   }, [pump])
 
-  const update = useCallback((texts: string[], modelId: EmbeddingModelId) => {
-    targetRef.current = { texts, modelId }
+  const update = useCallback((texts: string[], modelId: EmbeddingModelId, metric: UmapMetric) => {
+    targetRef.current = { texts, modelId, metric }
     pump(getWorker())
   }, [getWorker, pump])
 

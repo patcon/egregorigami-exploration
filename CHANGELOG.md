@@ -56,6 +56,7 @@ Entries are in chronological order (oldest first).
 - v8 live mode never starts a layout while the worker is still busy, including right after "Reset live" or a model/video change (previously the next request was sent immediately and queued behind the stale job). The 3D badge now shows how many passed segments are waiting for the next layout.
 - Fix the page stalling (~0.4–0.8s per cursor move) on long transcripts, which was most noticeable when jumping ahead on the timeline and then playing. `TranscriptViewer` now renders words in memoised chunks so only the chunk(s) around the highlight re-render (all views), and v8 memoises its Segments list instead of rebuilding every row on each cursor move.
 - v8 live mode: after a big jump ahead, the backlog is embedded in batches of 20 segments, so points appear within a few seconds and visibly catch up, instead of the 3D view staying blank until the whole backlog is embedded
+- v8 Config: "UMAP distance" setting (Euclidean, the default, or Cosine) for the 3D projection. Changing it restarts the live layout and also applies to a full "Run embedding"; saved in localStorage (`umap-metric`)
 
 ## Prior work (selected)
 

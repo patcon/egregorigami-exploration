@@ -1,4 +1,5 @@
 import { UMAP } from 'umap-js'
+import { umapDistanceFn, type UmapMetric } from './umapMetric'
 import { applyTransform, centreAndScale, fitProcrustes, type Vec3 } from './procrustes'
 
 /** RMS radius of the first live layout, in display units. */
@@ -9,6 +10,8 @@ export interface LiveLayoutOptions {
   warmEpochs?: number
   /** Learning rate for warm-started runs; lower keeps existing points closer to where they were. */
   warmLearningRate?: number
+  /** UMAP distance metric (default euclidean). */
+  metric?: UmapMetric
 }
 
 /** Deterministic PRNG (mulberry32) so repeated runs don't add their own randomness. */
@@ -36,7 +39,7 @@ function dot(a: Float32Array, b: Float32Array) {
  * near their most similar existing points), then Procrustes-aligns the result
  * onto the previously displayed frame so the view doesn't flip or spin.
  */
-export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3 }: LiveLayoutOptions = {}) {
+export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3, metric = 'euclidean' }: LiveLayoutOptions = {}) {
   let vectors: Float32Array[] = []
   let prevRaw: Vec3[] = []      // last UMAP output, in UMAP's own coordinates
   let prevAligned: Vec3[] = []  // last displayed coordinates
@@ -68,6 +71,7 @@ export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3 }: L
         nNeighbors: Math.min(15, n - 1),
         minDist: 0.1,
         random: rand,
+        distanceFn: umapDistanceFn(metric),
         ...(warm ? { nEpochs: warmEpochs, learningRate: warmLearningRate } : {}),
       })
       const nEpochs = umap.initializeFit(data)
