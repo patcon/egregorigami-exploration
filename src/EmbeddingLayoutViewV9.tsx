@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import TranscriptViewer from './TranscriptViewer'
 import YoutubePlayerEmbed from './YoutubePlayerEmbed'
 import ScatterPlot3DMulti from './ScatterPlot3DMulti'
+import type { LiveRenderer } from './livePathVisuals'
 import { DEFAULT_LINE_WIDTH, DEFAULT_NODE_SIZE } from './ScatterPlot3DLive'
 import { useLiveEmbedding } from './useLiveEmbedding'
 import type { CameraState } from './scatterTypes'
@@ -256,6 +257,11 @@ export default function EmbeddingLayoutViewV9() {
   const [autoRotate, setAutoRotate] = useState(() => localStorage.getItem('live-auto-rotate') === 'true')
   const [showGrid, setShowGrid] = useState(() => localStorage.getItem('live-show-grid') !== 'false')
   const [autoRotateSpeed, setAutoRotateSpeed] = useState(() => parseFloat(localStorage.getItem('live-auto-rotate-speed') ?? '') || 1)
+  const [rendererType, setRendererType] = useState<LiveRenderer>(() => {
+    const stored = localStorage.getItem('scatter-renderer')
+    return stored === 'cividis-tube' || stored === 'glow' ? stored : 'original'
+  })
+  const [glowStrength, setGlowStrength] = useState(() => parseFloat(localStorage.getItem('glow-strength') ?? '1'))
 
   // ─── Live embedding into one shared space ────────────────────────────────
   // Segments from both sessions are appended in the order the playheads pass
@@ -493,6 +499,25 @@ export default function EmbeddingLayoutViewV9() {
       </div>
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
+          <label htmlFor="v9-renderer" className="text-[13px] text-text-h font-medium">Renderer</label>
+          <select id="v9-renderer" value={rendererType}
+            className="py-1 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer"
+            onChange={e => { const v = e.target.value as LiveRenderer; setRendererType(v); localStorage.setItem('scatter-renderer', v) }}>
+            <option value="original">Points + Line</option>
+            <option value="cividis-tube">Tube</option>
+            <option value="glow">Glow (Shader)</option>
+          </select>
+        </div>
+        <div className={`flex flex-col gap-2 ${rendererType === 'glow' ? '' : 'opacity-40 pointer-events-none'}`}>
+          <div className="flex items-center justify-between">
+            <label htmlFor="v9-glow-strength" className="text-[13px] text-text-h font-medium">Glow strength</label>
+            <span className="text-[13px] text-text opacity-60 tabular-nums">{glowStrength.toFixed(2)}</span>
+          </div>
+          <input id="v9-glow-strength" type="range" min={0} max={2} step={0.05} value={glowStrength}
+            onChange={e => { const v = parseFloat(e.target.value); setGlowStrength(v); localStorage.setItem('glow-strength', String(v)) }}
+            className="w-full accent-accent" />
+        </div>
+        <div className="flex items-center justify-between">
           <label htmlFor="v9-line-width" className="text-[13px] text-text-h font-medium">Line width</label>
           <span className="text-[13px] text-text opacity-60 tabular-nums">{lineWidth.toFixed(1)} px</span>
         </div>
@@ -533,6 +558,9 @@ export default function EmbeddingLayoutViewV9() {
   const threeDContent = livePoints !== null ? (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
       <ScatterPlot3DMulti
+        key={rendererType}
+        renderer={rendererType}
+        glowStrength={glowStrength}
         points={livePoints}
         pointTracks={pointTracks}
         labels={pointLabels}

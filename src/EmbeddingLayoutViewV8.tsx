@@ -532,6 +532,23 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
             </div>
             <div className={`flex flex-col gap-2 ${liveEmbed ? '' : 'opacity-40 pointer-events-none'}`}>
               <div className="flex items-center justify-between">
+                <label htmlFor="live-renderer" className="text-[13px] text-text-h font-medium">Renderer</label>
+                <select
+                  id="live-renderer"
+                  className="py-1 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer"
+                  value={rendererType}
+                  onChange={e => {
+                    const v = e.target.value as RendererType
+                    setRendererType(v)
+                    localStorage.setItem('scatter-renderer', v)
+                  }}
+                >
+                  <option value="original">Points + Line</option>
+                  <option value="cividis-tube">Tube</option>
+                  <option value="glow">Glow (Shader)</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between">
                 <label htmlFor="live-line-width" className="text-[13px] text-text-h font-medium">Line width</label>
                 <span className="text-[13px] text-text opacity-60 tabular-nums">{lineWidth.toFixed(1)} px</span>
               </div>
@@ -582,7 +599,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                 />
                 Ground grid
               </label>
-              <p className="text-[12px] text-text opacity-40 m-0">Live (Points + Line) renderer only.</p>
+              <p className="text-[12px] text-text opacity-40 m-0">Live view only. Line width also sets the tube's thickness and the glow's trail.</p>
             </div>
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
@@ -609,7 +626,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const liveThreeDContent = livePoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            <ScatterPlot3DLive points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} showGrid={showGrid} />
+            <ScatterPlot3DLive key={rendererType} renderer={rendererType} glowStrength={glowStrength} points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} showGrid={showGrid} />
             <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
               <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
               <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}{liveCompleted - livePoints.length > 0 ? ` · ${liveCompleted - livePoints.length} waiting` : ''}</div>
@@ -828,7 +845,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   }}
                 >
                   <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Cividis Tube</option>
+                  <option value="cividis-tube">Tube</option>
                   <option value="glow">Glow (Shader)</option>
                 </select>
                 <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">

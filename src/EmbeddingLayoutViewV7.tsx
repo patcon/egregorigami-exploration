@@ -624,7 +624,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
                   }}
                 >
                   <option value="original">Points + Line</option>
-                  <option value="cividis-tube">Cividis Tube</option>
+                  <option value="cividis-tube">Tube</option>
                   <option value="glow">Glow (Shader)</option>
                 </select>
                 <button className="py-1.5 px-2.5 rounded-md border border-border bg-code-bg text-text-h text-[13px] cursor-pointer whitespace-nowrap hover:bg-border" onClick={handleDownload} title="Download 3D points as JSON">

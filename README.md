@@ -22,7 +22,7 @@ There's also a Cloudflare Worker deploy that serves the app plus a `/api/transcr
 | `#v2` | YouTube Transcript Visualizer | Paste a YouTube URL and watch the embedding window slide through the synced transcript. |
 | `#v3` | Embedding Projector | Generate sentence embeddings in-browser (via HuggingFace Transformers.js) and explore the 3D semantic space with an interactive scatter plot. |
 | `#v4` | Embedding Layout | Side-by-side view: YouTube player + transcript + inline 3D embedding panel. |
-| `#v5` | Embedding Layout (New Renderers) | Same as v4, with switchable 3D renderers: original points, Cividis tube, and glow shader with bloom. |
+| `#v5` | Embedding Layout (New Renderers) | Same as v4, with switchable 3D renderers: original points, tube, and glow shader with bloom. |
 
 ## Usage: Embedding Layout (v5)
 

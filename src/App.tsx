@@ -56,7 +56,7 @@ function IndexPage() {
           <li>
             <a href="#v5" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Embedding Layout (New Renderers)</strong>
-              <span className="text-sm text-text">Same as v4, with switchable renderers: original points, Cividis tube, and glow shader.</span>
+              <span className="text-sm text-text">Same as v4, with switchable renderers: original points, tube, and glow shader.</span>
             </a>
           </li>
           <li>

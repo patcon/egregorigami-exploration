@@ -57,6 +57,8 @@ Entries are in chronological order (oldest first).
 - Fix the page stalling (~0.4–0.8s per cursor move) on long transcripts, which was most noticeable when jumping ahead on the timeline and then playing. `TranscriptViewer` now renders words in memoised chunks so only the chunk(s) around the highlight re-render (all views), and v8 memoises its Segments list instead of rebuilding every row on each cursor move.
 - v8 live mode: after a big jump ahead, the backlog is embedded in batches of 20 segments, so points appear within a few seconds and visibly catch up, instead of the 3D view staying blank until the whole backlog is embedded
 - v8 Config: "UMAP distance" setting (Euclidean, the default, or Cosine) for the 3D projection. Changing it restarts the live layout and also applies to a full "Run embedding"; saved in localStorage (`umap-metric`)
+- Tube and Glow renderers now work in the live views (v8, v9), not just after a full Visualize run: a Renderer selector in the live settings switches between Points + Line, Tube and Glow, and the path rebuilds as the layout tweens. Line width sets the tube's thickness and the glow's trail; v9 dims the inactive session's tube/glow and gains a Glow strength slider. Shared code is in `src/livePathVisuals.ts`.
+- Tube renderer uses the shared blue → cyan → yellow gradient instead of cividis, whose dull grey-olive middle was a leftover from the old white background; renamed "Cividis Tube" to "Tube" in the selectors
 
 ## Prior work (selected)
 

@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { Line2 } from 'three/addons/lines/Line2.js'
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { glowPalette, SCENE_BG } from './palettes'
+import { addTubeLights, createGlowFx, createPathVisual, hash01, type GlowFx, type LiveRenderer, type PathVisual } from './livePathVisuals'
 import { swingFollowCamera } from './followCamera'
 import type { CameraState, FollowMode } from './scatterTypes'
 
@@ -26,6 +24,10 @@ interface Props {
   autoRotateSpeed?: number
   /** Fixed floor grid under the cloud, as a stable reference while points move. */
   showGrid?: boolean
+  /** Path style. Read once when the scene is built: remount (e.g. via `key`) to change it. */
+  renderer?: LiveRenderer
+  /** Bloom intensity multiplier ('glow' only). */
+  glowStrength?: number
 }
 
 export const DEFAULT_LINE_WIDTH = 3
@@ -43,6 +45,8 @@ interface Buffers {
   capacity: number
   position: THREE.BufferAttribute
   color: THREE.BufferAttribute
+  /** Per-point random in [0, 1): glow sprite size and pulse phase. */
+  seed: THREE.BufferAttribute
   fromPos: Float32Array
   toPos: Float32Array
   fromCol: Float32Array
@@ -54,6 +58,7 @@ function makeBuffers(capacity: number): Buffers {
     capacity,
     position: new THREE.BufferAttribute(new Float32Array(capacity * 3), 3).setUsage(THREE.DynamicDrawUsage),
     color: new THREE.BufferAttribute(new Float32Array(capacity * 3), 3).setUsage(THREE.DynamicDrawUsage),
+    seed: new THREE.BufferAttribute(Float32Array.from({ length: capacity }, (_, i) => hash01(i)), 1),
     fromPos: new Float32Array(capacity * 3),
     toPos: new Float32Array(capacity * 3),
     fromCol: new Float32Array(capacity * 3),
@@ -61,20 +66,29 @@ function makeBuffers(capacity: number): Buffers {
   }
 }
 
+/** Point the geometry at the buffers (the glow shader reads colours as `aColor`). */
+function bindBuffers(geo: THREE.BufferGeometry, buf: Buffers) {
+  geo.setAttribute('position', buf.position)
+  geo.setAttribute('color', buf.color)
+  geo.setAttribute('aColor', buf.color)
+  geo.setAttribute('aSeed', buf.seed)
+}
+
 /**
- * Points + Line renderer for the live (incremental) view. Unlike the other
- * renderers, the scene is built once and point updates tween in place, so the
- * camera and frame of reference stay put while the layout evolves.
+ * Renderer for the live (incremental) view. Unlike the static renderers, the
+ * scene is built once and point updates tween in place, so the camera and
+ * frame of reference stay put while the layout evolves. The path is drawn as
+ * a line, tube or glow (see livePathVisuals.ts).
  */
-export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1, showGrid = true }: Props) {
+export default function ScatterPlot3DLive({ points, labels, highlightPosition, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1, showGrid = true, renderer: rendererStyle = 'original', glowStrength = 1 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     camera: THREE.PerspectiveCamera
     controls: OrbitControls
     pointsMesh: THREE.Points
-    lineMesh: Line2
     pointsMat: THREE.PointsMaterial
-    lineMat: LineMaterial
+    path: PathVisual
+    glow: GlowFx | null
     highlightMesh: THREE.Mesh
     grid: THREE.GridHelper
     raycaster: THREE.Raycaster
@@ -93,6 +107,8 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
   const highlightPositionRef = useRef<number | null>(highlightPosition)
   const currentSphereTRef = useRef(0)
   const styleRef = useRef({ lineWidth, nodeSize, autoRotate, autoRotateSpeed, showGrid })
+  const glowStrengthRef = useRef(glowStrength)
+  useEffect(() => { glowStrengthRef.current = glowStrength }, [glowStrength])
   const labelsRef = useRef(labels)
   useEffect(() => { labelsRef.current = labels }, [labels])
   const onCameraChangeRef = useRef(onCameraChange)
@@ -104,10 +120,11 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     return out.set(arr[i * 3], arr[i * 3 + 1], arr[i * 3 + 2])
   }
 
-  /** Displayed position at a fractional index along the path. */
+  /** Displayed position at a fractional index along the path (on the tube's curve, if drawn). */
   const pathAt = (t: number, out: THREE.Vector3) => {
     const n = countRef.current
     const ct = Math.max(0, Math.min(n - 1, t))
+    if (n >= 2 && sceneRef.current?.path.pointAt(ct, out)) return out
     const a = Math.floor(ct), b = Math.min(n - 1, a + 1)
     const pa = pointAt(a, new THREE.Vector3())
     const pb = pointAt(b, new THREE.Vector3())
@@ -120,23 +137,12 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     return pointAt(a + 1, new THREE.Vector3()).sub(pointAt(a, new THREE.Vector3())).normalize()
   }
 
-  /**
-   * Copy the displayed positions/colours into the thick path line. Line2 is
-   * screen-space (real pixel widths, unlike THREE.Line which is always 1px) but
-   * can't share the points' buffer, so it's rebuilt while points are moving.
-   */
+  /** Rebuild the path from the displayed positions/colours; called while points are moving. */
   const syncLine = () => {
     const s = sceneRef.current
     if (!s) return
-    const n = countRef.current
-    s.lineMesh.visible = n >= 2
-    if (n < 2) return
     const b = buffersRef.current
-    const geo = new LineGeometry()
-    geo.setPositions((b.position.array as Float32Array).subarray(0, n * 3))
-    geo.setColors((b.color.array as Float32Array).subarray(0, n * 3))
-    s.lineMesh.geometry.dispose()
-    s.lineMesh.geometry = geo
+    s.path.update(b.position.array as Float32Array, b.color.array as Float32Array, countRef.current)
   }
 
   /** Start tweening from what's on screen now to `next`. */
@@ -151,8 +157,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       const grown = makeBuffers(cap)
       ;(grown.position.array as Float32Array).set(buf.position.array as Float32Array)
       ;(grown.color.array as Float32Array).set(buf.color.array as Float32Array)
-      s.pointsMesh.geometry.setAttribute('position', grown.position)
-      s.pointsMesh.geometry.setAttribute('color', grown.color)
+      bindBuffers(s.pointsMesh.geometry, grown)
       buffersRef.current = buf = grown
     }
     const prevN = countRef.current
@@ -215,21 +220,23 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       }
       controls.addEventListener('change', onControlsChange)
 
-      const buf = buffersRef.current
+      const glow = rendererStyle === 'glow'
+        ? createGlowFx(renderer, scene, camera, w, h, styleRef.current.nodeSize, styleRef.current.lineWidth)
+        : null
+      if (rendererStyle === 'cividis-tube') addTubeLights(scene)
+
       const pointsGeo = new THREE.BufferGeometry()
-      pointsGeo.setAttribute('position', buf.position)
-      pointsGeo.setAttribute('color', buf.color)
+      bindBuffers(pointsGeo, buffersRef.current)
       pointsGeo.setDrawRange(0, 0)
       const pointsMat = new THREE.PointsMaterial({ size: styleRef.current.nodeSize, sizeAttenuation: true, vertexColors: true })
-      const pointsMesh = new THREE.Points(pointsGeo, pointsMat)
+      const pointsMesh = new THREE.Points(pointsGeo, glow ? glow.nodeMaterial : pointsMat)
       pointsMesh.frustumCulled = false
+      // The tube's alternating shading marks the nodes; keep the (hidden) points for hover/click
+      pointsMesh.visible = rendererStyle !== 'cividis-tube'
       scene.add(pointsMesh)
 
-      const lineMat = new LineMaterial({ vertexColors: true, linewidth: styleRef.current.lineWidth, opacity: 0.6, transparent: true, depthWrite: false })
-      const lineMesh = new Line2(new LineGeometry(), lineMat)
-      lineMesh.visible = false
-      lineMesh.frustumCulled = false
-      scene.add(lineMesh)
+      const path = createPathVisual(rendererStyle, scene, styleRef.current.lineWidth, glow)
+      path.setEmphasis({ lineOpacity: 0.6, dimmed: false, renderOrder: 0 })
 
       const highlightMesh = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff2222 }))
       highlightMesh.visible = false
@@ -249,8 +256,9 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
       const raycaster = new THREE.Raycaster()
       raycaster.params.Points!.threshold = 0.05
 
-      sceneRef.current = { camera, controls, pointsMesh, lineMesh, pointsMat, lineMat, highlightMesh, grid, raycaster, bgColor }
+      sceneRef.current = { camera, controls, pointsMesh, pointsMat, path, glow, highlightMesh, grid, raycaster, bgColor }
       if (pendingPointsRef.current) { retarget(pendingPointsRef.current); pendingPointsRef.current = null }
+      else { pointsGeo.setDrawRange(0, countRef.current); syncLine() } // rebuilt scene (StrictMode remount)
 
       let animId = 0
       let sphereWasVisible = false
@@ -311,7 +319,8 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
           prevFollowTargetRef.current.copy(newTarget)
         }
         controls.update(dt) // dt keeps auto-rotate speed independent of refresh rate
-        renderer.render(scene, camera)
+        if (glow) glow.render(dt, camera.position.distanceTo(controls.target), n, glowStrengthRef.current)
+        else renderer.render(scene, camera)
       }
       animate()
 
@@ -320,6 +329,7 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
         const nh = mount.clientHeight
         if (nw === 0 || nh === 0) return
         renderer.setSize(nw, nh)
+        glow?.setSize(nw, nh)
         camera.aspect = nw / nh
         camera.updateProjectionMatrix()
       })
@@ -329,6 +339,10 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
         cancelAnimationFrame(animId)
         controls.removeEventListener('change', onControlsChange)
         controls.dispose()
+        path.dispose()
+        glow?.dispose()
+        pointsGeo.dispose()
+        pointsMat.dispose()
         renderer.dispose()
         ro.disconnect()
         sceneRef.current = null
@@ -361,7 +375,9 @@ export default function ScatterPlot3DLive({ points, labels, highlightPosition, o
     styleRef.current = { lineWidth, nodeSize, autoRotate, autoRotateSpeed, showGrid }
     const s = sceneRef.current
     if (!s) return
-    s.lineMat.linewidth = lineWidth
+    s.path.setLineWidth(lineWidth)
+    s.glow?.setLineWidth(lineWidth)
+    s.glow?.setNodeSize(nodeSize)
     s.pointsMat.size = nodeSize
     s.highlightMesh.scale.setScalar(Math.max(1, nodeSize / DEFAULT_NODE_SIZE))
     s.controls.autoRotate = autoRotate
