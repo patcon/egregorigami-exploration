@@ -138,6 +138,10 @@ export default function EmbeddingLayoutViewV7() {
   const [scrollToWord, setScrollToWord] = useState<{ wordIndex: number; nonce: number } | undefined>(undefined)
   const segmentsRef = useRef<string[] | null>(null)
   const cameraStateRef = useRef<CameraState | null>(null)
+  // Renderers only read this when they mount (to keep the camera across renderer
+  // switches/remounts), so a render-time snapshot of the latest camera is what we want.
+  // eslint-disable-next-line react-hooks/refs
+  const initialCamera = cameraStateRef.current ?? undefined
   const currentWordIndexRef = useRef(0)
   const wordTimestampsRef = useRef(wordTimestamps)
   useEffect(() => { wordTimestampsRef.current = wordTimestamps }, [wordTimestamps])
@@ -462,9 +466,9 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
         const threeDContent = displayPoints !== null ? (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-            {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} />}
-            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} glowStrength={glowStrength} />}
+            {rendererType === 'original' && <ScatterPlot3D points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={initialCamera} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'cividis-tube' && <ScatterPlot3DV5 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={initialCamera} onCameraChange={s => { cameraStateRef.current = s }} />}
+            {rendererType === 'glow' && <ScatterPlot3DV6 points={displayPoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={initialCamera} onCameraChange={s => { cameraStateRef.current = s }} glowStrength={glowStrength} />}
             {displayMeta && (
               <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
                 <div>{EMBEDDING_MODELS.find(m => m.id === displayMeta.modelId)?.label ?? displayMeta.modelId.split('/').pop()}</div>

@@ -26,26 +26,32 @@ async function fetchOembedTitle(url: string): Promise<string | null> {
 export function useUrlHistory(url: string, videoId: string | null) {
   const [history, setHistory] = useState<UrlHistoryEntry[]>(loadHistory)
 
-  useEffect(() => {
-    if (!videoId) return
+  // Move the video to the top when it changes. Done during render (React's
+  // "adjust state when a prop changes" pattern) rather than in an effect.
+  const [lastVideoId, setLastVideoId] = useState<string | null>(null)
+  if (videoId && videoId !== lastVideoId) {
+    setLastVideoId(videoId)
     setHistory(prev => {
       const existing = prev.find(e => e.videoId === videoId)
       const entry: UrlHistoryEntry = { url, videoId, title: existing?.title }
-      const next = [entry, ...prev.filter(e => e.videoId !== videoId)].slice(0, MAX_HISTORY)
-      persistHistory(next)
-      if (!existing?.title) {
-        fetchOembedTitle(url).then(title => {
-          if (!title) return
-          setHistory(h => {
-            const updated = h.map(e => e.videoId === videoId ? { ...e, title } : e)
-            persistHistory(updated)
-            return updated
-          })
-        })
-      }
-      return next
+      return [entry, ...prev.filter(e => e.videoId !== videoId)].slice(0, MAX_HISTORY)
     })
-  }, [videoId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
+
+  useEffect(() => { persistHistory(history) }, [history])
+
+  // Fill in the title asynchronously for entries that don't have one yet
+  const needsTitle = !!videoId && !history.find(e => e.videoId === videoId)?.title
+  useEffect(() => {
+    if (!videoId || !needsTitle) return
+    let cancelled = false
+    fetchOembedTitle(url).then(title => {
+      if (cancelled || !title) return
+      setHistory(h => h.map(e => e.videoId === videoId ? { ...e, title } : e))
+    })
+    return () => { cancelled = true }
+  // Keyed on the video, not every keystroke in the URL field
+  }, [videoId, needsTitle]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { history }
 }
