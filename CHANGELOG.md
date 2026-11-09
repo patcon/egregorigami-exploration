@@ -71,6 +71,7 @@ Entries are in chronological order (oldest first).
 - Landing page lists the variants newest first, each with the dates most of its work happened (from git history). The list is now a `VARIANTS` array in `App.tsx`
 - Landing page tagline drops "protein folding"
 - Transcripts are fetched automatically when the URL names a new video (every YouTube view, via `useYoutubeTranscript`), where the transcript API is available. On page load a transcript already held is kept; a share link that carries its transcript isn't overwritten; a failed fetch isn't retried until the URL changes. The Fetch button still works for a manual retry. v9's own fetch-on-load for query-string videos is folded into this
+- New embedding model: EmbeddingGemma-300m (`onnx-community/embeddinggemma-300m-ONNX`, q8, ~310 MB download) in every model picker. It goes through `AutoModel` and its own `sentence_embedding` output rather than the mean-pooling pipeline, with the model card's clustering prompt (`task: clustering | query: `) on each segment. Model loading for both the main thread and the worker now lives in `src/embedder.ts`
 
 ## Prior work (selected)
 

@@ -1,27 +1,11 @@
 import { UMAP } from 'umap-js'
 import type { WorkerCommand, WorkerEvent } from './embeddingWorker.types'
-import { loadTransformers } from './loadTransformers'
+import { getEmbedder } from './embedder'
 import { createLiveLayout } from './liveLayout'
 import { umapDistanceFn } from './umapMetric'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyPipeline = any
-
-const pipelineCache = new Map<string, AnyPipeline>()
-
-async function getPipeline(modelId: string): Promise<AnyPipeline> {
-  if (!pipelineCache.has(modelId)) {
-    const { pipeline } = await loadTransformers()
-    const instance = await pipeline('feature-extraction', modelId, {
-      progress_callback: (info: unknown) => {
-        const pct = (info as { progress?: number })?.progress ?? 0
-        self.postMessage({ type: 'progress:model-loading', progress: Math.round(pct) } satisfies WorkerEvent)
-      },
-    })
-    pipelineCache.set(modelId, instance)
-  }
-  return pipelineCache.get(modelId)!
-}
+const embedderFor = (modelId: string) =>
+  getEmbedder(modelId, progress => self.postMessage({ type: 'progress:model-loading', progress } satisfies WorkerEvent))
 
 // Live (incremental) layouts: one session per worker, see liveLayout.ts
 let live = createLiveLayout()
@@ -30,12 +14,11 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
   const cmd = e.data
   if (cmd.type === 'embed') {
     try {
-      const pipe = await getPipeline(cmd.modelId)
+      const embed = await embedderFor(cmd.modelId)
       const vectors: Float32Array[] = []
       for (let i = 0; i < cmd.texts.length; i++) {
         self.postMessage({ type: 'progress:embedding', loaded: i, total: cmd.texts.length } satisfies WorkerEvent)
-        const output = await pipe(cmd.texts[i], { pooling: 'mean', normalize: true })
-        vectors.push(output.data as Float32Array)
+        vectors.push(await embed(cmd.texts[i]))
       }
 
       self.postMessage({ type: 'progress:umap-running' } satisfies WorkerEvent)
@@ -65,10 +48,9 @@ async function handleLive(cmd: Exclude<WorkerCommand, { type: 'embed' }>) {
     try {
       const key = `${cmd.modelId}|${cmd.metric}`
       if (liveKey !== key) { live = createLiveLayout({ metric: cmd.metric }); liveKey = key }
-      const pipe = await getPipeline(cmd.modelId)
+      const embed = await embedderFor(cmd.modelId)
       for (let i = live.count(); i < cmd.texts.length; i++) {
-        const output = await pipe(cmd.texts[i], { pooling: 'mean', normalize: true })
-        live.add(output.data as Float32Array)
+        live.add(await embed(cmd.texts[i]))
       }
       const points = live.layout()
       self.postMessage({ type: 'live-done', requestId: cmd.requestId, points } satisfies WorkerEvent)
