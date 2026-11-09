@@ -183,13 +183,6 @@ function useSession(id: SessionId, eventTime: number) {
     onLoaded: ({ text }) => { setText(text); setVideoDuration(null) },
     onSubtitleLoaded: ({ text }) => { setText(text) },
   })
-  // A video arriving by link (query string) with no transcript yet: fetch it, once, on load
-  const autoFetchedRef = useRef(false)
-  useEffect(() => {
-    if (autoFetchedRef.current) return
-    autoFetchedRef.current = true
-    if (hasTranscriptApi && queryVideo && !text.trim()) transcript.handleLoad()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const words = useMemo(() => text.trim().split(/\s+/).filter(Boolean), [text])
   const totalSecs = transcript.loadedDuration ? parseInt(transcript.loadedDuration) : null
   const durationMismatch = videoDuration !== null && totalSecs !== null

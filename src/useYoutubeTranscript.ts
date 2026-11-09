@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { buildTranscriptData, segmentsToVtt } from './subtitleParser'
 import { extractVideoId } from './videoUtils'
+import { hasTranscriptApi } from './env'
+import { readShareParam } from './shareUrl'
 
 export type TranscriptLoadedResult = {
   text: string
@@ -22,6 +24,8 @@ export function useYoutubeTranscript(
     onSubtitleLoaded?: (result: SubtitleLoadResult) => void
     /** Namespace for localStorage keys, so several transcripts can coexist (v9). */
     storagePrefix?: string
+    /** Fetch the transcript automatically when the URL names a new video (default true). */
+    autoFetch?: boolean
   },
 ) {
   const p = options?.storagePrefix ?? ''
@@ -88,6 +92,32 @@ export function useYoutubeTranscript(
     localStorage.removeItem(p + 'yt-video-id')
     options?.onSubtitleLoaded?.(result)
   }, [options?.onSubtitleLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-fetch: when the URL comes to name a new video, fetch its transcript as if
+  // Fetch had been pressed. Only where the transcript API exists (not the static
+  // GitHub Pages build, which uses the manual VTT flow).
+  // - On first load, a transcript already held (fetched, or an uploaded VTT) is kept.
+  // - A video opened from a share link that carries its transcript isn't fetched,
+  //   so the shared copy isn't overwritten.
+  // - A failed fetch isn't retried until the URL changes again.
+  const prevVideoIdRef = useRef<string | null | undefined>(undefined)
+  const [sharedVideo] = useState(() => {
+    const shared = readShareParam()
+    return shared?.rawText && shared.videoId ? shared.videoId : null
+  })
+  const sharedVideoSkippedRef = useRef(false)
+  useEffect(() => {
+    if (options?.autoFetch === false || !hasTranscriptApi) return
+    const vid = extractVideoId(urlInput)
+    const prev = prevVideoIdRef.current
+    prevVideoIdRef.current = vid
+    if (!vid || vid === prev) return
+    if (vid === sharedVideo && !sharedVideoSkippedRef.current) { sharedVideoSkippedRef.current = true; return }
+    const firstLoad = prev === undefined
+    if (firstLoad && loadedText?.trim() && (loadedVideoId === vid || loadedVideoId === null)) return
+    if (!firstLoad && vid === loadedVideoId) return
+    handleLoad()
+  }, [urlInput]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const serverFailed = failedVideoId !== null && failedVideoId === extractVideoId(urlInput)
 

@@ -443,7 +443,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
           </div>
 
           <ul className="m-0 pl-4 list-disc flex flex-col gap-1.5 text-[13px] leading-snug">
-            <li>Paste a YouTube URL, fetch its transcript, then press play.</li>
+            <li>Paste a YouTube URL (its transcript is fetched automatically), then press play.</li>
             <li>Segments are embedded once the playhead passes them; each new layout is aligned to the last, so the view stays steady.</li>
             <li>Turn off <b className="text-text-h">Embed as transcript plays</b> in Config to embed the whole transcript at once with <b className="text-text-h">Visualize</b> instead.</li>
             <li><b className="text-text-h">Share</b> copies a link with the transcript and any finished 3D layout.</li>
