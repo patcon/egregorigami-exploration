@@ -62,6 +62,7 @@ Entries are in chronological order (oldest first).
 - v9 playheads are red again (both sessions), matching v8; the active session's is still drawn larger
 - Renderer switch (Lines / Tubes / Glow) and an auto-rotate button are now overlaid on the 3D view in v8 and v9, as well as in Config. Glow is the default renderer in v9 too (v8 already defaulted to it). The v8 static view gets the same renderer switch in place of the dropdown next to "Rerun Viz"; auto-rotate there stays live-only.
 - UMAP distance now defaults to Cosine in v8 and v9 (an explicitly saved "Euclidean" choice is kept)
+- v8/v9 live mode shows the black 3D view (ground grid, auto-rotate, renderer toggle) from the start, with the status text ("Load a transcript…", "Press play…", model loading) overlaid on it until the first points are laid out, instead of plain text on the page background
 
 ## Prior work (selected)
 

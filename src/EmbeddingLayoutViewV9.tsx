@@ -31,6 +31,8 @@ const sessionLabel = (k: number) => String.fromCharCode(65 + k)
 
 /** UMAP needs more points than neighbours; below this the live view just waits. */
 const LIVE_MIN_SEGMENTS = 5
+/** Stable empty input so the 3D view renders (grid, auto-rotate) before the first layout. */
+const NO_POINTS: [number, number, number][] = []
 /** Above this the YouTube players can't keep up, so sessions run on a simulated clock. */
 const MAX_VIDEO_SPEED = 2
 /** A background video further than this from the shared clock gets re-seeked. */
@@ -558,14 +560,15 @@ export default function EmbeddingLayoutViewV9() {
   )
 
   const anyText = segmentsA.length > 0 || segmentsB.length > 0
-  const threeDContent = livePoints !== null ? (
+  // The scene (grid, auto-rotate) shows from the start; status text sits over it until the first points arrive
+  const threeDContent = (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
       <RendererToggle value={rendererType} onChange={chooseRenderer} autoRotate={autoRotate} onAutoRotateChange={chooseAutoRotate} />
       <ScatterPlot3DMulti
         key={rendererType}
         renderer={rendererType}
         glowStrength={glowStrength}
-        points={livePoints}
+        points={livePoints ?? NO_POINTS}
         pointTracks={pointTracks}
         labels={pointLabels}
         trackCount={2}
@@ -580,6 +583,7 @@ export default function EmbeddingLayoutViewV9() {
         autoRotateSpeed={autoRotateSpeed}
         showGrid={showGrid}
       />
+      {livePoints !== null ? (
       <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
         <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
         {[0, 1].map(k => (
@@ -593,9 +597,8 @@ export default function EmbeddingLayoutViewV9() {
           {entries.length - livePoints.length > 0 ? ` ${entries.length - livePoints.length} waiting` : ''}
         </div>
       </div>
-    </div>
-  ) : (
-    <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+      ) : (
+    <div className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm pointer-events-none select-none" style={{ color: 'rgba(255,255,255,0.6)' }}>
       {liveStatus.status === 'model-loading'
         ? `Loading model… ${liveStatus.progress}%`
         : liveStatus.status === 'updating'
@@ -605,6 +608,8 @@ export default function EmbeddingLayoutViewV9() {
         : entries.length < LIVE_MIN_SEGMENTS
         ? `Press play — points appear after ${LIVE_MIN_SEGMENTS} segments across both sessions (${entries.length} so far).`
         : 'Embedding…'}
+    </div>
+      )}
     </div>
   )
 

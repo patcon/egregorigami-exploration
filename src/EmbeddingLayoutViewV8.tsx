@@ -25,6 +25,8 @@ const noTranscriptApiBuild = !hasTranscriptApi
 
 /** UMAP needs more points than neighbours; below this the live view just waits. */
 const LIVE_MIN_SEGMENTS = 5
+/** Stable empty input so the 3D view renders (grid, auto-rotate) before the first layout. */
+const NO_POINTS: [number, number, number][] = []
 
 export default function EmbeddingLayoutViewV8() {
   const [urlInput, setUrlInput] = useState(() => {
@@ -623,17 +625,18 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
           </div>
         )
 
-        const liveThreeDContent = livePoints !== null ? (
+        // The scene (grid, auto-rotate) shows from the start; status text sits over it until the first points arrive
+        const liveThreeDContent = (
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
             <RendererToggle value={rendererType} onChange={chooseRenderer} autoRotate={autoRotate} onAutoRotateChange={chooseAutoRotate} />
-            <ScatterPlot3DLive key={rendererType} renderer={rendererType} glowStrength={glowStrength} points={livePoints} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} showGrid={showGrid} />
-            <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
-              <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
-              <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}{liveCompleted - livePoints.length > 0 ? ` · ${liveCompleted - livePoints.length} waiting` : ''}</div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-text opacity-40 text-sm p-8 text-center">
+            <ScatterPlot3DLive key={rendererType} renderer={rendererType} glowStrength={glowStrength} points={livePoints ?? NO_POINTS} labels={segments ?? []} highlightPosition={highlightIndex} onPointClick={handlePointClick} initialCameraState={cameraStateRef.current ?? undefined} onCameraChange={s => { cameraStateRef.current = s }} lineWidth={lineWidth} nodeSize={nodeSize} autoRotate={autoRotate} autoRotateSpeed={autoRotateSpeed} showGrid={showGrid} />
+            {livePoints !== null ? (
+              <div className="absolute bottom-2 right-2 text-[11px] text-right pointer-events-none leading-tight select-none rounded px-1.5 py-1" style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.75)' }}>
+                <div>{EMBEDDING_MODELS.find(m => m.id === selectedModel)?.label ?? selectedModel.split('/').pop()}</div>
+                <div>{livePoints.length} / {segments?.length ?? 0} segments{liveStatus.status === 'updating' ? ' · updating…' : ''}{liveCompleted - livePoints.length > 0 ? ` · ${liveCompleted - livePoints.length} waiting` : ''}</div>
+              </div>
+            ) : (
+          <div className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm pointer-events-none select-none" style={{ color: 'rgba(255,255,255,0.6)' }}>
             {liveStatus.status === 'model-loading'
               ? `Loading model… ${liveStatus.progress}%`
               : liveStatus.status === 'updating'
@@ -643,6 +646,8 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
               : liveCompleted < LIVE_MIN_SEGMENTS
               ? `Press play — points appear after ${LIVE_MIN_SEGMENTS} segments (${liveCompleted} so far).`
               : 'Embedding…'}
+          </div>
+            )}
           </div>
         )
 
