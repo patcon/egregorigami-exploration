@@ -59,6 +59,7 @@ Entries are in chronological order (oldest first).
 - v8 Config: "UMAP distance" setting (Euclidean, the default, or Cosine) for the 3D projection. Changing it restarts the live layout and also applies to a full "Run embedding"; saved in localStorage (`umap-metric`)
 - Tube and Glow renderers now work in the live views (v8, v9), not just after a full Visualize run: a Renderer selector in the live settings switches between Points + Line, Tube and Glow, and the path rebuilds as the layout tweens. Line width sets the tube's thickness and the glow's trail; v9 dims the inactive session's tube/glow and gains a Glow strength slider. Shared code is in `src/livePathVisuals.ts`.
 - Tube renderer uses the shared blue → cyan → yellow gradient instead of cividis, whose dull grey-olive middle was a leftover from the old white background; renamed "Cividis Tube" to "Tube" in the selectors
+- v9 playheads are red again (both sessions), matching v8; the active session's is still drawn larger
 
 ## Prior work (selected)
 

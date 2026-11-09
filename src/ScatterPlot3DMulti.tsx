@@ -267,9 +267,9 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
 
       const paths = Array.from({ length: trackCount }, () => createPathVisual(rendererStyle, scene, styleRef.current.lineWidth, glow))
 
-      // Playheads: tinted with each session's colour, ringed in white so they stand out from the path
-      const spheres = Array.from({ length: trackCount }, (_, k) => {
-        const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), new THREE.MeshBasicMaterial({ color: trackPalette(k, 1).lerp(new THREE.Color(1, 1, 1), 0.35) }))
+      // Playheads: red like the single-session view (the active one is drawn larger, see applyActiveStyle)
+      const spheres = Array.from({ length: trackCount }, () => {
+        const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff2222 }))
         m.visible = false
         scene.add(m)
         return m
