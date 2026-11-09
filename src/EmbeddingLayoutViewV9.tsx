@@ -282,22 +282,37 @@ export default function EmbeddingLayoutViewV9() {
   const segmentsKeyA = segKey(segmentsA), segmentsKeyB = segKey(segmentsB)
   useEffect(() => { resetLive() }, [segmentsKeyA, segmentsKeyB, selectedModel, umapMetric, resetLive])
 
+  /** Event time (secs) when segment `seg` of session `k` finished being spoken. */
+  const segmentSpokenAt = (k: number, seg: number) => {
+    const s = sessionsRef.current[k]
+    const n = s.words.length
+    if (n === 0) return 0
+    const w = segmentEndWord(seg, n, windowSize, overlapPct)
+    const ts = s.transcript.wordTimestamps
+    if (ts && ts.length > 0) return ts[Math.min(w, ts.length - 1)]
+    return n > 1 && s.totalSecs ? (w / (n - 1)) * s.totalSecs : w
+  }
+
   const [hlA, hlB] = highlights
   useEffect(() => {
-    let appended = false
+    // After a jump ahead, both sessions can have a backlog. Merge them in the order
+    // the segments were spoken (as if the jump hadn't happened), so the worker's
+    // batches grow both paths together instead of finishing one session first.
+    const pending: (Entry & { at: number })[] = []
     let reachedEnd = false
     ;[hlA, hlB].forEach((hl, k) => {
       const segs = k === 0 ? segmentsA : segmentsB
       if (hl === null || segs.length === 0) return
       const passed = Math.min(segs.length, Math.floor(hl) + 1)
       for (let i = completedRef.current[k]; i < passed; i++) {
-        entriesRef.current.push({ track: k, seg: i, text: segs[i] })
-        appended = true
+        pending.push({ track: k, seg: i, text: segs[i], at: segmentSpokenAt(k, i) })
         if (i === segs.length - 1) reachedEnd = true
       }
       completedRef.current[k] = Math.max(completedRef.current[k], passed)
     })
-    if (!appended) return
+    if (pending.length === 0) return
+    pending.sort((x, y) => x.at - y.at || x.track - y.track)
+    for (const { at: _at, ...e } of pending) entriesRef.current.push(e) // eslint-disable-line @typescript-eslint/no-unused-vars
     setEntries([...entriesRef.current])
     const total = entriesRef.current.length
     if (total < LIVE_MIN_SEGMENTS) return
