@@ -68,6 +68,8 @@ Entries are in chronological order (oldest first).
 - v7/v8/v9: a home icon in the URL bar links back to the version index, instead of the link being tucked inside the ⓘ modal. v7 and v8 drop the ⓘ button, since that link was the modal's only content; v9 keeps its modal for the parallel-sessions explanation.
 - v8: the ⓘ button and info modal are back (beside the home icon), now explaining live incremental embedding, with a link to v9
 - v7: the ⓘ button and info modal are back too, now explaining the embedding layout (Visualize, playhead, point clicks, Share), with a link to v8
+- Landing page lists the variants newest first, each with the dates most of its work happened (from git history). The list is now a `VARIANTS` array in `App.tsx`
+- Landing page tagline drops "protein folding"
 
 ## Prior work (selected)
 
