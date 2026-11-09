@@ -20,6 +20,7 @@ import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
 import { hasTranscriptApi } from './env'
 import { UMAP_METRICS, type UmapMetric } from './umapMetric'
+import HomeLink from './HomeLink'
 
 const noTranscriptApiBuild = !hasTranscriptApi
 
@@ -27,12 +28,14 @@ const noTranscriptApiBuild = !hasTranscriptApi
 const LIVE_MIN_SEGMENTS = 5
 /** Stable empty input so the 3D view renders (grid, auto-rotate) before the first layout. */
 const NO_POINTS: [number, number, number][] = []
+/** Pre-filled on first visit so there's something to try without hunting for a video. */
+const DEFAULT_VIDEO_URL = 'https://www.youtube.com/watch?v=HMycIvbhmCU'
 
 export default function EmbeddingLayoutViewV8() {
   const [urlInput, setUrlInput] = useState(() => {
     const qsVideoId = new URLSearchParams(window.location.search).get('videoId')
     if (qsVideoId) return `https://www.youtube.com/watch?v=${qsVideoId}`
-    return localStorage.getItem('yt-url') ?? ''
+    return localStorage.getItem('yt-url') ?? DEFAULT_VIDEO_URL
   })
   const currentVideoId = extractVideoId(urlInput)
   useEffect(() => {
@@ -51,7 +54,7 @@ export default function EmbeddingLayoutViewV8() {
   const [hasTranscriptText, setHasTranscriptText] = useState(() => !!(localStorage.getItem('yt-transcript')?.trim()))
 
   const windowParamsRef = useRef<{ windowSize: number; overlapPct: number; text: string }>({
-    windowSize: 40,
+    windowSize: 100,
     overlapPct: 80,
     text: localStorage.getItem('yt-transcript') ?? '',
   })
@@ -421,20 +424,42 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
       <dialog
         ref={infoDialogRef}
         onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
-        className="m-auto backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(360px,90vw)] shadow-lg"
+        className="m-auto text-left backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-0 w-[min(440px,92vw)] max-h-[90dvh] shadow-lg"
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold m-0">About</h2>
-          <button onClick={() => setInfoOpen(false)} className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none">×</button>
+        <div className="flex flex-col gap-5 p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-text-h m-0">Live incremental embedding</h2>
+              <p className="text-[13px] leading-snug m-0">
+                A talk's transcript is embedded as it plays, as if it were happening live, and its path through
+                the 3D space grows segment by segment.
+              </p>
+            </div>
+            <button
+              onClick={() => setInfoOpen(false)}
+              className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none -mt-1"
+              aria-label="Close"
+            >×</button>
+          </div>
+
+          <ul className="m-0 pl-4 list-disc flex flex-col gap-1.5 text-[13px] leading-snug">
+            <li>Paste a YouTube URL, fetch its transcript, then press play.</li>
+            <li>Segments are embedded once the playhead passes them; each new layout is aligned to the last, so the view stays steady.</li>
+            <li>Turn off <b className="text-text-h">Embed as transcript plays</b> in Config to embed the whole transcript at once with <b className="text-text-h">Visualize</b> instead.</li>
+            <li><b className="text-text-h">Share</b> copies a link with the transcript and any finished 3D layout.</li>
+          </ul>
+
+          <p className="text-[12px] leading-snug opacity-75 m-0">
+            For several talks at once in one shared space, see{' '}
+            <a href="#v9" onClick={() => setInfoOpen(false)} className="text-accent no-underline hover:underline">Parallel Live Sessions →</a>
+          </p>
         </div>
-        <a href="#index" onClick={() => setInfoOpen(false)} className="text-sm text-accent no-underline hover:underline">
-          Version Index →
-        </a>
       </dialog>
 
       {/* URL Bar */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
+          <HomeLink />
           <button
             onClick={() => setInfoOpen(true)}
             className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"

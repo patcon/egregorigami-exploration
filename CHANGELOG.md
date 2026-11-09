@@ -63,6 +63,10 @@ Entries are in chronological order (oldest first).
 - Renderer switch (Lines / Tubes / Glow) and an auto-rotate button are now overlaid on the 3D view in v8 and v9, as well as in Config. Glow is the default renderer in v9 too (v8 already defaulted to it). The v8 static view gets the same renderer switch in place of the dropdown next to "Rerun Viz"; auto-rotate there stays live-only.
 - UMAP distance now defaults to Cosine in v8 and v9 (an explicitly saved "Euclidean" choice is kept)
 - v8/v9 live mode shows the black 3D view (ground grid, auto-rotate, renderer toggle) from the start, with the status text ("Load a transcript…", "Press play…", model loading) overlaid on it until the first points are laid out, instead of plain text on the page background
+- Easier first visit: v9 is now the default landing page; its sessions are pre-filled with two example videos (A: `HMycIvbhmCU`, B: `V1SKd6zmpsw`), and v8 with `HMycIvbhmCU`. Only applies when no URL has been saved yet.
+- Default transcript window is now 100 words (was 40), in v9 and every view using `TranscriptViewer`; a saved window size is kept
+- v7/v8/v9: a home icon in the URL bar links back to the version index, instead of the link being tucked inside the ⓘ modal. v7 and v8 drop the ⓘ button, since that link was the modal's only content; v9 keeps its modal for the parallel-sessions explanation.
+- v8: the ⓘ button and info modal are back (beside the home icon), now explaining live incremental embedding, with a link to v9
 
 ## Prior work (selected)
 

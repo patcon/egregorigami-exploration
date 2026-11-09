@@ -16,6 +16,7 @@ import { loadCached, saveCached } from './usePointsCache'
 import { useUrlHistory } from './useUrlHistory'
 import UrlHistoryInput from './UrlHistoryInput'
 import { hasTranscriptApi } from './env'
+import HomeLink from './HomeLink'
 
 const noTranscriptApiBuild = !hasTranscriptApi
 
@@ -324,15 +325,6 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
     ? `https://www.youtube-transcript.io/videos?id=${currentVideoId}`
     : 'https://www.youtube-transcript.io'
 
-  const [infoOpen, setInfoOpen] = useState(false)
-  const infoDialogRef = useRef<HTMLDialogElement>(null)
-  useEffect(() => {
-    const dialog = infoDialogRef.current
-    if (!dialog) return
-    if (infoOpen) dialog.showModal()
-    else dialog.close()
-  }, [infoOpen])
-
   const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
@@ -347,29 +339,10 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
 
   return (
     <div className="flex flex-col h-[100dvh] overflow-hidden overscroll-none">
-      {/* Info modal */}
-      <dialog
-        ref={infoDialogRef}
-        onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
-        className="m-auto backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(360px,90vw)] shadow-lg"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold m-0">About</h2>
-          <button onClick={() => setInfoOpen(false)} className="text-text opacity-50 hover:opacity-100 bg-transparent border-0 text-xl cursor-pointer leading-none">×</button>
-        </div>
-        <a href="#index" onClick={() => setInfoOpen(false)} className="text-sm text-accent no-underline hover:underline">
-          Version Index →
-        </a>
-      </dialog>
-
       {/* URL Bar */}
       <div className="flex-shrink-0 py-2.5 px-4 border-b border-border flex flex-col gap-1.5">
         <div className="flex gap-2 items-center">
-          <button
-            onClick={() => setInfoOpen(true)}
-            className="flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-bold opacity-40 hover:opacity-80 bg-transparent cursor-pointer text-inherit"
-            aria-label="About"
-          >i</button>
+          <HomeLink />
           <UrlHistoryInput
             value={urlInput}
             onChange={val => {

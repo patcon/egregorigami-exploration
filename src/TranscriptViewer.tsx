@@ -81,7 +81,7 @@ export default function TranscriptViewer({ initialText, initialDuration, onWindo
   const isCollapsed = collapsible && open === false
   const [rawText, setRawText] = useState(() => localStorage.getItem(storagePrefix + 'transcript-raw-text') ?? initialText ?? DEFAULT_TEXT)
   const [text, setText] = useState(() => initialText ?? localStorage.getItem(storagePrefix + 'transcript-text') ?? DEFAULT_TEXT)
-  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '40')
+  const [windowInput, setWindowInput] = useState(() => localStorage.getItem('transcript-window') ?? '100')
   const [windowMode, setWindowMode] = useState<'words' | 'segments'>(() => (localStorage.getItem('transcript-window-mode') as 'words' | 'segments') ?? 'words')
   useEffect(() => {
     if (hideSegmentsMode && windowMode === 'segments') setWindowMode('words')

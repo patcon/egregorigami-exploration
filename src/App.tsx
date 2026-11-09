@@ -74,13 +74,13 @@ function IndexPage() {
           <li>
             <a href="#v8" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Live Incremental Embedding</strong>
-              <span className="text-sm text-text">v7 plus a live mode: segments are embedded as the transcript plays, and the 3D layout animates as it grows. (default)</span>
+              <span className="text-sm text-text">v7 plus a live mode: segments are embedded as the transcript plays, and the 3D layout animates as it grows.</span>
             </a>
           </li>
           <li>
             <a href="#v9" className="flex flex-col gap-1 py-4 px-5 border border-border rounded-lg no-underline text-text-h bg-social-bg transition-[box-shadow,border-color] duration-200 hover:shadow-[var(--shadow)] hover:border-accent-border">
               <strong className="text-base">Parallel Live Sessions</strong>
-              <span className="text-sm text-text">v8's live mode for two videos at once: simulates parallel conference sessions playing together and embedding into one shared 3D space.</span>
+              <span className="text-sm text-text">v8's live mode for up to four videos at once: simulates parallel conference sessions playing together and embedding into one shared 3D space. (default)</span>
             </a>
           </li>
           <li>
@@ -152,7 +152,7 @@ function App() {
   if (hash === '#v9') return <><GitHubCorner /><EmbeddingLayoutViewV9 /></>
   if (hash === '#manual') return <><GitHubCorner /><IndexLink /><ManualEmbeddingProjector /></>
   if (hash === '#index') return <><GitHubCorner /><IndexPage /></>
-  return <><GitHubCorner /><EmbeddingLayoutViewV8 /></>
+  return <><GitHubCorner /><EmbeddingLayoutViewV9 /></>
 }
 
 export default App
