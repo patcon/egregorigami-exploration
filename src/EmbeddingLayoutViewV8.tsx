@@ -412,7 +412,7 @@ const isEmbedding = embedPhase.status === 'model-loading' || embedPhase.status =
       <dialog
         ref={infoDialogRef}
         onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
-        className="backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(360px,90vw)] shadow-lg"
+        className="m-auto backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(360px,90vw)] shadow-lg"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold m-0">About</h2>

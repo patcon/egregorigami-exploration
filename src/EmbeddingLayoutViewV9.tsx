@@ -618,7 +618,7 @@ export default function EmbeddingLayoutViewV9() {
       <dialog
         ref={infoDialogRef}
         onClick={e => { if (e.target === infoDialogRef.current) setInfoOpen(false) }}
-        className="backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(380px,90vw)] shadow-lg"
+        className="m-auto backdrop:bg-black/40 rounded-xl border border-border bg-bg text-text p-6 w-[min(380px,90vw)] shadow-lg"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold m-0">Parallel sessions</h2>
@@ -628,6 +628,18 @@ export default function EmbeddingLayoutViewV9() {
           Simulates two conference sessions running at the same time. Load a video into A and B; both play together
           (the hidden one muted) and are embedded into one shared space as they're spoken. The A/B toggle switches which
           session's video, transcript and playhead you're looking at.
+        </p>
+        <p className="text-sm m-0 mb-3">
+          Need videos? Try the{' '}
+          <a
+            href="https://www.youtube.com/playlist?list=PLdH_E8WPD_iv2OPkVyJESUnfuWD7qPZSE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent no-underline hover:underline"
+          >
+            Living Room Conversations playlist ↗
+          </a>
+          : small-group conversations across differences, good for comparing two discussions side by side.
         </p>
         <a href="#index" onClick={() => setInfoOpen(false)} className="text-sm text-accent no-underline hover:underline">
           Version Index →
