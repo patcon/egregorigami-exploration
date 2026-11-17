@@ -14,6 +14,12 @@ interface Props {
   pointTracks: number[]
   /** Hover label of each point (same order as `points`; may be longer). */
   labels: string[]
+  /**
+   * Stable id of each point (same order as `points`). A point keeps its id when
+   * others are added or dropped, so it tweens from where it was; points whose id
+   * disappears fade out. Defaults to the index.
+   */
+  pointKeys?: number[]
   /** Number of sessions (paths). */
   trackCount: number
   /** Per session: float index along that session's own path (1.7 = 70% between its nodes 1 and 2). */
@@ -81,7 +87,7 @@ function bindBuffers(geo: THREE.BufferGeometry, buf: Buffers) {
  * tween-in-place approach as ScatterPlot3DLive, but each session gets its own
  * coloured path (line, tube or glow) and playhead.
  */
-export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackCount, highlights, activeTrack, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1, showGrid = true, renderer: rendererStyle = 'original', glowStrength = 1 }: Props) {
+export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointKeys, trackCount, highlights, activeTrack, onPointClick, initialCameraState, onCameraChange, lineWidth = DEFAULT_LINE_WIDTH, nodeSize = DEFAULT_NODE_SIZE, autoRotate = false, autoRotateSpeed = 1, showGrid = true, renderer: rendererStyle = 'original', glowStrength = 1 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<{
     camera: THREE.PerspectiveCamera
@@ -96,13 +102,23 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
     bgColor: THREE.Color
   } | null>(null)
   const buffersRef = useRef<Buffers>(makeBuffers(64))
+  /** Points currently shown (slots 0..count-1 of the buffers). */
   const countRef = useRef(0)
+  /** Slots drawn: the shown points plus, during a tween, the ones fading out after them. */
+  const drawCountRef = useRef(0)
+  /** Key and session of each shown slot. */
+  const slotKeysRef = useRef<number[]>([])
+  const slotTracksRef = useRef<number[]>([])
   /** Per session: indices into the shared buffers, in path order. */
   const trackIdxRef = useRef<number[][]>(Array.from({ length: trackCount }, () => []))
+  /** `trackIdxRef` once the fading-out points are gone. */
+  const settledTrackIdxRef = useRef<number[][] | null>(null)
   const tweenStartRef = useRef<number | null>(null)
   const pendingPointsRef = useRef<[number, number, number][] | null>(points)
   const pointTracksRef = useRef(pointTracks)
   useEffect(() => { pointTracksRef.current = pointTracks }, [pointTracks])
+  const pointKeysRef = useRef(pointKeys)
+  useEffect(() => { pointKeysRef.current = pointKeys }, [pointKeys])
 
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; track: number } | null>(null)
   const [followMode, setFollowMode] = useState<FollowMode>(() => initialCameraState?.followMode ?? 'static')
@@ -178,37 +194,74 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
     const s = sceneRef.current
     if (!s) { pendingPointsRef.current = next; return }
     const n = next.length
+    const keys = pointKeysRef.current ?? next.map((_, i) => i)
+    const tracks = pointTracksRef.current
+
+    // Shown points whose key is gone fade out where they are, drawn after the new ones
+    const prevN = countRef.current
+    const prevKeys = slotKeysRef.current
+    const prevTracks = slotTracksRef.current
+    const nextKeys = new Set(keys.slice(0, n))
+    const exiting: number[] = [] // their old slots
+    for (let i = 0; i < prevN; i++) if (!nextKeys.has(prevKeys[i])) exiting.push(i)
+    const total = n + exiting.length
+
     let buf = buffersRef.current
-    if (n > buf.capacity) {
+    if (total > buf.capacity) {
       let cap = buf.capacity
-      while (cap < n) cap *= 2
+      while (cap < total) cap *= 2
       const grown = makeBuffers(cap)
       ;(grown.position.array as Float32Array).set(buf.position.array as Float32Array)
       ;(grown.color.array as Float32Array).set(buf.color.array as Float32Array)
       bindBuffers(s.pointsMesh.geometry, grown)
       buffersRef.current = buf = grown
     }
-    const tracks = pointTracksRef.current
-    const idx: number[][] = Array.from({ length: trackCount }, () => [])
-    for (let i = 0; i < n; i++) idx[tracks[i] ?? 0]?.push(i)
-    trackIdxRef.current = idx
-
-    const prevN = countRef.current
     const pos = buf.position.array as Float32Array
     const col = buf.color.array as Float32Array
-    buf.fromPos.set(pos.subarray(0, n * 3))
-    buf.fromCol.set(col.subarray(0, n * 3))
+    // Where each point is now (possibly mid-tween), before slots get reassigned
+    const oldPos = pos.slice(0, prevN * 3)
+    const oldCol = col.slice(0, prevN * 3)
+    const oldSlot = new Map<number, number>()
+    for (let i = 0; i < prevN; i++) oldSlot.set(prevKeys[i], i)
+
+    const idx: number[][] = Array.from({ length: trackCount }, () => [])
+    for (let i = 0; i < n; i++) idx[tracks[i] ?? 0]?.push(i)
+    const bg = s.bgColor
     idx.forEach((list, k) => list.forEach((i, j) => {
       const c = trackPalette(k, list.length > 1 ? j / (list.length - 1) : 0)
-      buf.toPos[i * 3] = next[i][0]; buf.toPos[i * 3 + 1] = next[i][1]; buf.toPos[i * 3 + 2] = next[i][2]
+      for (let d = 0; d < 3; d++) buf.toPos[i * 3 + d] = next[i][d]
       buf.toCol[i * 3] = c.r; buf.toCol[i * 3 + 1] = c.g; buf.toCol[i * 3 + 2] = c.b
-      if (i >= prevN) {
-        buf.fromPos[i * 3] = next[i][0]; buf.fromPos[i * 3 + 1] = next[i][1]; buf.fromPos[i * 3 + 2] = next[i][2]
-        buf.fromCol[i * 3] = s.bgColor.r; buf.fromCol[i * 3 + 1] = s.bgColor.g; buf.fromCol[i * 3 + 2] = s.bgColor.b
+      const o = oldSlot.get(keys[i])
+      for (let d = 0; d < 3; d++) {
+        // Known points move from where they were; new ones fade in from the background in place
+        buf.fromPos[i * 3 + d] = o !== undefined ? oldPos[o * 3 + d] : next[i][d]
+        buf.fromCol[i * 3 + d] = o !== undefined ? oldCol[o * 3 + d] : [bg.r, bg.g, bg.b][d]
       }
     }))
+
+    // Fading-out points keep their session's path (so its line fades with them) until the tween ends
+    const exitIdx: number[][] = Array.from({ length: trackCount }, () => [])
+    exiting.forEach((o, j) => {
+      const i = n + j
+      exitIdx[prevTracks[o] ?? 0]?.push(i)
+      for (let d = 0; d < 3; d++) {
+        buf.fromPos[i * 3 + d] = buf.toPos[i * 3 + d] = oldPos[o * 3 + d]
+        buf.fromCol[i * 3 + d] = oldCol[o * 3 + d]
+        buf.toCol[i * 3 + d] = [bg.r, bg.g, bg.b][d]
+      }
+    })
+    pos.set(buf.fromPos.subarray(0, total * 3))
+    col.set(buf.fromCol.subarray(0, total * 3))
+    buf.position.needsUpdate = true
+    buf.color.needsUpdate = true
+
+    settledTrackIdxRef.current = exiting.length > 0 ? idx : null
+    trackIdxRef.current = exiting.length > 0 ? idx.map((list, k) => list.length > 0 ? list : exitIdx[k]) : idx
+    slotKeysRef.current = keys.slice(0, n)
+    slotTracksRef.current = Array.from({ length: n }, (_, i) => tracks[i] ?? 0)
     countRef.current = n
-    s.pointsMesh.geometry.setDrawRange(0, n)
+    drawCountRef.current = total
+    s.pointsMesh.geometry.setDrawRange(0, total)
     syncLines()
     tweenStartRef.current = performance.now()
   }
@@ -289,7 +342,7 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
       sceneRef.current = { camera, controls, pointsMesh, pointsMat, paths, glow, spheres, grid, raycaster, bgColor }
       applyActiveStyle()
       if (pendingPointsRef.current) { retarget(pendingPointsRef.current); pendingPointsRef.current = null }
-      else { pointsGeo.setDrawRange(0, countRef.current); syncLines() } // rebuilt scene (StrictMode remount)
+      else { pointsGeo.setDrawRange(0, drawCountRef.current); syncLines() } // rebuilt scene (StrictMode remount)
 
       let animId = 0
       const sphereWasVisible = Array(trackCount).fill(false)
@@ -300,7 +353,7 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
         const now = performance.now()
         const dt = Math.min(0.1, (now - lastFrame) / 1000)
         lastFrame = now
-        const n = countRef.current
+        const n = drawCountRef.current
 
         if (tweenStartRef.current !== null) {
           const b = buffersRef.current
@@ -315,8 +368,17 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
           b.position.needsUpdate = true
           b.color.needsUpdate = true
           pointsGeo.computeBoundingSphere()
+          if (raw >= 1) {
+            tweenStartRef.current = null
+            // Drop the faded-out points and their paths
+            if (settledTrackIdxRef.current) {
+              trackIdxRef.current = settledTrackIdxRef.current
+              settledTrackIdxRef.current = null
+              drawCountRef.current = countRef.current
+              pointsGeo.setDrawRange(0, countRef.current)
+            }
+          }
           syncLines()
-          if (raw >= 1) tweenStartRef.current = null
         }
 
         spheres.forEach((sphere, k) => {
@@ -437,8 +499,9 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, trackC
       -((e.clientY - rect.top) / rect.height) * 2 + 1,
     )
     s.raycaster.setFromCamera(mouse, s.camera)
-    const hits = s.raycaster.intersectObject(s.pointsMesh)
-    return hits.length > 0 ? { idx: hits[0].index!, x: e.clientX - rect.left, y: e.clientY - rect.top } : null
+    // Slots past the shown points are fading out: not hoverable
+    const hit = s.raycaster.intersectObject(s.pointsMesh).find(h => h.index! < countRef.current)
+    return hit ? { idx: hit.index!, x: e.clientX - rect.left, y: e.clientY - rect.top } : null
   }
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {

@@ -35,6 +35,7 @@ const sessionLabel = (k: number) => String.fromCharCode(65 + k)
 const LIVE_MIN_SEGMENTS = 5
 /** Stable empty input so the 3D view renders (grid, auto-rotate) before the first layout. */
 const NO_POINTS: [number, number, number][] = []
+const NO_INDICES: number[] = []
 /** Above this the YouTube players can't keep up, so sessions run on a simulated clock. */
 const MAX_VIDEO_SPEED = 2
 /** A background video further than this from the shared clock gets re-seeked. */
@@ -64,6 +65,17 @@ function highlightForWord(wordIndex: number, nWords: number, segCount: number, w
     if (wordIndex >= ends[i] && wordIndex < ends[i + 1]) return i + (wordIndex - ends[i]) / (ends[i + 1] - ends[i])
   }
   return segCount - 1
+}
+
+/** Eye (shown in the 3D view) or struck-through eye (hidden from it). */
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {off && <line x1="3" y1="3" x2="21" y2="21" />}
+    </svg>
+  )
 }
 
 /** Plain text of a raw transcript (VTT/SRT or pasted text), as the transcript viewer derives it. */
@@ -237,11 +249,29 @@ export default function EmbeddingLayoutViewV9() {
     setSlots(next)
     localStorage.setItem('v9-slots', next.map(k => SESSION_IDS[k]).join(','))
   }
+
+  // Sessions hidden from the 3D view: they keep playing and being embedded, but the
+  // layout is re-run without them, so the rest spread out over the whole view
+  const [hidden, setHidden] = useState<number[]>(() =>
+    (localStorage.getItem('v9-hidden') ?? '').split(',').map(v => SESSION_IDS.indexOf(v as SessionId)).filter(k => k >= 0))
+  const changeHidden = (next: number[]) => {
+    setHidden(next)
+    localStorage.setItem('v9-hidden', next.map(k => SESSION_IDS[k]).join(','))
+  }
+  const shownSlots = slots.filter(k => !hidden.includes(k))
+  /** Sessions laid out in 3D (all of them, should every one somehow be hidden). */
+  const visibleSlots = shownSlots.length > 0 ? shownSlots : slots
+  const isShown = (k: number) => visibleSlots.includes(k)
+  const toggleHidden = (k: number) => {
+    if (hidden.includes(k)) changeHidden(hidden.filter(h => h !== k))
+    else if (visibleSlots.length > 1) changeHidden([...hidden, k].sort())
+  }
   const freeSlot = SESSION_IDS.findIndex((_, k) => !slots.includes(k))
   const addSession = () => {
     if (freeSlot < 0) return
     allSessions[freeSlot].setSeekTarget(eventTime) // start its video where the event is, not at 0
     changeSlots([...slots, freeSlot].sort())
+    if (hidden.includes(freeSlot)) changeHidden(hidden.filter(h => h !== freeSlot))
     switchTo(freeSlot)
   }
   /** Removes the session being shown; the others keep their letters and colours. */
@@ -251,6 +281,7 @@ export default function EmbeddingLayoutViewV9() {
     const next = slots.filter(k => k !== active)
     switchTo(next[Math.min(i, next.length - 1)])
     changeSlots(next)
+    if (hidden.includes(active)) changeHidden(hidden.filter(h => h !== active))
   }
 
   // ?a=<videoId>&b=<videoId>… for the sessions in play
@@ -427,12 +458,22 @@ export default function EmbeddingLayoutViewV9() {
   // them; the worker embeds that growing list incrementally, so all paths are
   // laid out by the same UMAP.
   type Entry = { track: number; seg: number; text: string }
-  const { points: livePoints, status: liveStatus, update: liveUpdate, reset: liveReset } = useLiveEmbedding()
+  const { points: livePoints, indices: liveIndices, status: liveStatus, update: liveUpdate, reset: liveReset } = useLiveEmbedding()
   const entriesRef = useRef<Entry[]>([])
   const [entries, setEntries] = useState<Entry[]>([])
   const completedRef = useRef<number[]>(Array(MAX_SESSIONS).fill(0))  // per session: segments passed (only grows)
   const laidOutRef = useRef(0)                    // entries included in the last layout request
   const [liveEpoch, setLiveEpoch] = useState(0)
+  const visibleKey = visibleSlots.join(',')
+  const visibleRef = useRef(visibleSlots)
+  useEffect(() => { visibleRef.current = visibleSlots })
+
+  /** Ask for a layout of every entry so far (only the visible sessions' are laid out). */
+  const requestLayout = useCallback(() => {
+    const es = entriesRef.current
+    laidOutRef.current = es.length
+    liveUpdate(es.map(e => e.text), selectedModel, umapMetric, { tracks: es.map(e => e.track), visible: visibleRef.current })
+  }, [liveUpdate, selectedModel, umapMetric])
 
   const resetLive = useCallback(() => {
     entriesRef.current = []
@@ -481,18 +522,29 @@ export default function EmbeddingLayoutViewV9() {
     for (const { at: _at, ...e } of pending) entriesRef.current.push(e) // eslint-disable-line @typescript-eslint/no-unused-vars
     setEntries([...entriesRef.current])
     const total = entriesRef.current.length
-    if (total < LIVE_MIN_SEGMENTS) return
-    if (laidOutRef.current === 0 || total - laidOutRef.current >= liveEvery || reachedEnd) {
-      laidOutRef.current = total
-      liveUpdate(entriesRef.current.map(e => e.text), selectedModel, umapMetric)
-    }
+    if (entriesRef.current.filter(e => visibleRef.current.includes(e.track)).length < LIVE_MIN_SEGMENTS) return
+    if (laidOutRef.current === 0 || total - laidOutRef.current >= liveEvery || reachedEnd) requestLayout()
   // highlights/segments are covered by highlightsKey and liveEpoch (a segments change resets and bumps it)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightsKey, liveEpoch, liveEvery, selectedModel, umapMetric, liveUpdate])
+  }, [highlightsKey, liveEpoch, liveEvery, requestLayout])
 
-  const pointTracks = useMemo(() => entries.map(e => e.track), [entries])
-  const pointLabels = useMemo(() => entries.map(e => e.text), [entries])
-  const laidOutPerTrack = allSessions.map((_, k) => livePoints ? pointTracks.slice(0, livePoints.length).filter(t => t === k).length : 0)
+  // Showing/hiding a session re-lays out what's embedded so far, without starting over.
+  // The worker keeps each set of visible sessions' layout, so going back to one is quick.
+  useEffect(() => {
+    if (laidOutRef.current > 0) requestLayout()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey])
+
+  // The layout covers the visible sessions' entries; `liveIndices` says which, in point order
+  const pointKeys = liveIndices ?? NO_INDICES
+  const pointTracks = useMemo(() => pointKeys.map(i => entries[i]?.track ?? 0), [pointKeys, entries])
+  const pointLabels = useMemo(() => pointKeys.map(i => entries[i]?.text ?? ''), [pointKeys, entries])
+  const laidOutPerTrack = allSessions.map((_, k) => pointTracks.filter(t => t === k).length)
+  const visibleEntryCount = entries.filter(e => visibleSlots.includes(e.track)).length
+  const pointKeysRef = useRef(pointKeys)
+  useEffect(() => { pointKeysRef.current = pointKeys }, [pointKeys])
+  // Hidden sessions have no playhead in 3D
+  const plotHighlights = highlights.map((h, k) => isShown(k) ? h : null)
 
   // ─── Interaction ─────────────────────────────────────────────────────────
   const [scrollToWord, setScrollToWord] = useState<{ wordIndex: number; nonce: number } | undefined>(undefined)
@@ -511,7 +563,7 @@ export default function EmbeddingLayoutViewV9() {
 
   // Clicking a point jumps to that moment, switching to its session if needed
   const handlePointClick = useCallback((idx: number) => {
-    const e = entriesRef.current[idx]
+    const e = entriesRef.current[pointKeysRef.current[idx]]
     if (!e) return
     switchTo(e.track)
     seekSessionToSegment(e.track, e.seg)
@@ -592,21 +644,39 @@ export default function EmbeddingLayoutViewV9() {
   // ─── Blocks ──────────────────────────────────────────────────────────────
   const sessionToggle = (
     <div className="flex flex-shrink-0 rounded-md border border-border overflow-hidden" role="tablist" aria-label="Session">
-      {slots.map((k, i) => { const s = allSessions[k]; return (
-        <button
-          key={s.id}
-          role="tab"
-          aria-selected={k === active}
-          onClick={() => switchTo(k)}
-          title={`Show session ${sessionLabel(k)}`}
-          className={`flex items-center gap-1.5 py-1.5 px-2.5 text-[13px] cursor-pointer border-0 whitespace-nowrap tabular-nums ${k === active ? 'bg-accent text-white' : 'bg-code-bg text-text-h hover:bg-border'} ${i > 0 ? 'border-l border-border' : ''}`}
-        >
-          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: TRACK_SWATCHES[k] }} />
-          <span className="font-semibold">{sessionLabel(k)}</span>
-          {/* With 3+ sessions the times would crowd out the URL field on phones */}
-          <span className={`opacity-75 text-[12px] ${slots.length > 2 ? 'hidden sm:inline' : ''}`}>{!s.totalSecs ? '—' : s.ended ? 'ended' : formatTime(s.time)}</span>
-        </button>
-      ) })}
+      {slots.map((k, i) => {
+        const s = allSessions[k]
+        const shown = isShown(k)
+        const lastShown = shown && visibleSlots.length <= 1
+        const colours = k === active ? 'bg-accent text-white' : 'bg-code-bg text-text-h hover:bg-border'
+        return (
+          <div key={s.id} className={`flex ${i > 0 ? 'border-l border-border' : ''}`}>
+            <button
+              role="tab"
+              aria-selected={k === active}
+              onClick={() => switchTo(k)}
+              title={`Show session ${sessionLabel(k)}`}
+              className={`flex items-center gap-1.5 py-1.5 pl-2.5 pr-1 text-[13px] cursor-pointer border-0 whitespace-nowrap tabular-nums ${colours}`}
+            >
+              {/* Hollow swatch: hidden from the 3D view */}
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 box-border" style={shown ? { background: TRACK_SWATCHES[k] } : { border: `1.5px solid ${TRACK_SWATCHES[k]}` }} />
+              <span className="font-semibold">{sessionLabel(k)}</span>
+              {/* With 3+ sessions the times would crowd out the URL field on phones */}
+              <span className={`opacity-75 text-[12px] ${slots.length > 2 ? 'hidden sm:inline' : ''}`}>{!s.totalSecs ? '—' : s.ended ? 'ended' : formatTime(s.time)}</span>
+            </button>
+            <button
+              onClick={() => toggleHidden(k)}
+              disabled={lastShown}
+              aria-pressed={!shown}
+              title={lastShown ? 'At least one session stays in the 3D view' : `${shown ? 'Hide' : 'Show'} session ${sessionLabel(k)} in the 3D view`}
+              aria-label={`${shown ? 'Hide' : 'Show'} session ${sessionLabel(k)} in the 3D view`}
+              className={`flex items-center py-1.5 pl-1 pr-2 cursor-pointer border-0 ${colours} ${shown ? 'opacity-60 hover:opacity-100' : ''} disabled:opacity-25 disabled:cursor-not-allowed`}
+            >
+              <EyeIcon off={!shown} />
+            </button>
+          </div>
+        )
+      })}
       {slots.length > 1 && (
         <button
           onClick={removeActiveSession}
@@ -764,8 +834,9 @@ export default function EmbeddingLayoutViewV9() {
         points={livePoints ?? NO_POINTS}
         pointTracks={pointTracks}
         labels={pointLabels}
+        pointKeys={pointKeys}
         trackCount={MAX_SESSIONS}
-        highlights={highlights}
+        highlights={plotHighlights}
         activeTrack={active}
         onPointClick={handlePointClick}
         initialCameraState={cameraStateRef.current ?? undefined}
@@ -782,12 +853,12 @@ export default function EmbeddingLayoutViewV9() {
         {slots.map(k => (
           <div key={k} className="flex items-center justify-end gap-1">
             <span className="w-2 h-2 rounded-full inline-block" style={{ background: TRACK_SWATCHES[k] }} />
-            {sessionLabel(k)}: {laidOutPerTrack[k]} / {segments[k].length}
+            {sessionLabel(k)}: {isShown(k) ? `${laidOutPerTrack[k]} / ${segments[k].length}` : 'hidden'}
           </div>
         ))}
         <div>
           {liveStatus.status === 'updating' ? 'updating…' : ''}
-          {entries.length - livePoints.length > 0 ? ` ${entries.length - livePoints.length} waiting` : ''}
+          {visibleEntryCount - livePoints.length > 0 ? ` ${visibleEntryCount - livePoints.length} waiting` : ''}
         </div>
       </div>
       ) : (
@@ -798,8 +869,8 @@ export default function EmbeddingLayoutViewV9() {
         ? 'Embedding…'
         : !anyText
         ? 'Load a transcript into at least one session, then press play.'
-        : entries.length < LIVE_MIN_SEGMENTS
-        ? `Press play — points appear after ${LIVE_MIN_SEGMENTS} segments across all sessions (${entries.length} so far).`
+        : visibleEntryCount < LIVE_MIN_SEGMENTS
+        ? `Press play — points appear after ${LIVE_MIN_SEGMENTS} segments across the shown sessions (${visibleEntryCount} so far).`
         : 'Embedding…'}
     </div>
       )}
@@ -868,6 +939,7 @@ export default function EmbeddingLayoutViewV9() {
           <ul className="m-0 pl-4 list-disc flex flex-col gap-1.5 text-[13px] leading-snug">
             <li>Paste a YouTube URL for each session. <b className="text-text-h">+</b> beside the session toggle adds one; <b className="text-text-h">−</b> removes the one you're viewing (the others keep their letters and colours).</li>
             <li>All sessions share one clock; the hidden ones play muted. The toggle picks whose video, transcript and playhead you see.</li>
+            <li>The eye beside a session hides it from the 3D view: the rest are laid out again without it, so they spread out and show more detail. It keeps being embedded, and each combination of sessions is remembered, so switching back is quick.</li>
             <li><b className="text-text-h">Share</b> copies a link to the current sessions, window and overlap.</li>
           </ul>
 
@@ -987,7 +1059,7 @@ export default function EmbeddingLayoutViewV9() {
             {(liveStatus.status === 'updating' || liveStatus.status === 'model-loading') && <div className="spinner" />}
             {liveStatus.status === 'model-loading'
               ? `Loading model… ${liveStatus.progress}%`
-              : `Live: ${livePoints?.length ?? 0} embedded (${slots.map(k => `${sessionLabel(k)} ${laidOutPerTrack[k]}`).join(' · ')})`}
+              : `Live: ${livePoints?.length ?? 0} embedded (${slots.map(k => `${sessionLabel(k)} ${isShown(k) ? laidOutPerTrack[k] : 'hidden'}`).join(' · ')})`}
           </span>
           <select
             className="flex-1 py-1.5 px-2 border border-border rounded-md bg-code-bg text-text-h text-[13px] cursor-pointer focus:outline-2 focus:outline-accent focus:outline-offset-[1px]"

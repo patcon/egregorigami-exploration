@@ -2,7 +2,7 @@ import { UMAP } from 'umap-js'
 import { umapDistanceFn, type UmapMetric } from './umapMetric'
 import { applyTransform, centreAndScale, fitProcrustes, type Vec3 } from './procrustes'
 
-/** RMS radius of the first live layout, in display units. */
+/** RMS radius of a live layout, in display units. */
 const LIVE_RMS_RADIUS = 0.9
 
 export interface LiveLayoutOptions {
@@ -33,16 +33,16 @@ function dot(a: Float32Array, b: Float32Array) {
 }
 
 /**
- * Stable incremental 3D layout for a growing list of (unit-normalised) embedding vectors.
+ * Stable incremental 3D UMAP for a growing list of (unit-normalised) embedding vectors.
  *
- * Each `layout()` warm-starts UMAP from the previous layout (new points start
- * near their most similar existing points), then Procrustes-aligns the result
- * onto the previously displayed frame so the view doesn't flip or spin.
+ * Each `fit()` warm-starts UMAP from the previous fit (new points start near
+ * their most similar existing points) and returns UMAP's own coordinates. When
+ * nothing was added since the last fit, it returns that fit again without
+ * re-running UMAP. Use `alignToDisplayed` to turn the result into view coordinates.
  */
 export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3, metric = 'cosine' }: LiveLayoutOptions = {}) {
   let vectors: Float32Array[] = []
   let prevRaw: Vec3[] = []      // last UMAP output, in UMAP's own coordinates
-  let prevAligned: Vec3[] = []  // last displayed coordinates
 
   /** Starting position for a new point: mean of its 3 most similar already-placed points. */
   const seedPosition = (vec: Float32Array, placed: number, rand: () => number): Vec3 => {
@@ -59,10 +59,11 @@ export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3, met
   return {
     count: () => vectors.length,
     add: (v: Float32Array) => { vectors.push(v) },
-    reset: () => { vectors = []; prevRaw = []; prevAligned = [] },
+    reset: () => { vectors = []; prevRaw = [] },
 
-    layout(): Vec3[] {
+    fit(): Vec3[] {
       const n = vectors.length
+      if (n > 0 && prevRaw.length === n) return prevRaw
       const data = vectors.map(v => Array.from(v))
       const warm = prevRaw.length > 0
       const rand = seededRandom(42)
@@ -89,19 +90,23 @@ export function createLiveLayout({ warmEpochs = 200, warmLearningRate = 0.3, met
       }
 
       for (let e = 0; e < nEpochs; e++) umap.step()
-      const raw = umap.getEmbedding().map(p => [p[0], p[1], p[2]] as Vec3)
-
-      // Rotation/reflection comes from Procrustes (keeps orientation steady); then
-      // re-centre and re-scale so the cloud stays framed as it grows. That last step
-      // is a pure zoom/shift, so it can't introduce flips or spins.
-      const aligned = centreAndScale(
-        warm ? applyTransform(raw, fitProcrustes(raw.slice(0, prevAligned.length), prevAligned)) : raw,
-        LIVE_RMS_RADIUS,
-      )
-
-      prevRaw = raw
-      prevAligned = aligned
-      return aligned
+      prevRaw = umap.getEmbedding().map(p => [p[0], p[1], p[2]] as Vec3)
+      return prevRaw
     },
   }
+}
+
+export type LiveLayout = ReturnType<typeof createLiveLayout>
+
+/**
+ * View coordinates for a fit: rotated/reflected (Procrustes) onto `reference`,
+ * the positions currently on screen for the points that have one, so the view
+ * doesn't flip or spin; then re-centred and re-scaled so the cloud stays framed.
+ * That last step is a pure zoom/shift, so it can't introduce flips or spins.
+ */
+export function alignToDisplayed(raw: Vec3[], reference: (Vec3 | undefined)[]): Vec3[] {
+  const src: Vec3[] = []
+  const tgt: Vec3[] = []
+  reference.forEach((r, i) => { if (r) { src.push(raw[i]); tgt.push(r) } })
+  return centreAndScale(src.length >= 3 ? applyTransform(raw, fitProcrustes(src, tgt)) : raw, LIVE_RMS_RADIUS)
 }

@@ -75,6 +75,7 @@ Entries are in chronological order (oldest first).
 - v9 mobile: the 3D tab no longer rebuilds its scene when you switch sessions or change a session's video; the plot now stays mounted outside the per-session transcript viewer (#22)
 - v9: the session toggle's **−** removes the session you're viewing instead of the last one, and the remaining sessions keep their letters and colours (sessions are now slots A–D; the set in play is stored as `v9-slots`). The 3D plot always has four tracks, so adding or removing a session no longer remounts it (#22)
 - Resizing across the mobile/desktop breakpoint no longer restarts the videos from 0 (v7, v8, v9). The layouts mount the player in different places, so it gets re-created; `YoutubePlayerEmbed` now takes an `initialTime` that it seeks to once the new player is ready. In v9 this also makes a newly added session's video join at the shared time, as it was meant to
+- v9: an eye button beside each session in the toggle hides it from the 3D view. The remaining sessions are laid out again without it, so they spread out and show more detail; existing points tween to their new places and the hidden session's points and path fade out. Hidden sessions keep being embedded, and the worker keeps one layout per set of shown sessions, so switching back to a combination already seen skips UMAP. Stored as `v9-hidden`
 
 ## Prior work (selected)
 

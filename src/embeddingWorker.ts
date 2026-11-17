@@ -1,14 +1,29 @@
 import { UMAP } from 'umap-js'
 import type { WorkerCommand, WorkerEvent } from './embeddingWorker.types'
 import { getEmbedder } from './embedder'
-import { createLiveLayout } from './liveLayout'
-import { umapDistanceFn } from './umapMetric'
+import { alignToDisplayed, createLiveLayout, type LiveLayout } from './liveLayout'
+import type { Vec3 } from './procrustes'
+import { umapDistanceFn, type UmapMetric } from './umapMetric'
 
 const embedderFor = (modelId: string) =>
   getEmbedder(modelId, progress => self.postMessage({ type: 'progress:model-loading', progress } satisfies WorkerEvent))
 
-// Live (incremental) layouts: one session per worker, see liveLayout.ts
-let live = createLiveLayout()
+// Live (incremental) layouts, see liveLayout.ts. Every text is embedded once
+// (whether or not its track is visible); each set of visible tracks gets its own
+// warm-startable layout, kept until reset so toggling a track back is quick.
+const LIVE_MIN_POINTS = 5
+type MaskLayout = { layout: LiveLayout; indices: number[]; scanned: number }
+let vectors: Float32Array[] = []
+let layouts = new Map<string, MaskLayout>()
+/** Positions last sent to the view, by text index (the frame the next result is aligned to). */
+let displayed = new Map<number, Vec3>()
+let liveMetric: UmapMetric = 'cosine'
+
+function resetLive() {
+  vectors = []
+  layouts = new Map()
+  displayed = new Map()
+}
 
 self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
   const cmd = e.data
@@ -42,20 +57,40 @@ let liveKey: string | null = null // model + metric of the current live session
 
 async function handleLive(cmd: Exclude<WorkerCommand, { type: 'embed' }>) {
   if (cmd.type === 'live-reset') {
-    live.reset()
+    resetLive()
     liveKey = null
-  } else {
-    try {
-      const key = `${cmd.modelId}|${cmd.metric}`
-      if (liveKey !== key) { live = createLiveLayout({ metric: cmd.metric }); liveKey = key }
-      const embed = await embedderFor(cmd.modelId)
-      for (let i = live.count(); i < cmd.texts.length; i++) {
-        live.add(await embed(cmd.texts[i]))
-      }
-      const points = live.layout()
-      self.postMessage({ type: 'live-done', requestId: cmd.requestId, points } satisfies WorkerEvent)
-    } catch (err) {
-      self.postMessage({ type: 'live-error', requestId: cmd.requestId, message: String(err) } satisfies WorkerEvent)
+    return
+  }
+  try {
+    const key = `${cmd.modelId}|${cmd.metric}`
+    if (liveKey !== key) { resetLive(); liveMetric = cmd.metric; liveKey = key }
+    const embed = await embedderFor(cmd.modelId)
+    for (let i = vectors.length; i < cmd.texts.length; i++) vectors.push(await embed(cmd.texts[i]))
+
+    const visible = cmd.visible && cmd.tracks ? new Set(cmd.visible) : null
+    const maskKey = visible ? [...visible].sort((a, b) => a - b).join(',') : '*'
+    let mask = layouts.get(maskKey)
+    if (!mask) {
+      mask = { layout: createLiveLayout({ metric: liveMetric }), indices: [], scanned: 0 }
+      layouts.set(maskKey, mask)
     }
+    for (let i = mask.scanned; i < cmd.texts.length; i++) {
+      if (!visible || visible.has(cmd.tracks![i])) { mask.indices.push(i); mask.layout.add(vectors[i]) }
+    }
+    mask.scanned = Math.max(mask.scanned, cmd.texts.length)
+
+    // Too few visible points for UMAP (only possible with a visible-track filter)
+    if (visible && mask.indices.length < LIVE_MIN_POINTS) {
+      displayed = new Map()
+      self.postMessage({ type: 'live-done', requestId: cmd.requestId, points: [], indices: [] } satisfies WorkerEvent)
+      return
+    }
+    // Reuses the cached fit when this set of tracks gained no points since it was last shown
+    const raw = mask.layout.fit()
+    const points = alignToDisplayed(raw, mask.indices.map(i => displayed.get(i)))
+    displayed = new Map(mask.indices.map((i, j) => [i, points[j]]))
+    self.postMessage({ type: 'live-done', requestId: cmd.requestId, points, indices: [...mask.indices] } satisfies WorkerEvent)
+  } catch (err) {
+    self.postMessage({ type: 'live-error', requestId: cmd.requestId, message: String(err) } satisfies WorkerEvent)
   }
 }
