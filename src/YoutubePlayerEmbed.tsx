@@ -18,9 +18,16 @@ interface YoutubePlayerEmbedProps {
   noBottomMargin?: boolean
   /** Mute the player (e.g. a background session in v9). */
   muted?: boolean
+  /**
+   * Where to start, read once when this component mounts (later changes are
+   * ignored, as is a change of video). Lets a view that re-mounts its player,
+   * e.g. when the layout switches between mobile and desktop, carry on from
+   * the current time instead of starting over.
+   */
+  initialTime?: number
 }
 
-export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration, noBottomMargin, muted }: YoutubePlayerEmbedProps) {
+export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, playing, onPlayStateChange, playbackRate, onVideoDuration, noBottomMargin, muted, initialTime }: YoutubePlayerEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<YT.Player | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -29,6 +36,8 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
   const onVideoDurationRef = useRef(onVideoDuration)
   const mutedRef = useRef(muted)
   const playingRef = useRef(playing)
+  // Consumed by the first player created; a later video change starts from 0 as before
+  const initialTimeRef = useRef(initialTime)
   useEffect(() => { mutedRef.current = muted; playingRef.current = playing })
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate
@@ -82,6 +91,10 @@ export default function YoutubePlayerEmbed({ videoId, onTimeUpdate, seekTo, play
             // Only expose the player once it's fully initialized
             playerRef.current = event.target
             if (mutedRef.current) event.target.mute()
+            // A seekTo given before the player was ready was dropped, so resume here
+            const start = initialTimeRef.current
+            initialTimeRef.current = undefined
+            if (start && start > 0) event.target.seekTo(start, true)
             // Join in if playback was already requested before the player was ready
             if (playingRef.current) event.target.playVideo()
             const dur = event.target.getDuration()

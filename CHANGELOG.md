@@ -74,6 +74,7 @@ Entries are in chronological order (oldest first).
 - New embedding model: EmbeddingGemma-300m (`onnx-community/embeddinggemma-300m-ONNX`, q8, ~310 MB download) in every model picker. It goes through `AutoModel` and its own `sentence_embedding` output rather than the mean-pooling pipeline, with the model card's clustering prompt (`task: clustering | query: `) on each segment. Model loading for both the main thread and the worker now lives in `src/embedder.ts`
 - v9 mobile: the 3D tab no longer rebuilds its scene when you switch sessions or change a session's video; the plot now stays mounted outside the per-session transcript viewer (#22)
 - v9: the session toggle's **−** removes the session you're viewing instead of the last one, and the remaining sessions keep their letters and colours (sessions are now slots A–D; the set in play is stored as `v9-slots`). The 3D plot always has four tracks, so adding or removing a session no longer remounts it (#22)
+- Resizing across the mobile/desktop breakpoint no longer restarts the videos from 0 (v7, v8, v9). The layouts mount the player in different places, so it gets re-created; `YoutubePlayerEmbed` now takes an `initialTime` that it seeks to once the new player is ready. In v9 this also makes a newly added session's video join at the shared time, as it was meant to
 
 ## Prior work (selected)
 

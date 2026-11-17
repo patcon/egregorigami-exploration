@@ -646,6 +646,8 @@ export default function EmbeddingLayoutViewV9() {
             onVideoDuration={s.setVideoDuration}
             noBottomMargin={isDesktop}
             muted={k !== active}
+            // Re-mounted on a mobile/desktop layout switch (and mounted when a session is added): join at the shared time
+            initialTime={s.videoEnd ? Math.min(eventTime, s.videoEnd) : eventTime}
           />
         </div>
       ))}
