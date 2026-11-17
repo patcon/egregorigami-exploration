@@ -72,6 +72,8 @@ Entries are in chronological order (oldest first).
 - Landing page tagline drops "protein folding"
 - Transcripts are fetched automatically when the URL names a new video (every YouTube view, via `useYoutubeTranscript`), where the transcript API is available. On page load a transcript already held is kept; a share link that carries its transcript isn't overwritten; a failed fetch isn't retried until the URL changes. The Fetch button still works for a manual retry. v9's own fetch-on-load for query-string videos is folded into this
 - New embedding model: EmbeddingGemma-300m (`onnx-community/embeddinggemma-300m-ONNX`, q8, ~310 MB download) in every model picker. It goes through `AutoModel` and its own `sentence_embedding` output rather than the mean-pooling pipeline, with the model card's clustering prompt (`task: clustering | query: `) on each segment. Model loading for both the main thread and the worker now lives in `src/embedder.ts`
+- v9 mobile: the 3D tab no longer rebuilds its scene when you switch sessions or change a session's video; the plot now stays mounted outside the per-session transcript viewer (#22)
+- v9: the session toggle's **−** removes the session you're viewing instead of the last one, and the remaining sessions keep their letters and colours (sessions are now slots A–D; the set in play is stored as `v9-slots`). The 3D plot always has four tracks, so adding or removing a session no longer remounts it (#22)
 
 ## Prior work (selected)
 
