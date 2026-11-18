@@ -40,6 +40,8 @@ const NO_INDICES: number[] = []
 const MAX_VIDEO_SPEED = 2
 /** A background video further than this from the shared clock gets re-seeked. */
 const MAX_DRIFT_SECS = 1.5
+/** After a seek, how long to wait for the driving video to report the new time before trusting it again. */
+const SEEK_SETTLE_MS = 2000
 
 const noTranscriptApiBuild = !hasTranscriptApi
 
@@ -353,11 +355,19 @@ export default function EmbeddingLayoutViewV9() {
   /** End of the whole event: when the longest session finishes. */
   const eventEnd = Math.max(0, ...sessions.map(s => s.totalSecs ?? s.videoDuration ?? 0))
 
+  /**
+   * The last seek, until the driving video catches up with it. While playing, a
+   * video polled just before its seek lands still reports the old time, which
+   * would pull the clock back (and every playhead with it) for a moment.
+   */
+  const pendingSeekRef = useRef<{ time: number; until: number } | null>(null)
+
   /** Move the shared clock, and every video with it. */
   const seekAll = useCallback((t: number) => {
     const ss = sessionsRef.current
     const end = Math.max(0, ...ss.map(s => s.totalSecs ?? s.videoDuration ?? 0))
     const c = Math.max(0, end > 0 ? Math.min(end, t) : t)
+    pendingSeekRef.current = { time: c, until: performance.now() + SEEK_SETTLE_MS }
     setEventTime(c)
     ss.forEach(s => { if (s.videoId) s.setSeekTarget(s.videoEnd ? Math.min(c, s.videoEnd) : c) })
   }, [])
@@ -392,7 +402,18 @@ export default function EmbeddingLayoutViewV9() {
   const lastCorrectionRef = useRef<number[]>(Array(MAX_SESSIONS).fill(0))
   const handleVideoTime = (k: number, t: number) => {
     if (fastMode) return
-    if (k === driver) { setEventTime(t); return }
+    if (k === driver) {
+      const pending = pendingSeekRef.current
+      if (pending) {
+        const end = allSessions[k].videoEnd
+        const expected = end ? Math.min(pending.time, end) : pending.time
+        // A stale report from before the seek landed: ignore it (unless the seek seems lost)
+        if (Math.abs(t - expected) > MAX_DRIFT_SECS && performance.now() < pending.until) return
+        pendingSeekRef.current = null
+      }
+      setEventTime(t)
+      return
+    }
     const s = allSessions[k]
     const target = eventTime
     const now = performance.now()
