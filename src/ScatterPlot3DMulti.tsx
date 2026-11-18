@@ -131,7 +131,8 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
   /**
    * Per session: where its playhead was along the path when the current layout
    * tween started, so it eases to its new spot in step with the points (null:
-   * not tweening, e.g. after a seek mid-tween). Last target seen, to spot seeks.
+   * not tweening, e.g. after a seek mid-tween). Last target seen, to spot seeks
+   * (NaN right after a new layout, whose growth isn't a seek).
    */
   const sphereFromTRef = useRef<(number | null)[]>(Array(trackCount).fill(null))
   const sphereLastTargetRef = useRef<number[]>(Array(trackCount).fill(0))
@@ -271,6 +272,8 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
     s.pointsMesh.geometry.setDrawRange(0, total)
     syncLines()
     sphereFromTRef.current = sphereTRef.current.slice()
+    // The path just grew, possibly by several segments: don't mistake that for a seek
+    sphereLastTargetRef.current = sphereLastTargetRef.current.map(() => NaN)
     tweenStartRef.current = performance.now()
   }
 
@@ -399,6 +402,7 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
             const target = Math.min(len - 1, Math.max(0, hp))
             const from = sphereFromTRef.current[k]
             // A jump in the target mid-tween is a seek: let it use the quick chase below
+            // (NaN compares false, so the new layout's own jump is eased with the points)
             if (from !== null && Math.abs(target - sphereLastTargetRef.current[k]) > 1) sphereFromTRef.current[k] = null
             sphereLastTargetRef.current[k] = target
             if (!sphereWasVisible[k]) {
