@@ -128,6 +128,13 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
   const highlightsRef = useRef(highlights)
   const activeTrackRef = useRef(activeTrack)
   const sphereTRef = useRef<number[]>(Array(trackCount).fill(0))
+  /**
+   * Per session: where its playhead was along the path when the current layout
+   * tween started, so it eases to its new spot in step with the points (null:
+   * not tweening, e.g. after a seek mid-tween). Last target seen, to spot seeks.
+   */
+  const sphereFromTRef = useRef<(number | null)[]>(Array(trackCount).fill(null))
+  const sphereLastTargetRef = useRef<number[]>(Array(trackCount).fill(0))
   const styleRef = useRef({ lineWidth, nodeSize, autoRotate, autoRotateSpeed, showGrid })
   const glowStrengthRef = useRef(glowStrength)
   useEffect(() => { glowStrengthRef.current = glowStrength }, [glowStrength])
@@ -263,6 +270,7 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
     drawCountRef.current = total
     s.pointsMesh.geometry.setDrawRange(0, total)
     syncLines()
+    sphereFromTRef.current = sphereTRef.current.slice()
     tweenStartRef.current = performance.now()
   }
 
@@ -354,11 +362,14 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
         const dt = Math.min(0.1, (now - lastFrame) / 1000)
         lastFrame = now
         const n = drawCountRef.current
+        // Layout tween progress (null: none running); playheads use it too
+        let tweenK: number | null = null
 
         if (tweenStartRef.current !== null) {
           const b = buffersRef.current
           const raw = Math.min(1, (performance.now() - tweenStartRef.current) / TWEEN_MS)
           const k = easeInOutCubic(raw)
+          tweenK = k
           const pos = b.position.array as Float32Array
           const col = b.color.array as Float32Array
           for (let j = 0; j < n * 3; j++) {
@@ -386,9 +397,18 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
           const len = trackIdxRef.current[k]?.length ?? 0
           if (hp !== null && hp !== undefined && len > 0) {
             const target = Math.min(len - 1, Math.max(0, hp))
-            sphereTRef.current[k] = sphereWasVisible[k]
-              ? sphereTRef.current[k] + (target - sphereTRef.current[k]) * 0.2
-              : target
+            const from = sphereFromTRef.current[k]
+            // A jump in the target mid-tween is a seek: let it use the quick chase below
+            if (from !== null && Math.abs(target - sphereLastTargetRef.current[k]) > 1) sphereFromTRef.current[k] = null
+            sphereLastTargetRef.current[k] = target
+            if (!sphereWasVisible[k]) {
+              sphereTRef.current[k] = target
+            } else if (tweenK !== null && sphereFromTRef.current[k] !== null) {
+              // New layout: ease along the path with the same timing as the points
+              sphereTRef.current[k] = from! + (target - from!) * tweenK
+            } else {
+              sphereTRef.current[k] = sphereTRef.current[k] + (target - sphereTRef.current[k]) * 0.2
+            }
             pathAt(k, sphereTRef.current[k], sphere.position)
             sphere.visible = true
             sphereWasVisible[k] = true
