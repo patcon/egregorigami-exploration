@@ -124,6 +124,12 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
   const [followMode, setFollowMode] = useState<FollowMode>(() => initialCameraState?.followMode ?? 'static')
   const followModeRef = useRef<FollowMode>(initialCameraState?.followMode ?? 'static')
   const prevFollowTargetRef = useRef(new THREE.Vector3())
+  /**
+   * Camera move in progress (switching follow mode or session): the follow
+   * logic steers `toPos`/`toTarget`, and the real camera eases from where it
+   * was to them with the same timing and easing as the point tween.
+   */
+  const camTweenRef = useRef<{ start: number; fromPos: THREE.Vector3; fromTarget: THREE.Vector3; toPos: THREE.Vector3; toTarget: THREE.Vector3 } | null>(null)
   const prevPathTangentRef = useRef(new THREE.Vector3())
   const highlightsRef = useRef(highlights)
   const activeTrackRef = useRef(activeTrack)
@@ -183,6 +189,22 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
       })
       path.update(p, c, idx.length)
     })
+  }
+
+  /** Start easing the camera from where it is now; returns the destination for the follow logic to set. */
+  const startCameraTween = () => {
+    const s = sceneRef.current
+    if (!s) return null
+    const prev = camTweenRef.current
+    camTweenRef.current = {
+      start: performance.now(),
+      fromPos: s.camera.position.clone(),
+      fromTarget: s.controls.target.clone(),
+      // Mid-move: carry on toward the same place, from where the camera is now
+      toPos: prev ? prev.toPos : s.camera.position.clone(),
+      toTarget: prev ? prev.toTarget : s.controls.target.clone(),
+    }
+    return camTweenRef.current
   }
 
   const applyActiveStyle = () => {
@@ -306,9 +328,12 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
         controls.target.set(...initialCameraState.target)
       }
       const onControlsChange = () => {
+        // Mid-move, remember where the camera is headed (a remount picks up from there)
+        const pos = camTweenRef.current?.toPos ?? camera.position
+        const target = camTweenRef.current?.toTarget ?? controls.target
         onCameraChangeRef.current?.({
-          position: [camera.position.x, camera.position.y, camera.position.z],
-          target: [controls.target.x, controls.target.y, controls.target.z],
+          position: [pos.x, pos.y, pos.z],
+          target: [target.x, target.y, target.z],
           followMode: followModeRef.current,
         })
       }
@@ -422,27 +447,40 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
           }
         })
 
-        // Follow the active session's playhead; re-anchor when the active session changes
+        // Follow the active session's playhead. The follow logic steers a logical
+        // camera: the real one, or a camera move's destination while one runs.
         const active = activeTrackRef.current
         const followed = spheres[active]
+        const mode = followModeRef.current
         if (active !== lastFollowed && followed?.visible) {
-          prevFollowTargetRef.current.copy(followed.position)
+          // Glide over to the new session's playhead, keeping the same view of it
+          const tween = mode !== 'static' ? startCameraTween() : null
+          prevFollowTargetRef.current.copy(tween ? tween.toTarget : followed.position)
           prevPathTangentRef.current.set(0, 0, 0)
           lastFollowed = active
         }
-        const mode = followModeRef.current
+        const camTween = camTweenRef.current
+        const camPos = camTween ? camTween.toPos : camera.position
+        const camTarget = camTween ? camTween.toTarget : controls.target
         if (mode === 'tracking' && followed?.visible) {
           const newTarget = followed.position.clone()
-          camera.position.add(newTarget.clone().sub(prevFollowTargetRef.current))
-          controls.target.copy(newTarget)
+          camPos.add(newTarget.clone().sub(prevFollowTargetRef.current))
+          camTarget.copy(newTarget)
           prevFollowTargetRef.current.copy(newTarget)
         } else if (mode === 'following' && followed?.visible && (trackIdxRef.current[active]?.length ?? 0) > 1) {
           const newTarget = followed.position.clone()
-          const offset = camera.position.clone().sub(prevFollowTargetRef.current)
+          const offset = camPos.clone().sub(prevFollowTargetRef.current)
           swingFollowCamera(offset, prevPathTangentRef.current, pathTangentAt(active, sphereTRef.current[active]))
-          camera.position.copy(newTarget).add(offset)
-          controls.target.copy(newTarget)
+          camPos.copy(newTarget).add(offset)
+          camTarget.copy(newTarget)
           prevFollowTargetRef.current.copy(newTarget)
+        }
+        if (camTween) {
+          const raw = Math.min(1, (now - camTween.start) / TWEEN_MS)
+          const k = easeInOutCubic(raw)
+          camera.position.lerpVectors(camTween.fromPos, camTween.toPos, k)
+          controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, k)
+          if (raw >= 1) camTweenRef.current = null
         }
         controls.update(dt)
         if (glow) glow.render(dt, camera.position.distanceTo(controls.target), n, glowStrengthRef.current)
@@ -577,20 +615,25 @@ export default function ScatterPlot3DMulti({ points, pointTracks, labels, pointK
           const s = sceneRef.current
           const active = activeTrackRef.current
           const sphere = s?.spheres[active]
+          // Static leaves the camera where it is; the others glide onto the playhead
+          const tween = next !== 'static' && sphere?.visible ? startCameraTween() : camTweenRef.current
           if (s && sphere?.visible) {
             const cursorPos = sphere.position.clone()
-            if (next === 'following' && (trackIdxRef.current[active]?.length ?? 0) > 1) {
+            if (next === 'following' && tween && (trackIdxRef.current[active]?.length ?? 0) > 1) {
               const tangent = pathTangentAt(active, sphereTRef.current[active])
-              s.camera.position.copy(cursorPos).addScaledVector(tangent, -0.6).add(new THREE.Vector3(0, 0.15, 0))
-              s.controls.target.copy(cursorPos)
+              tween.toPos.copy(cursorPos).addScaledVector(tangent, -0.6).add(new THREE.Vector3(0, 0.15, 0))
+              tween.toTarget.copy(cursorPos)
               prevPathTangentRef.current.copy(tangent)
             }
             prevFollowTargetRef.current.copy(cursorPos)
           }
           if (s) {
+            // Report where the camera is headed, not where it is mid-move
+            const pos = tween ? tween.toPos : s.camera.position
+            const target = tween ? tween.toTarget : s.controls.target
             onCameraChange?.({
-              position: [s.camera.position.x, s.camera.position.y, s.camera.position.z],
-              target: [s.controls.target.x, s.controls.target.y, s.controls.target.z],
+              position: [pos.x, pos.y, pos.z],
+              target: [target.x, target.y, target.z],
               followMode: next,
             })
           }

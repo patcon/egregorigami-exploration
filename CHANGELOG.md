@@ -4,6 +4,7 @@ Entries are in chronological order (oldest first).
 
 ## Unreleased
 
+- v9: the camera glides instead of cutting when you switch to Tracking or Following, and when you switch sessions while following, keeping the same view of the new session's playhead.
 - v9: when a new layout arrives, the red playheads now ease to their new spots with the same timing and easing as the points, instead of racing ahead, including when a layout adds several segments at once. Seeking still moves them quickly.
 - Add download button for 3D embedding points (v3 modal + v5 inline panel) — exports `embeddings-3d.json` once embeddings are complete
 - Sync `?videoId=` querystring in real time as YouTube URL is typed into any view (v2, v3, v4, v5)
